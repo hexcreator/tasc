@@ -6,8 +6,8 @@ This repo is now a credible protocol prototype, not yet a product.
 
 | Target | Estimated Progress | Notes |
 | --- | ---: | --- |
-| MVP mechanics | 100% local / SBF-built | The protocol mechanics now cover signed funded inventory, worker claim before deadline, verifier pass/fail, release, failure refund, timeout refund after deadline while Funded/Claimed, custody scans, and completed settlement index admission. The timeout-aware SBF artifact builds without npm or Cargo dependencies. |
-| Testnet MVP | 97% | Base Sepolia is blocked by faucet friction; Solana devnet now has a finalized CPI-enabled program deploy, finalized token-backed fund transactions admitted with live vault custody, confirmed live claim/attest transactions, confirmed program-signed SPL release and failure-refund transactions, and completed-settlement evidence admitted as `completed` index entries. The remaining live testnet mechanics gap is deploying the timeout-aware artifact and running a fresh live timeout-refund proof; product wallet flows are still outside protocol mechanics. |
+| MVP mechanics | 100% | The protocol mechanics now cover signed funded inventory, worker claim before deadline, verifier pass/fail, release, failure refund, timeout refund after deadline while Funded/Claimed, custody scans, and completed settlement index admission. All of those paths are implemented, validated, SBF-built, and live-proven on Solana devnet. |
+| Testnet MVP mechanics | 100% | Solana devnet now has finalized CPI-enabled program deploys, finalized token-backed fund transactions admitted with live vault custody, confirmed live claim/attest transactions, confirmed program-signed SPL release, failure-refund, and timeout-refund transactions, and completed-settlement evidence admitted as `completed` index entries. Product wallet flows are still outside protocol mechanics. |
 | Private beta product | 25% | Missing buyer/worker wallet flows, real task inventory, verifier service, reputation, disputes, and durable metadata. |
 | Production decentralized marketplace | 10% | Missing decentralization, economic security, audits, abuse controls, governance, and real liquidity/demand. |
 
@@ -43,18 +43,18 @@ This repo is now a credible protocol prototype, not yet a product.
 - A reusable completed-settlement scanner now emits `tasc.settlement.solana.spl_token` evidence at `examples/solana-devnet/summarize_url_spl.settlement.live.json`, and the indexer admits it as `completed` at `examples/index/solana.spl.release.index.json` rather than re-admitting it as claimable inventory.
 - A fresh failed-task refund proof confirmed on devnet: funding `5EjrMf1vZifxJCufdVJRgx9ZSBASLS4j7vejXQ8wtYdEwR9La9YYFECc8o5rEQZ2GnNs4TNN8KQfXwofJuEqgnuu`, claim `5bk9oGPPbC7wyEv1JyBAXwKcKrqii36hQNQBW8SfSWiFiG3FgEGiBtgNTLaviy3TWvywhZjCz2uuGNPHFLjzQPbP`, fail attest `7gS9gQXJhwUpqsW65Wu83wV13U8UxwPwQ3dgk5wVLApWtJEJknbCXtHp1egE6UsPRhEccYdCG2Jp4oo6TwfhVfP`, and refund `TmTDr1U2GKRdPQm1oq6CSDXs3nuuxiNyDFAY9wryjSdRQpgb8oBnghbYDzaEHH5V8GyAoPNsQxALevXxfKpcqxk`; the task account `CDK1cd9ghTj1Je8yXEVXZmDWJijJFQmctoNXKv9rqTZw` is `Refunded`, vault `9TmntNGZPy2Pnj3kiRM8CNdbaxiFMcV85s7V2cwLWZbB` is `0`, and buyer token account `3Vho8KJa6gfMMFi3LQk5EJPrComjZiHmCMb7BX7Scqxf` holds `10000000`.
 - The completed-settlement scanner now validates both release and refund evidence; the refund evidence lives at `examples/solana-devnet/summarize_url_refund_job_spl.settlement.live.json` and admits as `completed` at `examples/index/solana.spl.refund.index.json`.
-- The latest SBF artifact at `build/solana/global_tasc_solana_program.so` includes Clock-backed claim and timeout refund mechanics. `npm run solana:deploy-plan` reports it is ready to deploy to program `FAqKhKke5pZr4TK6kXq9aKR98hWFy19SMQG9eGfXQrRM`, but the live deploy transaction was blocked by the approval system before execution.
+- The timeout-aware program deploy confirmed at `5sMn9YWpGjzFGYRTQtzZTMp5M1dm7z4nNLavUfFR17GRAQBxUyjFNAdRMTRi7kH9WBNECmXKtyxmWJMiz8ixmgLG`. A fresh overdue task then funded at `D6RG18ofYQSpJzaQPAJQHZW7XZBRe674YEYrjUETLYGnB1et8pHc3nWa855AdwxRfLuqUQcc9D9rW9jntuVL7fY` and timeout-refunded at `56eyY1wgLnS3TdScJ6ciVpVY8bDXMCCt6v3jZEYvbzcaAmENVeRYKPZ5ekC13vfR65BZvizzwdigNULqT1FD9iGa`, moving task account `F2jbuu49cAxc9eDC9jGrQ1TDq8Mb5Ei79UL3Lz6AR4v` from `Funded` to `Refunded`, emptying vault `Cx8EbkKKtK4babifUxkx45YVoze6aPxX6Q71T9a3VyUR`, and restoring `10000000` token base units to buyer token account `4G9eWtjdL8sbLL6gBb2ioABZrbkxxrcr7wQZAK8UGdmz` without worker claim or verifier failure.
 - The current npm dependency tree has no production vulnerabilities, all 17 registry signatures verify, and 2 registry attestations verify.
 
 ## Biggest Missing Pieces
 
-1. Live timeout proof: deploy the timeout-aware SBF artifact and capture a fresh overdue-task timeout refund transaction.
-2. Verifier service: deterministic verifier runners, artifact storage, result attestations, and paid verifier incentives.
-3. Reputation and abuse controls: worker/buyer/verifier histories, duplicate detection, bonds, rate limits, and spam economics.
-4. Dispute path: reviewer selection, evidence packaging, deadlines, and appeal/ruling settlement.
-5. Product surfaces: buyer task creation, worker claim UI, wallet flows, notifications, and support tooling.
-6. Decentralization: multiple indexers, gossip or replication, slashing/attestation rules, and censorship resistance.
-7. Security hardening: contract tests, fuzzing, external audit, key management, dependency pinning policy, and incident response.
+1. Verifier service: deterministic verifier runners, artifact storage, result attestations, and paid verifier incentives.
+2. Reputation and abuse controls: worker/buyer/verifier histories, duplicate detection, bonds, rate limits, and spam economics.
+3. Dispute path: reviewer selection, evidence packaging, deadlines, and appeal/ruling settlement.
+4. Product surfaces: buyer task creation, worker claim UI, wallet flows, notifications, and support tooling.
+5. Decentralization: multiple indexers, gossip or replication, slashing/attestation rules, and censorship resistance.
+6. Security hardening: contract tests, fuzzing, external audit, key management, dependency pinning policy, and incident response.
+7. Reproducibility: package the live devnet proof path into a single guarded script with fixture cleanup and duplicate-task suppression.
 
 ## Practical Distance
 
@@ -64,6 +64,6 @@ The fastest useful path is not full decentralization first. It is a narrow testn
 buyer signs and funds -> scanner batch -> index admission -> worker claims before deadline -> verifier attests -> escrow releases/refunds or buyer timeout-refunds after deadline
 ```
 
-The happy-path and failed-task Solana testnet loops now work at protocol level, and timeout refund mechanics work in source/validators/SBF. A production system that can safely support a global market for instant `$10` work is still much farther: likely months of focused buildout after live timeout/dispute paths work, because the hard parts become abuse resistance, demand liquidity, dispute quality, and reliable user experience.
+The happy-path, failed-task refund, and timeout-refund Solana testnet loops now work at protocol level. A production system that can safely support a global market for instant `$10` work is still much farther: likely months of focused buildout after dispute/product paths work, because the hard parts become abuse resistance, demand liquidity, dispute quality, and reliable user experience.
 
-If Solana is the preferred path, the next increment is now concrete: run the live timeout refund proof as soon as devnet deploy approval is available, then make the live task loop usable through wallet-backed product flows.
+If Solana is the preferred path, the next increment is now concrete: package the live proof path, then make the live task loop usable through wallet-backed product flows.

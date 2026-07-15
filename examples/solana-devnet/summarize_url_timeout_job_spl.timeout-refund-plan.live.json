@@ -1,0 +1,72 @@
+{
+  "ok": true,
+  "mode": "plan-timeout-refund",
+  "signed_intent": "examples/solana-devnet/summarize_url_timeout_job.signature.json",
+  "task_account_file": "examples/solana-devnet/summarize_url_timeout_job_spl.task-account.live.json",
+  "funding_file": "examples/solana-devnet/summarize_url_timeout_job_spl.funding.live.json",
+  "sends_transactions": false,
+  "token_movement": "planned_not_sent",
+  "cpi_required": true,
+  "cluster": "devnet",
+  "program_id": "FAqKhKke5pZr4TK6kXq9aKR98hWFy19SMQG9eGfXQrRM",
+  "token_program_id": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+  "task_account": "F2jbuu49cAxc9eDC9jGrQ1TDq8Mb5Ei79UL3Lz6AR4v",
+  "task_status": "Funded",
+  "now_unix": "1784149012",
+  "deadline_unix": "1700000060",
+  "vault_token_account": "Cx8EbkKKtK4babifUxkx45YVoze6aPxX6Q71T9a3VyUR",
+  "vault_authority": "EYb1YCuF2QkzyFN3PpdDAM9VCtnaDfyqBjrVNgR8tjk8",
+  "vault_authority_bump": 252,
+  "vault_authority_seeds": [
+    "global-tasc-vault",
+    "0xca11e5a9a33628bbc8401c480eab319085a0ba5a08ee66c3d7adce5debd2a84f",
+    "Emteqou7zpWD42vbKNrbxjyCFCGzfC9MLkrQrq9ZUDRT",
+    "252"
+  ],
+  "destination_token_account": "4G9eWtjdL8sbLL6gBb2ioABZrbkxxrcr7wQZAK8UGdmz",
+  "destination_owner": "6Apg3YonZ8yCnhSnEVPx3EoUZYnhH9297EuCf5A1beTR",
+  "destination_role": "buyer",
+  "destination_ready": true,
+  "token_mint": "Emteqou7zpWD42vbKNrbxjyCFCGzfC9MLkrQrq9ZUDRT",
+  "amount": "10000000",
+  "token_decimals": 6,
+  "transfer_checked": {
+    "name": "spl_token.transfer_checked",
+    "program_id": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "accounts": [
+      {
+        "pubkey": "Cx8EbkKKtK4babifUxkx45YVoze6aPxX6Q71T9a3VyUR",
+        "signer": false,
+        "writable": true
+      },
+      {
+        "pubkey": "Emteqou7zpWD42vbKNrbxjyCFCGzfC9MLkrQrq9ZUDRT",
+        "signer": false,
+        "writable": false
+      },
+      {
+        "pubkey": "4G9eWtjdL8sbLL6gBb2ioABZrbkxxrcr7wQZAK8UGdmz",
+        "signer": false,
+        "writable": true
+      },
+      {
+        "pubkey": "EYb1YCuF2QkzyFN3PpdDAM9VCtnaDfyqBjrVNgR8tjk8",
+        "signer": true,
+        "writable": false
+      }
+    ],
+    "data_hex": "0x0c809698000000000006",
+    "decoded_data": {
+      "name": "transfer_checked",
+      "tag": 12,
+      "amount": "10000000",
+      "decimals": 6
+    }
+  },
+  "lifecycle_send_requirements": [
+    "run the guarded lifecycle timeout-refund sender with the same settlement accounts plus Clock sysvar",
+    "program signs the CPI as the vault_authority PDA with the documented seeds",
+    "task account transitions to Released or Refunded only after the CPI succeeds"
+  ],
+  "key_material_printed": false
+}

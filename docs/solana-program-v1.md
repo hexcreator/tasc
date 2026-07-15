@@ -158,7 +158,7 @@ The live scanner reads that deterministic task account with `getAccountInfo`, de
 
 ## Next Step
 
-The guarded deploy/fund/scan/claim/attest/release sequence has been executed on devnet, and release evidence now admits as a completed index entry. A separate fresh failed-task run has also executed `claim -> fail attest -> refund`, drained the PDA-owned vault, restored `10000000` token base units to the buyer token account, and admitted refund evidence as a completed index entry. Timeout refund mechanics are implemented in source, validators, CLI builders, and the latest SBF artifact. The next live step is deploying that artifact and running a fresh overdue-task timeout refund proof.
+The guarded deploy/fund/scan/claim/attest/release sequence has been executed on devnet, and release evidence now admits as a completed index entry. A separate fresh failed-task run has also executed `claim -> fail attest -> refund`, drained the PDA-owned vault, restored `10000000` token base units to the buyer token account, and admitted refund evidence as a completed index entry. Timeout refund has also been executed on a fresh overdue funded task, proving `Funded -> Refunded` with Clock sysvar and SPL CPI. The next implementation step is packaging these live mechanics into a reproducible end-to-end proof script and browser wallet flow.
 
 Run:
 

@@ -1,0 +1,50 @@
+{
+  "kind": "tasc.index",
+  "version": "0.1",
+  "entries": [
+    {
+      "kind": "tasc.index.entry",
+      "version": "0.1",
+      "status": "completed",
+      "completed_status": "Refunded",
+      "admitted_at": "1970-01-01T00:00:00.000Z",
+      "intent_hash": "sha256:9042d30214eebef530c8fe0e474745eda455086d9f7156be1a36e01014557fce",
+      "task_hash": "0xca11e5a9a33628bbc8401c480eab319085a0ba5a08ee66c3d7adce5debd2a84f",
+      "settlement": {
+        "chain": "solana",
+        "cluster": "devnet",
+        "program_id": "FAqKhKke5pZr4TK6kXq9aKR98hWFy19SMQG9eGfXQrRM",
+        "task_pda": "F2jbuu49cAxc9eDC9jGrQ1TDq8Mb5Ei79UL3Lz6AR4v",
+        "vault": "Cx8EbkKKtK4babifUxkx45YVoze6aPxX6Q71T9a3VyUR",
+        "token_program_id": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+        "vault_authority": "EYb1YCuF2QkzyFN3PpdDAM9VCtnaDfyqBjrVNgR8tjk8",
+        "destination_token_account": "4G9eWtjdL8sbLL6gBb2ioABZrbkxxrcr7wQZAK8UGdmz",
+        "destination_owner": "6Apg3YonZ8yCnhSnEVPx3EoUZYnhH9297EuCf5A1beTR",
+        "destination_role": "buyer"
+      },
+      "buyer": "6Apg3YonZ8yCnhSnEVPx3EoUZYnhH9297EuCf5A1beTR",
+      "worker": "11111111111111111111111111111111",
+      "token_mint": "Emteqou7zpWD42vbKNrbxjyCFCGzfC9MLkrQrq9ZUDRT",
+      "amount": "10000000",
+      "deadline_unix": "1700000060",
+      "verifier": "3Siw3mYu8yQVaZ8qvXH5z4quyhhk6vBySn5d3KhNW9Tt",
+      "nonce": "1",
+      "completed_settlement": {
+        "kind": "tasc.settlement.solana.spl_token",
+        "action": "refund",
+        "status": "Refunded",
+        "signature": "56eyY1wgLnS3TdScJ6ciVpVY8bDXMCCt6v3jZEYvbzcaAmENVeRYKPZ5ekC13vfR65BZvizzwdigNULqT1FD9iGa",
+        "slot": "476519263",
+        "instruction_index": "0",
+        "confirmation_status": "confirmed",
+        "vault_balance_after": "0",
+        "destination_balance_after": "10000000",
+        "result_hash": "0x0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "signature": {
+        "signer": "6Apg3YonZ8yCnhSnEVPx3EoUZYnhH9297EuCf5A1beTR",
+        "valid": true
+      }
+    }
+  ]
+}

@@ -153,7 +153,7 @@ signed intent -> SPL vault custody -> funded task account -> scanner -> claimabl
 
 The current Solana program and CLI support program-signed SPL Token `TransferChecked` CPI for `release` and `refund`. Live devnet proofs have released `10000000` token base units from a PDA-owned vault to the worker token account, and refunded `10000000` token base units from a fresh failed task back to the buyer token account.
 
-The timeout-aware Solana artifact also enforces Clock-backed claim deadlines and timeout refund eligibility for `Funded` or `Claimed` tasks. The deployable SBF artifact is built locally; the live timeout-refund devnet transaction is pending deploy approval.
+The timeout-aware Solana artifact also enforces Clock-backed claim deadlines and timeout refund eligibility for `Funded` or `Claimed` tasks. A live devnet timeout refund proof now refunds an overdue funded task back to the buyer without a worker claim or verifier failure.
 
 ## Repository Map
 
@@ -193,8 +193,8 @@ The near-term product should not be "ask the world for $10." It should be "claim
 The best first contributions are narrow and verifiable:
 
 - harden live Solana `claim`, `attest`, `release`, and `refund`
-- run and document the live Solana timeout-refund proof
 - add dispute handling around release/refund eligibility
+- harden duplicate-task, finality, and concurrency handling around the live Solana proofs
 - turn the static task feed into a public demo
 - add more TascLang task examples with deterministic verifier rules
 - build an indexer process that watches live Solana task accounts

@@ -1,0 +1,36 @@
+{
+  "kind": "tasc.solana.program.account.live",
+  "version": "0.1",
+  "pubkey": "F2jbuu49cAxc9eDC9jGrQ1TDq8Mb5Ei79UL3Lz6AR4v",
+  "owner": "FAqKhKke5pZr4TK6kXq9aKR98hWFy19SMQG9eGfXQrRM",
+  "executable": false,
+  "lamports": "2811840",
+  "rent_epoch": "18446744073709552000",
+  "data_base64": "/lqbGiDwjwMBAQAAyhHlqaM2KLvIQBxIDqsxkIWguloI7mbD163OXevSqE9MzpDujxv2lH4hvDM8N12p8JWVz/k/fts30eritGAHIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAJE5OfCWf/Pzdv87HRmKX/e1efWthYq/LTEXFmLo7Jo/Mp+OlX1BKRXy0Lrxfzid6pTOEk+xYNY1AI/KL7B138rGPrkQdpJzv6UZhe7qQ/hjywlCrCT6xDXvswTh1Uqk2gJaYAAAAAAA88VNlAAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+  "context": {
+    "slot": "476519188",
+    "api_version": "4.1.0-rc.1"
+  },
+  "decoded": {
+    "kind": "tasc.solana.task_account",
+    "version": "0.1",
+    "program_id": "FAqKhKke5pZr4TK6kXq9aKR98hWFy19SMQG9eGfXQrRM",
+    "task_pda": "F2jbuu49cAxc9eDC9jGrQ1TDq8Mb5Ei79UL3Lz6AR4v",
+    "status": "Funded",
+    "status_code": 1,
+    "bump": 0,
+    "flags": 0,
+    "task_hash": "0xca11e5a9a33628bbc8401c480eab319085a0ba5a08ee66c3d7adce5debd2a84f",
+    "buyer": "6Apg3YonZ8yCnhSnEVPx3EoUZYnhH9297EuCf5A1beTR",
+    "worker": "11111111111111111111111111111111",
+    "verifier": "3Siw3mYu8yQVaZ8qvXH5z4quyhhk6vBySn5d3KhNW9Tt",
+    "token_mint": "Emteqou7zpWD42vbKNrbxjyCFCGzfC9MLkrQrq9ZUDRT",
+    "vault": "Cx8EbkKKtK4babifUxkx45YVoze6aPxX6Q71T9a3VyUR",
+    "amount": "10000000",
+    "deadline_unix": "1700000060",
+    "nonce": "1",
+    "result_hash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+    "created_slot": "0",
+    "updated_slot": "0"
+  }
+}

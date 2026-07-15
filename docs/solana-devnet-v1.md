@@ -372,6 +372,33 @@ settlement index:     examples/index/solana.spl.refund.index.json
 
 The refund proof uses two task hashes on purpose. `summarize_url_refund.tasc` creates a fresh SPL mint and buyer token setup; `summarize_url_refund_job.tasc` is the actual funded task, so its deterministic vault account is fresh when funding runs.
 
+Current live SPL timeout-refund proof:
+
+```text
+timeout deploy tx:       5sMn9YWpGjzFGYRTQtzZTMp5M1dm7z4nNLavUfFR17GRAQBxUyjFNAdRMTRi7kH9WBNECmXKtyxmWJMiz8ixmgLG
+setup tx:                4uR2z2BPZwa1y5YmowbKuVoNUbdsRXtJBJBo6v4QxKGbh1YQAf2fCu91kpLbghY9D2LM6Le6LWVkPYeRRuXRjRNH
+fund tx:                 D6RG18ofYQSpJzaQPAJQHZW7XZBRe674YEYrjUETLYGnB1et8pHc3nWa855AdwxRfLuqUQcc9D9rW9jntuVL7fY
+timeout-refund tx:       56eyY1wgLnS3TdScJ6ciVpVY8bDXMCCt6v3jZEYvbzcaAmENVeRYKPZ5ekC13vfR65BZvizzwdigNULqT1FD9iGa
+task account:            F2jbuu49cAxc9eDC9jGrQ1TDq8Mb5Ei79UL3Lz6AR4v
+signed deadline:         1700000060
+pre-refund status:       Funded
+post-refund status:      Refunded
+worker:                  11111111111111111111111111111111
+result hash:             0x0000000000000000000000000000000000000000000000000000000000000000
+vault token balance:     0
+buyer token balance:     10000000
+mint:                    Emteqou7zpWD42vbKNrbxjyCFCGzfC9MLkrQrq9ZUDRT
+timeout vault:           Cx8EbkKKtK4babifUxkx45YVoze6aPxX6Q71T9a3VyUR
+buyer token account:     4G9eWtjdL8sbLL6gBb2ioABZrbkxxrcr7wQZAK8UGdmz
+deploy output:           examples/solana-devnet/summarize_url_timeout_spl.deploy.live.json
+funding evidence:        examples/solana-devnet/summarize_url_timeout_job_spl.funding.live.json
+timeout refund output:   examples/solana-devnet/summarize_url_timeout_job_spl.timeout-refund.live.json
+settlement evidence:     examples/solana-devnet/summarize_url_timeout_job_spl.settlement.live.json
+settlement index:        examples/index/solana.spl.timeout-refund.index.json
+```
+
+This proof exercises the timeout branch directly from `Funded -> Refunded`; no worker claim and no verifier failure are involved. The program accepts the same refund instruction tag with Clock sysvar as account 8, validates `now >= deadline_unix`, signs the SPL `TransferChecked` CPI as the vault authority PDA, and drains the vault back to the buyer token account.
+
 ## Scanner Shape
 
 The EVM scanner reads `Funded` logs. The Solana scanner reads task account state:
@@ -388,10 +415,10 @@ Solana devnet now works well enough to continue on the faster-chain path. The co
 
 The next real implementation step is:
 
-1. Deploy the timeout-aware SBF artifact and run a fresh live overdue-task timeout refund proof.
-2. Add wallet-backed browser claim/attest controls once the static proof should become interactive.
-3. Keep the browser/static index path chain-neutral by admitting Solana and EVM evidence through the same indexer boundary.
-4. Add production-style finality/reorg handling and duplicate-task suppression before treating devnet behavior as production-ready.
-5. Start dispute-path design once pass/fail/timeout settlement is live-proven.
+1. Add wallet-backed browser claim/attest controls once the static proof should become interactive.
+2. Keep the browser/static index path chain-neutral by admitting Solana and EVM evidence through the same indexer boundary.
+3. Add production-style finality/reorg handling and duplicate-task suppression before treating devnet behavior as production-ready.
+4. Start dispute-path design now that pass/fail/timeout settlement is live-proven.
+5. Package a reproducible devnet proof script that runs the whole mechanics loop end to end.
 
 That gives Global Tasc a credible faster-chain path without throwing away the EVM work.

@@ -1,0 +1,20 @@
+tasc summarize_url_timeout {
+  version "0.1"
+  reward 10 USDC
+  deadline 60s
+
+  input url string
+  output markdown string
+
+  verify {
+    min_words 120
+    contains_citation input.url
+    no_duplicate worker
+  }
+
+  payout {
+    pass -> worker
+    timeout -> buyer
+    dispute -> reviewers(3)
+  }
+}

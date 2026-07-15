@@ -1,0 +1,31 @@
+{
+  "ok": true,
+  "mode": "send",
+  "rpc_host": "solana-devnet.g.alchemy.com",
+  "sends_transactions": true,
+  "cluster": "devnet",
+  "buyer": "6Apg3YonZ8yCnhSnEVPx3EoUZYnhH9297EuCf5A1beTR",
+  "program_id": "FAqKhKke5pZr4TK6kXq9aKR98hWFy19SMQG9eGfXQrRM",
+  "token_program_id": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+  "mint": "Emteqou7zpWD42vbKNrbxjyCFCGzfC9MLkrQrq9ZUDRT",
+  "buyer_token_account": "4G9eWtjdL8sbLL6gBb2ioABZrbkxxrcr7wQZAK8UGdmz",
+  "vault_token_account": "4iZcmq58YNwPKR24z9GE1PeuhkqEfuN3PR1VqfREhdhp",
+  "vault_authority": "4xB819aBgJGkoYiungJBSkGNZotduviTd2ruqQ3uyy7c",
+  "vault_authority_bump": 253,
+  "mint_rent_lamports": "1461600",
+  "token_account_rent_lamports": "2039280",
+  "mint_amount": "10000000",
+  "token_decimals": 6,
+  "instructions": [
+    "create_mint_account",
+    "spl_token.initialize_mint2",
+    "create_buyer_token_account",
+    "spl_token.initialize_account3",
+    "create_vault_token_account",
+    "spl_token.initialize_account3",
+    "spl_token.mint_to_checked"
+  ],
+  "signature": "4uR2z2BPZwa1y5YmowbKuVoNUbdsRXtJBJBo6v4QxKGbh1YQAf2fCu91kpLbghY9D2LM6Le6LWVkPYeRRuXRjRNH",
+  "confirmation_status": "confirmed",
+  "key_material_printed": false
+}

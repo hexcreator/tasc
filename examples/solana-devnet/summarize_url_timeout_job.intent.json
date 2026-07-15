@@ -1,0 +1,32 @@
+{
+  "kind": "tasc.intent.solana",
+  "version": "0.1",
+  "task_file": "examples/summarize_url_timeout_job.tasc",
+  "task_name": "summarize_url_timeout_job",
+  "display_reward": {
+    "amount": "10",
+    "currency": "USDC"
+  },
+  "chain_reward": {
+    "amount": "10000000",
+    "decimals": 6,
+    "token_mint": "Emteqou7zpWD42vbKNrbxjyCFCGzfC9MLkrQrq9ZUDRT"
+  },
+  "relative_deadline": {
+    "raw": "60s",
+    "seconds": 60
+  },
+  "generated_at_unix": 1700000000,
+  "message": {
+    "cluster": "devnet",
+    "program_id": "FAqKhKke5pZr4TK6kXq9aKR98hWFy19SMQG9eGfXQrRM",
+    "buyer": "6Apg3YonZ8yCnhSnEVPx3EoUZYnhH9297EuCf5A1beTR",
+    "task_hash": "0xca11e5a9a33628bbc8401c480eab319085a0ba5a08ee66c3d7adce5debd2a84f",
+    "token_mint": "Emteqou7zpWD42vbKNrbxjyCFCGzfC9MLkrQrq9ZUDRT",
+    "amount": "10000000",
+    "deadline_unix": "1700000060",
+    "verifier": "3Siw3mYu8yQVaZ8qvXH5z4quyhhk6vBySn5d3KhNW9Tt",
+    "nonce": "1"
+  },
+  "intent_hash": "sha256:9042d30214eebef530c8fe0e474745eda455086d9f7156be1a36e01014557fce"
+}

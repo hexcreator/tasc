@@ -23,6 +23,17 @@ const CASES = [
     action: "refund",
     destinationRole: "buyer",
   },
+  {
+    name: "timeout-refund",
+    signed: "examples/solana-devnet/summarize_url_timeout_job.signature.json",
+    tx: "examples/solana-devnet/summarize_url_timeout_job_spl.timeout-refund.live.json",
+    settlement: "examples/solana-devnet/summarize_url_timeout_job_spl.settlement.live.json",
+    status: "Refunded",
+    action: "refund",
+    destinationRole: "buyer",
+    worker: "11111111111111111111111111111111",
+    resultHash: "0x0000000000000000000000000000000000000000000000000000000000000000",
+  },
 ];
 
 function assert(condition, message) {
@@ -50,6 +61,8 @@ function validateCase(testCase) {
   assert(settlement.status === testCase.status, `${testCase.name} settlement status mismatch`);
   assert(settlement.action === testCase.action, `${testCase.name} settlement action mismatch`);
   assert(settlement.destination_role === testCase.destinationRole, `${testCase.name} destination role mismatch`);
+  if (testCase.worker) assert(settlement.worker === testCase.worker, `${testCase.name} worker mismatch`);
+  if (testCase.resultHash) assert(settlement.result_hash === testCase.resultHash, `${testCase.name} result hash mismatch`);
   assert(settlement.vault_balance_after === "0", `${testCase.name} vault balance should be zero after settlement`);
   assert(settlement.destination_balance_after === settlement.amount, `${testCase.name} destination should hold settled amount in this proof`);
   assert(admitted.entry.status === "completed", "settlement evidence should admit as completed");
@@ -88,8 +101,8 @@ function main() {
     checks: [
       "settlement scan plan is read-only",
       "completed settlement evidence is index-admissible",
-      "released and refunded tasks admit as completed, not claimable",
-      "vault is empty after release and refund",
+      "released, failed-refunded, and timeout-refunded tasks admit as completed, not claimable",
+      "vault is empty after release, failure refund, and timeout refund",
       "worker and buyer destinations hold the settled amount",
       "nonzero vault settlement evidence is rejected",
       "no new dependencies",

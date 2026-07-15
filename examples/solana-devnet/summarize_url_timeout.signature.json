@@ -1,0 +1,40 @@
+{
+  "kind": "tasc.intent.signature.solana",
+  "version": "0.1",
+  "intent_hash": "sha256:18b608f21660ea155166dcb88d15edcfe96c065ea295737517b465ffbcd2f1e4",
+  "signer": "6Apg3YonZ8yCnhSnEVPx3EoUZYnhH9297EuCf5A1beTR",
+  "buyer": "6Apg3YonZ8yCnhSnEVPx3EoUZYnhH9297EuCf5A1beTR",
+  "signature": "3F1Mc7NQHssnmBRmSM5QbTGVqVJTRkBY7sWAjm4cWRATJL5gAqB6KZ8P9ERZCUFWmdcHqUQe8bPhpRizHVmM659R",
+  "intent": {
+    "kind": "tasc.intent.solana",
+    "version": "0.1",
+    "task_file": "examples/summarize_url_timeout.tasc",
+    "task_name": "summarize_url_timeout",
+    "display_reward": {
+      "amount": "10",
+      "currency": "USDC"
+    },
+    "chain_reward": {
+      "amount": "10000000",
+      "decimals": 6,
+      "token_mint": "11111111111111111111111111111111"
+    },
+    "relative_deadline": {
+      "raw": "60s",
+      "seconds": 60
+    },
+    "generated_at_unix": 1800000000,
+    "message": {
+      "cluster": "devnet",
+      "program_id": "FAqKhKke5pZr4TK6kXq9aKR98hWFy19SMQG9eGfXQrRM",
+      "buyer": "6Apg3YonZ8yCnhSnEVPx3EoUZYnhH9297EuCf5A1beTR",
+      "task_hash": "0x9258e5e83e6eab0043588a38dd3cc2552d7300618a88ae180161b8551c930cc1",
+      "token_mint": "11111111111111111111111111111111",
+      "amount": "10000000",
+      "deadline_unix": "1800000060",
+      "verifier": "3Siw3mYu8yQVaZ8qvXH5z4quyhhk6vBySn5d3KhNW9Tt",
+      "nonce": "1"
+    },
+    "intent_hash": "sha256:18b608f21660ea155166dcb88d15edcfe96c065ea295737517b465ffbcd2f1e4"
+  }
+}

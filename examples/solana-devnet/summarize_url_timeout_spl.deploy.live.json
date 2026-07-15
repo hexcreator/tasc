@@ -1,0 +1,11 @@
+{
+  "ok": true,
+  "mode": "deploy",
+  "program_artifact": "build/solana/global_tasc_solana_program.so",
+  "program_artifact_sha256": "101bea254e6a280030ae9df2b31da35824f5a8579d42d32a43eb892a2147e108",
+  "program_id": "FAqKhKke5pZr4TK6kXq9aKR98hWFy19SMQG9eGfXQrRM",
+  "payer_address": "6Apg3YonZ8yCnhSnEVPx3EoUZYnhH9297EuCf5A1beTR",
+  "rpc_value_printed": false,
+  "signature": "5sMn9YWpGjzFGYRTQtzZTMp5M1dm7z4nNLavUfFR17GRAQBxUyjFNAdRMTRi7kH9WBNECmXKtyxmWJMiz8ixmgLG",
+  "key_material_printed": false
+}
