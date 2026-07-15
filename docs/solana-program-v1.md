@@ -157,7 +157,7 @@ The live scanner reads that deterministic task account with `getAccountInfo`, de
 
 ## Next Step
 
-The guarded deploy/fund/scan/claim/attest/release sequence has been executed on devnet. The next implementation step is a reusable completed-settlement scanner for release/refund evidence and a fresh failed-task refund run.
+The guarded deploy/fund/scan/claim/attest/release sequence has been executed on devnet, and release evidence now admits as a completed index entry. The next implementation step is a fresh failed-task refund run and timeout policy around refund eligibility.
 
 Run:
 

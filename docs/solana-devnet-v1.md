@@ -343,6 +343,8 @@ vault token balance:  0
 worker token balance: 10000000
 release output:       examples/solana-devnet/summarize_url_spl.release.live.json
 release scan output:  examples/solana-devnet/summarize_url_spl.release-scan.live.json
+settlement evidence:  examples/solana-devnet/summarize_url_spl.settlement.live.json
+settlement index:     examples/index/solana.spl.release.index.json
 ```
 
 ## Scanner Shape
@@ -357,10 +359,12 @@ The EVM scanner reads `Funded` logs. The Solana scanner reads task account state
 
 ## Near-Term Decision
 
-Solana devnet now works well enough to continue on the faster-chain path. The next real implementation step is:
+Solana devnet now works well enough to continue on the faster-chain path. The completed-settlement scanner is `bin/scan-solana-settlement-live.js`; it emits `tasc.settlement.solana.spl_token`, which `bin/tascindex.js` admits as a `completed` index entry rather than claimable inventory.
 
-1. Turn the one-off post-release scan evidence into a reusable completed-settlement scanner/indexer boundary.
-2. Exercise the failed-task `refund` path on a fresh devnet task.
+The next real implementation step is:
+
+1. Exercise the failed-task `refund` path on a fresh devnet task.
+2. Add timeout policy around refund eligibility.
 3. Add wallet-backed browser claim/attest controls once the static proof should become interactive.
 4. Keep the browser/static index path chain-neutral by admitting Solana and EVM evidence through the same indexer boundary.
 5. Add production-style finality/reorg handling and duplicate-task suppression before treating devnet behavior as production-ready.

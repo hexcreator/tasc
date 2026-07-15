@@ -10,9 +10,9 @@ const { TOKEN_PROGRAM_ID } = require("./tascsolana-spl");
 function usage() {
   console.error([
     "Usage:",
-    "  node bin/tascindex.js admit <signed-intent.json> <funding.json> [--out index.json]",
+    "  node bin/tascindex.js admit <signed-intent.json> <evidence.json> [--out index.json]",
     "  node bin/tascindex.js admit-batch <signed-intent-dir-or-file> <funding-batch.json> [--out index.json]",
-    "  node bin/tascindex.js reject-check <signed-intent.json> <funding.json>",
+    "  node bin/tascindex.js reject-check <signed-intent.json> <evidence.json>",
   ].join("\n"));
   process.exit(1);
 }
@@ -106,6 +106,38 @@ function validateSolanaCustodyEvidence(custody) {
   }
 }
 
+function validateSolanaSettlementEvidence(settlement) {
+  assert(settlement.kind === "tasc.settlement.solana.spl_token", "settlement kind must be tasc.settlement.solana.spl_token");
+  assert(settlement.status === "Released" || settlement.status === "Refunded", "settlement status must be Released or Refunded");
+  assert(settlement.action === "release" || settlement.action === "refund", "settlement action must be release or refund");
+  assert((settlement.action === "release") === (settlement.status === "Released"), "settlement action/status mismatch");
+  assert(settlement.cluster === "devnet" || settlement.cluster === "testnet" || settlement.cluster === "mainnet-beta", "settlement cluster is invalid");
+  assert(/^0x[a-fA-F0-9]{64}$/.test(String(settlement.task_hash)), "settlement task_hash must be bytes32 hex");
+  validateSolanaAddress(settlement.program_id, "settlement program_id");
+  validateSolanaAddress(settlement.task_pda, "settlement task_pda");
+  validateSolanaAddress(settlement.vault, "settlement vault");
+  validateSolanaAddress(settlement.vault_authority, "settlement vault_authority");
+  validateSolanaAddress(settlement.token_program_id, "settlement token_program_id");
+  assert(settlement.token_program_id === TOKEN_PROGRAM_ID, "settlement token_program_id must be SPL Token Program");
+  validateSolanaAddress(settlement.buyer, "settlement buyer");
+  validateSolanaAddress(settlement.worker, "settlement worker");
+  validateSolanaAddress(settlement.token_mint, "settlement token_mint");
+  validateSolanaAddress(settlement.verifier, "settlement verifier");
+  validateSolanaAddress(settlement.destination_owner, "settlement destination_owner");
+  validateSolanaAddress(settlement.destination_token_account, "settlement destination_token_account");
+  assert(settlement.destination_role === "worker" || settlement.destination_role === "buyer", "settlement destination_role must be worker or buyer");
+  assert(/^\d+$/.test(String(settlement.amount)), "settlement amount must be integer string");
+  assert(/^\d+$/.test(String(settlement.deadline_unix)), "settlement deadline_unix must be integer string");
+  assert(/^\d+$/.test(String(settlement.nonce)), "settlement nonce must be integer string");
+  assert(/^0x[a-fA-F0-9]{64}$/.test(String(settlement.result_hash)), "settlement result_hash must be bytes32 hex");
+  assert(/^\d+$/.test(String(settlement.vault_balance_after)), "settlement vault_balance_after must be integer string");
+  assert(/^\d+$/.test(String(settlement.destination_balance_after)), "settlement destination_balance_after must be integer string");
+  validateSolanaSignature(settlement.signature, "settlement signature");
+  assert(/^\d+$/.test(String(settlement.slot)), "settlement slot must be integer string");
+  assert(/^\d+$/.test(String(settlement.instruction_index)), "settlement instruction_index must be integer string");
+  assert(settlement.confirmation_status === "confirmed" || settlement.confirmation_status === "finalized", "settlement confirmation_status must be confirmed or finalized");
+}
+
 function compareEvmFundingToIntent(signed, funding) {
   const signatureCheck = verifySignedIntent(signed);
   assert(signatureCheck.ok, "signed intent signature is invalid");
@@ -174,14 +206,63 @@ function compareSolanaFundingToIntent(signed, funding) {
   };
 }
 
-function compareFundingToIntent(signed, funding) {
+function compareSolanaSettlementToIntent(signed, settlement) {
+  const signatureCheck = verifySignedSolanaIntent(signed);
+  assert(signatureCheck.ok, "signed intent signature is invalid");
+
+  validateSolanaSettlementEvidence(settlement);
+  const message = signed.intent.message;
+  const checks = [
+    ["cluster", sameValue(settlement.cluster, message.cluster)],
+    ["task_hash", String(settlement.task_hash).toLowerCase() === String(message.task_hash).toLowerCase()],
+    ["program_id", sameValue(settlement.program_id, message.program_id)],
+    ["buyer", sameValue(settlement.buyer, message.buyer)],
+    ["token_mint", sameValue(settlement.token_mint, message.token_mint)],
+    ["amount", sameValue(settlement.amount, message.amount)],
+    ["deadline_unix", sameValue(settlement.deadline_unix, message.deadline_unix)],
+    ["verifier", sameValue(settlement.verifier, message.verifier)],
+    ["destination_amount", BigInt(settlement.destination_balance_after) >= BigInt(message.amount)],
+    ["vault_empty", BigInt(settlement.vault_balance_after) === 0n],
+  ];
+  if (settlement.status === "Released") {
+    checks.push(
+      ["release_destination_role", settlement.destination_role === "worker"],
+      ["release_destination_owner", sameValue(settlement.destination_owner, settlement.worker)],
+    );
+  }
+  if (settlement.status === "Refunded") {
+    checks.push(
+      ["refund_destination_role", settlement.destination_role === "buyer"],
+      ["refund_destination_owner", sameValue(settlement.destination_owner, message.buyer)],
+    );
+  }
+
+  const failed = checks.filter(([, pass]) => !pass).map(([name]) => name);
+  if (failed.length > 0) {
+    throw new Error(`Settlement evidence does not match signed intent: ${failed.join(", ")}`);
+  }
+
+  return {
+    signatureCheck,
+    checks: checks.map(([name, pass]) => ({ name, pass })),
+  };
+}
+
+function compareEvidenceToIntent(signed, evidence) {
   if (signed.kind === "tasc.intent.signature.eip712") {
-    return compareEvmFundingToIntent(signed, funding);
+    return compareEvmFundingToIntent(signed, evidence);
   }
   if (signed.kind === "tasc.intent.signature.solana") {
-    return compareSolanaFundingToIntent(signed, funding);
+    if (evidence.kind === "tasc.settlement.solana.spl_token") {
+      return compareSolanaSettlementToIntent(signed, evidence);
+    }
+    return compareSolanaFundingToIntent(signed, evidence);
   }
   throw new Error(`Unsupported signed intent kind: ${signed.kind}`);
+}
+
+function compareFundingToIntent(signed, funding) {
+  return compareEvidenceToIntent(signed, funding);
 }
 
 function buildEvmEntry(signed, funding, validation) {
@@ -268,9 +349,60 @@ function buildSolanaEntry(signed, funding, validation) {
   };
 }
 
-function buildEntry(signed, funding, validation) {
-  if (signed.kind === "tasc.intent.signature.eip712") return buildEvmEntry(signed, funding, validation);
-  if (signed.kind === "tasc.intent.signature.solana") return buildSolanaEntry(signed, funding, validation);
+function buildSolanaSettlementEntry(signed, settlement, validation) {
+  const message = signed.intent.message;
+  return {
+    kind: "tasc.index.entry",
+    version: "0.1",
+    status: "completed",
+    completed_status: settlement.status,
+    admitted_at: new Date(0).toISOString(),
+    intent_hash: signed.intent_hash,
+    task_hash: message.task_hash,
+    settlement: {
+      chain: "solana",
+      cluster: message.cluster,
+      program_id: message.program_id,
+      task_pda: settlement.task_pda,
+      vault: settlement.vault,
+      token_program_id: settlement.token_program_id,
+      vault_authority: settlement.vault_authority,
+      destination_token_account: settlement.destination_token_account,
+      destination_owner: settlement.destination_owner,
+      destination_role: settlement.destination_role,
+    },
+    buyer: message.buyer,
+    worker: settlement.worker,
+    token_mint: message.token_mint,
+    amount: message.amount,
+    deadline_unix: message.deadline_unix,
+    verifier: message.verifier,
+    nonce: message.nonce,
+    completed_settlement: {
+      kind: settlement.kind,
+      action: settlement.action,
+      status: settlement.status,
+      signature: settlement.signature,
+      slot: settlement.slot,
+      instruction_index: settlement.instruction_index,
+      confirmation_status: settlement.confirmation_status,
+      vault_balance_after: settlement.vault_balance_after,
+      destination_balance_after: settlement.destination_balance_after,
+      result_hash: settlement.result_hash,
+    },
+    signature: {
+      signer: validation.signatureCheck.signer,
+      valid: validation.signatureCheck.ok,
+    },
+  };
+}
+
+function buildEntry(signed, evidence, validation) {
+  if (signed.kind === "tasc.intent.signature.eip712") return buildEvmEntry(signed, evidence, validation);
+  if (signed.kind === "tasc.intent.signature.solana" && evidence.kind === "tasc.settlement.solana.spl_token") {
+    return buildSolanaSettlementEntry(signed, evidence, validation);
+  }
+  if (signed.kind === "tasc.intent.signature.solana") return buildSolanaEntry(signed, evidence, validation);
   throw new Error(`Unsupported signed intent kind: ${signed.kind}`);
 }
 
@@ -292,9 +424,9 @@ function writeIndex(outFile, entry) {
 
 function admit(signedFile, fundingFile, outFile) {
   const signed = loadInput(signedFile, "inlineSigned");
-  const funding = loadInput(fundingFile, "inlineFunding");
-  const validation = compareFundingToIntent(signed, funding);
-  const entry = buildEntry(signed, funding, validation);
+  const evidence = loadInput(fundingFile, "inlineFunding");
+  const validation = compareEvidenceToIntent(signed, evidence);
+  const entry = buildEntry(signed, evidence, validation);
   const result = {
     ok: true,
     entry,
