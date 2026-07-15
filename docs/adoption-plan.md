@@ -21,6 +21,8 @@ Done:
 - public repo exists
 - secret ignore rules exist
 - devnet SPL custody proof exists
+- live claim/attest proof exists
+- worker token account and release CPI plan artifacts exist
 - validators exist
 - Apache-2.0 license exists
 - GitHub topics and starter issues exist
@@ -48,6 +50,7 @@ npm run demo:market
 npm run validate:indexer
 npm run validate:solana-spl-escrow
 npm run validate:solana-lifecycle-tx
+npm run validate:solana-spl-settlement
 ```
 
 Next:
@@ -96,7 +99,7 @@ Ask for specific feedback:
 
 ## Next Engineering Steps
 
-1. Implement program-signed SPL token release/refund CPI.
+1. Implement program-signed SPL token release/refund CPI using `examples/solana-devnet/summarize_url_spl.release-plan.live.json` as the live release target shape.
 2. Extend scanner/indexer from "funded" and "attested" to completed payout/refund state.
 3. Add wallet-backed browser claim controls after release/refund semantics are safe.
 4. Add one-command local demo.

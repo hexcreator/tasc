@@ -36,6 +36,7 @@ Required checks:
 npm run validate:dependencies
 npm run validate:solana-source
 npm run validate:solana-spl-escrow
+npm run validate:solana-spl-settlement
 npm run validate:solana-live-scan
 npm run index:admit-solana-spl-live
 ```
@@ -45,6 +46,7 @@ Release notes should include:
 - program id or escrow address
 - transaction signatures
 - task account or event coordinates
+- SPL destination accounts and release/refund plan artifacts when settlement prep is included
 - admitted index output path
 - known limitations
 

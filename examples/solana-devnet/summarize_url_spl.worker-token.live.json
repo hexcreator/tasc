@@ -1,0 +1,50 @@
+{
+  "ok": true,
+  "mode": "send-worker-token",
+  "rpc_host": "solana-devnet.g.alchemy.com",
+  "rpc_url_printed": false,
+  "sends_transactions": true,
+  "already_existed": false,
+  "cluster": "devnet",
+  "worker": "BfRmLmH7ksPRCRxNBi7c8SspN7zKoyuAPKrJMDL5uQCJ",
+  "token_program_id": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+  "token_mint": "8WdRRCNVr8Du5Q1C1EeiMvqCRpSTBwWnHRjnx3FZ7KbC",
+  "worker_token_seed": "wtok-94dc64644920c8391998b5af480",
+  "worker_token_account": {
+    "kind": "tasc.solana.spl_token.account.live",
+    "version": "0.1",
+    "pubkey": "8KJmiwZR42u5pv5CKkxap6qFE1LYu4bKKye5DWXxbUJ8",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "executable": false,
+    "lamports": "2039280",
+    "rent_epoch": "18446744073709552000",
+    "data_base64": "b5jVUlSXb+4n+AHD2Qq3RBlgX6zTjZeuK04LgZD58PeebPD54bROr8mk5CmCw0eez6AajJ2kvzLXsU6JJq7gCwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+    "context": {
+      "slot": "476498784",
+      "api_version": "4.1.0-rc.1"
+    },
+    "decoded": {
+      "kind": "tasc.solana.spl_token.account",
+      "version": "0.1",
+      "pubkey": "8KJmiwZR42u5pv5CKkxap6qFE1LYu4bKKye5DWXxbUJ8",
+      "account_owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+      "mint": "8WdRRCNVr8Du5Q1C1EeiMvqCRpSTBwWnHRjnx3FZ7KbC",
+      "owner": "BfRmLmH7ksPRCRxNBi7c8SspN7zKoyuAPKrJMDL5uQCJ",
+      "amount": "0",
+      "state": 1
+    }
+  },
+  "token_account_rent_lamports": "2039280",
+  "instructions": [
+    "create_worker_token_account",
+    "spl_token.initialize_account3"
+  ],
+  "initialize_account3": {
+    "name": "initialize_account3",
+    "tag": 18,
+    "owner": "BfRmLmH7ksPRCRxNBi7c8SspN7zKoyuAPKrJMDL5uQCJ"
+  },
+  "signature": "2n64u7tNKnazWoaSjxW54fWhRqxk2PJrhrf2kuA47yMBXtUdR9m1WHmQmhpzLaqxn59Kr53FMrPzsH7NCj5c8VUu",
+  "confirmation_status": "confirmed",
+  "key_material_printed": false
+}

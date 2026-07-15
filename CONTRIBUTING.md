@@ -16,7 +16,7 @@ The project is licensed under Apache-2.0. By submitting a contribution, you agre
 
 ## High-Impact Areas
 
-- Live Solana `claim`, `attest`, `release`, and `refund` instructions.
+- Program-signed Solana SPL `release` and `refund` CPI, using the live release plan artifact as the target shape.
 - Solana account discovery/indexing beyond single known task accounts.
 - Worker claim lock semantics and timeout behavior.
 - Verifier service boundaries, artifact hashes, and result attestations.
@@ -38,6 +38,7 @@ npm run verify:example
 npm run demo:market
 npm run validate:indexer
 npm run validate:solana-spl-escrow
+npm run validate:solana-spl-settlement
 npm run validate:dependencies
 ```
 

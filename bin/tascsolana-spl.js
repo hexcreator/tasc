@@ -176,6 +176,16 @@ function splBuyerTokenAddress(buyer, mint) {
   return createWithSeedAddress(buyer, splBuyerTokenSeed(buyer, mint), TOKEN_PROGRAM_ID);
 }
 
+function splWorkerTokenSeed(worker, mint) {
+  pubkeyBytes(worker, "worker");
+  pubkeyBytes(mint, "mint");
+  return seedFrom("wtok", [worker, mint]);
+}
+
+function splWorkerTokenAddress(worker, mint) {
+  return createWithSeedAddress(worker, splWorkerTokenSeed(worker, mint), TOKEN_PROGRAM_ID);
+}
+
 function splVaultSeed(programId, taskHash, mint) {
   pubkeyBytes(programId, "program_id");
   bytes32Buffer(taskHash, "task_hash");
@@ -509,6 +519,8 @@ module.exports = {
   splBuyerTokenSeed,
   splMintAddress,
   splMintSeed,
+  splWorkerTokenAddress,
+  splWorkerTokenSeed,
   splVaultAddress,
   splVaultSeed,
   tokenAccountFixture,

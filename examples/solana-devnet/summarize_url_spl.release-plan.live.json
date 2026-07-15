@@ -1,0 +1,70 @@
+{
+  "ok": true,
+  "mode": "plan-release",
+  "signed_intent": "examples/solana-devnet/summarize_url_spl.signature.json",
+  "task_account_file": "examples/solana-devnet/summarize_url_spl.lifecycle-account.live.json",
+  "funding_file": "examples/solana-devnet/summarize_url_spl.funding.live.json",
+  "sends_transactions": false,
+  "token_movement": "planned_not_sent",
+  "cpi_required": true,
+  "cluster": "devnet",
+  "program_id": "FAqKhKke5pZr4TK6kXq9aKR98hWFy19SMQG9eGfXQrRM",
+  "token_program_id": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+  "task_account": "37hA4KUeR6eLPP1g1mBoTMYHKCPq7LECpLryQc61TmRi",
+  "task_status": "Passed",
+  "vault_token_account": "ChfKa5tEUjeSdaEhmjiDCWQE1Q6YT1oVaZt62HHR43b4",
+  "vault_authority": "8ysLbdWSpBQCPV5De2GWonQWM5cCjNw93d44ihh2Hv9F",
+  "vault_authority_bump": 255,
+  "vault_authority_seeds": [
+    "global-tasc-vault",
+    "0x103317ad603569805133b51ddd3447461a5ff998e8bca2642728205f7f7db65e",
+    "8WdRRCNVr8Du5Q1C1EeiMvqCRpSTBwWnHRjnx3FZ7KbC",
+    "255"
+  ],
+  "destination_token_account": "8KJmiwZR42u5pv5CKkxap6qFE1LYu4bKKye5DWXxbUJ8",
+  "destination_owner": "BfRmLmH7ksPRCRxNBi7c8SspN7zKoyuAPKrJMDL5uQCJ",
+  "destination_role": "worker",
+  "destination_ready": true,
+  "token_mint": "8WdRRCNVr8Du5Q1C1EeiMvqCRpSTBwWnHRjnx3FZ7KbC",
+  "amount": "10000000",
+  "token_decimals": 6,
+  "transfer_checked": {
+    "name": "spl_token.transfer_checked",
+    "program_id": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "accounts": [
+      {
+        "pubkey": "ChfKa5tEUjeSdaEhmjiDCWQE1Q6YT1oVaZt62HHR43b4",
+        "signer": false,
+        "writable": true
+      },
+      {
+        "pubkey": "8WdRRCNVr8Du5Q1C1EeiMvqCRpSTBwWnHRjnx3FZ7KbC",
+        "signer": false,
+        "writable": false
+      },
+      {
+        "pubkey": "8KJmiwZR42u5pv5CKkxap6qFE1LYu4bKKye5DWXxbUJ8",
+        "signer": false,
+        "writable": true
+      },
+      {
+        "pubkey": "8ysLbdWSpBQCPV5De2GWonQWM5cCjNw93d44ihh2Hv9F",
+        "signer": true,
+        "writable": false
+      }
+    ],
+    "data_hex": "0x0c809698000000000006",
+    "decoded_data": {
+      "name": "transfer_checked",
+      "tag": 12,
+      "amount": "10000000",
+      "decimals": 6
+    }
+  },
+  "on_chain_requirements_remaining": [
+    "program release/refund handlers must invoke SPL Token transfer_checked",
+    "program must sign the CPI as the vault_authority PDA with the documented seeds",
+    "task account should transition to Released or Refunded only after the CPI succeeds"
+  ],
+  "key_material_printed": false
+}

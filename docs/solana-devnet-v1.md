@@ -129,6 +129,7 @@ Validate the Rust source core and deploy readiness:
 
 ```sh
 npm run validate:solana-source
+npm run validate:solana-spl-settlement
 npm run solana:deploy-readiness
 npm run solana:build-sbf
 npm run solana:live-intent
@@ -232,6 +233,17 @@ refund:  buyer signer + writable task account -> Refunded after Failed
 
 The guarded CLI builder for those transactions is `bin/run-solana-lifecycle.js`. It intentionally keeps `release` and `refund` status-only until the program can sign an SPL Token `TransferChecked` CPI from the vault authority PDA.
 
+The SPL settlement prep CLI is `bin/run-solana-spl-settlement.js`:
+
+```sh
+npm run solana:spl-worker-token-plan
+GLOBAL_TASC_ALLOW_SOLANA_WORKER_TOKEN_SETUP=1 npm run solana:spl-worker-token-send
+npm run solana:spl-release-plan
+npm run validate:solana-spl-settlement
+```
+
+`plan-release` is read-only. It validates the signed intent, live task account, funding evidence, vault authority PDA, and worker token account before emitting the exact `spl_token.transfer_checked` account list/data that the on-chain program must invoke. `plan-refund` uses the same shape for failed tasks and intentionally rejects the current live task because its status is `Passed`, not `Failed`.
+
 The TascLang source should stay chain-agnostic. It should compile to the same canonical task hash and then generate Solana-specific settlement bindings separately.
 
 The adapter is intentionally dependencyless. It uses Node built-ins for Ed25519 signing/verification and reuses the local base58 implementation from the devnet harness instead of adding `@solana/web3.js`.
@@ -306,6 +318,21 @@ result hash:          0x0bdfacb7e0ec2c3241da82c7b812b1a0fa28945b47c7f8a6b113b4de
 lifecycle deploy out: examples/solana-devnet/summarize_url_spl.lifecycle-deploy.live.json
 lifecycle scan output: examples/solana-devnet/summarize_url_spl.lifecycle-account.live.json
 ```
+
+Current live SPL settlement-prep proof:
+
+```text
+worker token setup tx: 2n64u7tNKnazWoaSjxW54fWhRqxk2PJrhrf2kuA47yMBXtUdR9m1WHmQmhpzLaqxn59Kr53FMrPzsH7NCj5c8VUu
+worker token account: 8KJmiwZR42u5pv5CKkxap6qFE1LYu4bKKye5DWXxbUJ8
+release source vault:  ChfKa5tEUjeSdaEhmjiDCWQE1Q6YT1oVaZt62HHR43b4
+release destination:   8KJmiwZR42u5pv5CKkxap6qFE1LYu4bKKye5DWXxbUJ8
+vault authority PDA:   8ysLbdWSpBQCPV5De2GWonQWM5cCjNw93d44ihh2Hv9F
+release data:          0x0c809698000000000006
+worker token output:   examples/solana-devnet/summarize_url_spl.worker-token.live.json
+release plan output:   examples/solana-devnet/summarize_url_spl.release-plan.live.json
+```
+
+This is not a payout transaction yet. It proves the destination account exists and pins the transfer CPI that the program-signed release handler needs to execute.
 
 ## Scanner Shape
 

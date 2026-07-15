@@ -38,8 +38,12 @@ program id:   FAqKhKke5pZr4TK6kXq9aKR98hWFy19SMQG9eGfXQrRM
 fund tx:      zhrqMMYfXQAK37hLVkuvmqNwb2VzkdM4ZyHZMhpBhci97j3L38A7dswKhA9PsjimMPEFczf9NoWu5pR4jnudsm1
 task account: 37hA4KUeR6eLPP1g1mBoTMYHKCPq7LECpLryQc61TmRi
 vault token:  ChfKa5tEUjeSdaEhmjiDCWQE1Q6YT1oVaZt62HHR43b4
+claim tx:     3eQLPK2SsMFJySopM6W27YapKLAoxdFANy9qjf4JjoXe3suSt8yZLZrruFCTzBfqAkF4MvXPNieFQFasSoY4rBG6
+attest tx:    4ttsWrawCvg3v981Yyrsy8SYpr9ayzYmfLeVK72bvQmUBEHaaGyEiVCE9MLY3hYiTtR1ZZrS3NmMSsBnYA9sMUw1
+worker token: 8KJmiwZR42u5pv5CKkxap6qFE1LYu4bKKye5DWXxbUJ8
 amount:       10000000 base units
 index:        examples/index/solana.spl.live.index.json
+release plan: examples/solana-devnet/summarize_url_spl.release-plan.live.json
 ```
 
 ## Architecture
@@ -144,7 +148,7 @@ funded -> claimed -> passed -> released
 The live Solana devnet path currently covers:
 
 ```text
-signed intent -> SPL vault custody -> funded task account -> scanner -> claimable index -> live claim -> live verifier attest
+signed intent -> SPL vault custody -> funded task account -> scanner -> claimable index -> live claim -> live verifier attest -> worker token account -> release CPI plan
 ```
 
 The next protocol implementation step is program-signed SPL token movement for `release` and `refund`. The current Solana program and CLI support live task-account lifecycle transitions through `Passed`; payout/refund transfer CPI is still intentionally marked pending.
@@ -187,6 +191,7 @@ The near-term product should not be "ask the world for $10." It should be "claim
 The best first contributions are narrow and verifiable:
 
 - implement live Solana `claim`, `attest`, `release`, and `refund`
+- implement program-signed SPL token CPI from the documented release/refund plan
 - turn the static task feed into a public demo
 - add more TascLang task examples with deterministic verifier rules
 - build an indexer process that watches live Solana task accounts
