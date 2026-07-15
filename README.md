@@ -164,7 +164,7 @@ The timeout-aware Solana artifact also enforces Clock-backed claim deadlines and
 | `programs/solana-tasc/` | Dependencyless Rust core for Solana task account and instruction bytes. |
 | `examples/` | Task specs, signed intents, funding evidence, live devnet scans, and admitted indexes. |
 | `docs/` | Protocol, settlement, scanner, release, and operational notes. |
-| `web/` | Static browser scanner/feed proof. |
+| `web/` | Static browser scanner/feed and Solana operator proof. |
 | `assets/` | Repository SVGs and diagrams. |
 
 Useful docs:
@@ -212,7 +212,7 @@ The best first contributions are narrow and verifiable:
 - add dispute handling around release/refund eligibility
 - harden duplicate-task, finality, and concurrency handling around the live Solana proofs
 - turn the static task feed into a public demo
-- connect the reproducible devnet proof runner to wallet-backed buyer/worker flows
+- turn the wallet-aware Solana operator console into guarded transaction submission
 - add more TascLang task examples with deterministic verifier rules
 - build an indexer process that watches live Solana task accounts
 - package the CLI so people can create and sign tasks without reading the internals

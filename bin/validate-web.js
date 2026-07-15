@@ -10,6 +10,7 @@ const LOG = "examples/events/summarize_url.funded-log.json";
 const FUNDING = "examples/funding/summarize_url.from-log.json";
 const HANDOFF = "examples/testnet/base-sepolia.handoff.example.json";
 const SOLANA_INDEX = "examples/index/solana.spl.live.index.json";
+const SOLANA_LIFECYCLE_ACCOUNT = "examples/solana-devnet/summarize_url_spl.lifecycle-account.live.json";
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -29,6 +30,8 @@ function assertNoExternalRuntimeDependencies() {
   assert(html.includes("./tasc-web-core.js"), "index should load dependencyless core");
   assert(html.includes("./demo-index.js"), "index should load bundled demo index");
   assert(html.includes("./app.js"), "index should load app script");
+  assert(html.includes("connect-solana"), "index should expose Solana wallet connection");
+  assert(html.includes("refresh-solana"), "index should expose Solana task refresh");
 
   for (const file of ["app.js", "demo-index.js", "tasc-web-core.js"]) {
     const source = read(path.join(WEB_DIR, file));
@@ -50,6 +53,32 @@ function assertBundledSolanaIndexMatchesFixture() {
   assert(actualEntry.settlement.vault === expectedEntry.settlement.vault, "bundled Solana vault mismatch");
   assert(actualEntry.funding.signature === expectedEntry.funding.signature, "bundled Solana funding signature mismatch");
   assert(actualEntry.funding.custody.amount === expectedEntry.funding.custody.amount, "bundled Solana custody amount mismatch");
+}
+
+function assertSolanaTaskAccountDecode() {
+  const fixture = loadJson(SOLANA_LIFECYCLE_ACCOUNT);
+  const decoded = core.decodeSolanaTaskAccountBase64(fixture.data_base64, {
+    programId: fixture.owner,
+    taskPda: fixture.pubkey,
+  });
+  for (const field of [
+    "status",
+    "task_hash",
+    "buyer",
+    "worker",
+    "verifier",
+    "token_mint",
+    "vault",
+    "amount",
+    "deadline_unix",
+    "nonce",
+    "result_hash",
+    "created_slot",
+    "updated_slot",
+  ]) {
+    assert(decoded[field] === fixture.decoded[field], `Solana task account ${field} mismatch`);
+  }
+  assert(core.solanaNextAction(demoIndex.entries[0], decoded, fixture.decoded.worker).action === "complete", "released task should be complete");
 }
 
 function assertDecodeMatchesFundingFixture() {
@@ -104,6 +133,7 @@ function main() {
   assertDecodeMatchesFundingFixture();
   assertFilterAndHandoff();
   assertBundledSolanaIndexMatchesFixture();
+  assertSolanaTaskAccountDecode();
 
   process.stdout.write(`${JSON.stringify({
     ok: true,
@@ -111,6 +141,7 @@ function main() {
     decoded_fixture: LOG,
     handoff_fixture: HANDOFF,
     bundled_solana_index: SOLANA_INDEX,
+    solana_task_account_fixture: SOLANA_LIFECYCLE_ACCOUNT,
     external_runtime_dependencies: 0,
     next: "Open web/index.html or deploy web/ as static files.",
   }, null, 2)}\n`);

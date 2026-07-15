@@ -250,6 +250,19 @@ button:disabled {
   border-color: #fecdca;
 }
 
+.wallet-readout {
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: #fff;
+  color: var(--muted);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
 .feed {
   min-width: 0;
   overflow: hidden;
@@ -300,6 +313,41 @@ button:disabled {
   padding-top: 14px;
   color: var(--muted);
   font-size: 13px;
+}
+
+.action-readiness {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.action-readiness strong {
+  color: var(--text);
+}
+
+.status-pill {
+  display: inline-flex;
+  min-height: 26px;
+  align-items: center;
+  border-radius: 999px;
+  padding: 4px 9px;
+  border: 1px solid var(--border);
+  background: var(--panel-subtle);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.status-pill.ready {
+  border-color: #abefc6;
+  background: #ecfdf3;
+  color: var(--success);
+}
+
+.status-pill.idle {
+  border-color: #d6dee6;
 }
 
 .claimable-card h3,

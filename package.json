@@ -6,7 +6,7 @@
   "license": "Apache-2.0",
   "description": "Seed prototype for a decentralized instant micro-work task protocol.",
   "scripts": {
-    "demo": "npm run compile:example && npm run verify:example && npm run demo:market && npm run validate:indexer && npm run validate:solana-spl-escrow && npm run validate:solana-lifecycle-tx && npm run validate:solana-spl-settlement && npm run validate:solana-settlement-scan && npm run validate:solana-proof-runner",
+    "demo": "npm run compile:example && npm run verify:example && npm run demo:market && npm run validate:indexer && npm run validate:web && npm run validate:solana-spl-escrow && npm run validate:solana-lifecycle-tx && npm run validate:solana-spl-settlement && npm run validate:solana-settlement-scan && npm run validate:solana-proof-runner",
     "devnet:proof": "npm run solana:fund-spl-plan:live && npm run index:admit-solana-spl-live",
     "prove:solana-devnet:plan": "node bin/prove-solana-devnet.js plan",
     "prove:solana-devnet": "node bin/prove-solana-devnet.js run",

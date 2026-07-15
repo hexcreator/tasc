@@ -20,6 +20,10 @@
             <strong id="task-count">0</strong>
             <span>claimable tasks</span>
           </div>
+          <div class="stat">
+            <strong id="wallet-role">Offline</strong>
+            <span>wallet role</span>
+          </div>
         </div>
       </header>
 
@@ -31,6 +35,19 @@
             <div class="actions">
               <button id="load-demo" class="primary" type="button">Load Devnet Proof</button>
             </div>
+          </section>
+
+          <section class="section">
+            <h2>Solana Operator</h2>
+            <label>
+              Devnet RPC
+              <input id="solana-rpc-url" type="url" autocomplete="off" placeholder="https://api.devnet.solana.com">
+            </label>
+            <div class="actions">
+              <button id="connect-solana" type="button">Connect Wallet</button>
+              <button id="refresh-solana" type="button">Refresh Status</button>
+            </div>
+            <div id="solana-wallet" class="wallet-readout">No wallet connected</div>
           </section>
 
           <section class="section">

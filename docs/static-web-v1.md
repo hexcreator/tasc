@@ -8,6 +8,7 @@ The app is served from plain files in `web/`:
 web/index.html
 web/styles.css
 web/tasc-web-core.js
+web/demo-index.js
 web/app.js
 ```
 
@@ -16,7 +17,8 @@ There is no build step, no bundled dependency, no hosted database, and no requir
 ## Flow
 
 ```text
-browser -> RPC eth_blockNumber -> confirmed range -> RPC eth_getLogs -> Funded events -> local task cache
+EVM:     browser -> RPC eth_blockNumber -> confirmed range -> RPC eth_getLogs -> Funded events -> local task cache
+Solana:  browser -> RPC getAccountInfo(task_pda) -> decode 276-byte task account -> role/action readiness
 ```
 
 The browser reads only `TascEscrow.Funded` logs. It decodes the same event shape used by the CLI scanner:
@@ -29,8 +31,23 @@ The local cache uses browser storage. It stores:
 
 - connection settings
 - decoded funding entries
+- connected Solana wallet address
+- decoded Solana task account snapshots
 - the next block cursor
 - the last observed head block
+
+## Solana Operator Console
+
+The browser can connect to an injected Solana wallet provider, refresh bundled Solana task accounts from a devnet RPC, decode the live task-account status, and classify the connected wallet as buyer, verifier, worker, worker candidate, or spectator.
+
+The action readiness model is intentionally read-only for now:
+
+- `Funded` before deadline -> worker claim
+- `Funded` after deadline -> buyer timeout refund
+- `Claimed` -> verifier attest, or buyer timeout refund after deadline
+- `Passed` -> worker release
+- `Failed` -> buyer refund
+- `Released` / `Refunded` -> complete
 
 Repeated scans advance from the cached cursor instead of rescanning the full range.
 
@@ -79,14 +96,13 @@ The validator checks that:
 - the browser decoder matches the existing funding evidence fixture
 - handoff import derives the expected scanner config
 - the generated `eth_getLogs` filter matches the escrow and `Funded` topic
+- the browser Solana task-account decoder matches a committed live Solana lifecycle account fixture
 
 ## Limits
 
-This is a read-only discovery proof. It still needs:
+This is still a read-only operator surface. It still needs:
 
-- wallet connection
 - claim transaction UI
-- claim status decoding
 - attest/release transaction UI
 - richer task metadata retrieval
 - multi-RPC fallback
