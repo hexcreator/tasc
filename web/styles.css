@@ -27,6 +27,7 @@ body {
 
 button,
 input,
+select,
 textarea {
   font: inherit;
 }
@@ -166,6 +167,7 @@ label span {
 }
 
 input,
+select,
 textarea {
   width: 100%;
   min-width: 0;
@@ -181,6 +183,11 @@ input {
   padding: 7px 9px;
 }
 
+select {
+  height: 38px;
+  padding: 7px 9px;
+}
+
 textarea {
   min-height: 118px;
   resize: vertical;
@@ -189,9 +196,30 @@ textarea {
 }
 
 input:focus,
+select:focus,
 textarea:focus {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.14);
+}
+
+.checkline {
+  min-height: 38px;
+  grid-template-columns: 18px minmax(0, 1fr);
+  align-items: center;
+  align-self: end;
+  gap: 8px;
+  padding: 8px 0;
+}
+
+.checkline input {
+  width: 18px;
+  height: 18px;
+}
+
+.checkline span {
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 650;
 }
 
 .actions {

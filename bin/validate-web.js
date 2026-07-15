@@ -11,6 +11,11 @@ const FUNDING = "examples/funding/summarize_url.from-log.json";
 const HANDOFF = "examples/testnet/base-sepolia.handoff.example.json";
 const SOLANA_INDEX = "examples/index/solana.spl.live.index.json";
 const SOLANA_LIFECYCLE_ACCOUNT = "examples/solana-devnet/summarize_url_spl.lifecycle-account.live.json";
+const SOLANA_RELEASE_PLAN = "examples/solana-devnet/summarize_url_spl.release-plan.live.json";
+const SOLANA_TIMEOUT_FUNDING = "examples/solana-devnet/summarize_url_timeout_job_spl.funding.live.json";
+const SOLANA_TIMEOUT_ACCOUNT = "examples/solana-devnet/summarize_url_timeout_job_spl.task-account.live.json";
+const SOLANA_TIMEOUT_PLAN = "examples/solana-devnet/summarize_url_timeout_job_spl.timeout-refund-plan.live.json";
+const DUMMY_BLOCKHASH = "11111111111111111111111111111111";
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -32,6 +37,8 @@ function assertNoExternalRuntimeDependencies() {
   assert(html.includes("./app.js"), "index should load app script");
   assert(html.includes("connect-solana"), "index should expose Solana wallet connection");
   assert(html.includes("refresh-solana"), "index should expose Solana task refresh");
+  assert(html.includes("enable-solana-submit"), "index should expose guarded Solana submit toggle");
+  assert(html.includes("attest-result-hash"), "index should expose Solana attest result hash");
 
   for (const file of ["app.js", "demo-index.js", "tasc-web-core.js"]) {
     const source = read(path.join(WEB_DIR, file));
@@ -81,6 +88,128 @@ function assertSolanaTaskAccountDecode() {
   assert(core.solanaNextAction(demoIndex.entries[0], decoded, fixture.decoded.worker).action === "complete", "released task should be complete");
 }
 
+function entryFromFunding(funding) {
+  return {
+    kind: "tasc.index.entry",
+    version: "0.1",
+    status: "claimable",
+    task_hash: funding.task_hash,
+    settlement: {
+      chain: "solana",
+      cluster: funding.cluster,
+      program_id: funding.program_id,
+      task_pda: funding.task_pda,
+      vault: funding.vault,
+    },
+    buyer: funding.buyer,
+    token_mint: funding.token_mint,
+    amount: funding.amount,
+    deadline_unix: funding.deadline_unix,
+    verifier: funding.verifier,
+    nonce: funding.nonce || "1",
+    funding,
+  };
+}
+
+function assertPayload(payload, expected) {
+  assert(payload.ok === true, `${expected.action} payload should be ok`);
+  assert(payload.action === expected.action, `${expected.action} action mismatch`);
+  assert(payload.signer_role === expected.signerRole, `${expected.action} signer role mismatch`);
+  assert(payload.instruction_data_hex === expected.dataHex, `${expected.action} instruction data mismatch`);
+  assert(payload.accounts.length === expected.accountCount, `${expected.action} account count mismatch`);
+  assert(Array.isArray(payload.message_bytes) && payload.message_bytes.length > 0, `${expected.action} message missing`);
+  assert(payload.unsigned_transaction_bytes.length === payload.message_bytes.length + 65, `${expected.action} unsigned transaction size mismatch`);
+  assert(payload.unsigned_transaction_base64 === core.base64FromBytes(payload.unsigned_transaction_bytes), `${expected.action} transaction base64 mismatch`);
+  const walletTx = core.createSolanaWalletTransaction(payload);
+  const unsigned = Array.from(walletTx.serialize({ requireAllSignatures: false }));
+  assert(unsigned.length === payload.unsigned_transaction_bytes.length, `${expected.action} unsigned wallet serialization mismatch`);
+  walletTx.addSignature(null, new Uint8Array(64).fill(7));
+  const signed = Array.from(walletTx.serialize());
+  assert(signed.length === payload.unsigned_transaction_bytes.length, `${expected.action} signed wallet serialization mismatch`);
+  assert(signed[1] === 7, `${expected.action} signed transaction signature mismatch`);
+}
+
+async function assertSolanaLifecycleTransactionBuilds() {
+  const fixture = loadJson(SOLANA_LIFECYCLE_ACCOUNT);
+  const releasePlan = loadJson(SOLANA_RELEASE_PLAN);
+  const entry = demoIndex.entries[0];
+  const decoded = core.decodeSolanaTaskAccountBase64(fixture.data_base64, {
+    programId: fixture.owner,
+    taskPda: fixture.pubkey,
+  });
+  const worker = fixture.decoded.worker;
+  const buyer = fixture.decoded.buyer;
+  const verifier = fixture.decoded.verifier;
+  const resultHash = fixture.decoded.result_hash;
+
+  const claim = await core.buildSolanaLifecycleTransaction({
+    entry,
+    account: { ...decoded, status: "Funded", worker: core.ZERO_SOLANA_PUBKEY },
+    action: "claim",
+    walletAddress: worker,
+    recentBlockhash: DUMMY_BLOCKHASH,
+    resultHash,
+  });
+  assertPayload(claim, { action: "claim", signerRole: "worker", dataHex: "0x01", accountCount: 3 });
+  assert(claim.accounts[2].pubkey === core.CLOCK_SYSVAR_ID, "claim clock sysvar mismatch");
+
+  const attest = await core.buildSolanaLifecycleTransaction({
+    entry,
+    account: { ...decoded, status: "Claimed" },
+    action: "attest",
+    walletAddress: verifier,
+    recentBlockhash: DUMMY_BLOCKHASH,
+    verdict: "pass",
+    resultHash,
+  });
+  assertPayload(attest, { action: "attest", signerRole: "verifier", dataHex: `0x0201${resultHash.slice(2)}`, accountCount: 2 });
+
+  const release = await core.buildSolanaLifecycleTransaction({
+    entry,
+    account: { ...decoded, status: "Passed" },
+    action: "release",
+    walletAddress: worker,
+    recentBlockhash: DUMMY_BLOCKHASH,
+    resultHash,
+  });
+  assertPayload(release, { action: "release", signerRole: "worker", dataHex: "0x03", accountCount: 7 });
+  assert(release.settlement.vault_authority === releasePlan.vault_authority, "release vault authority mismatch");
+  assert(release.settlement.destination_token_account === releasePlan.destination_token_account, "release destination token account mismatch");
+  assert(release.settlement.token_program_id === core.TOKEN_PROGRAM_ID, "release token program mismatch");
+
+  const refund = await core.buildSolanaLifecycleTransaction({
+    entry,
+    account: { ...decoded, status: "Failed" },
+    action: "refund",
+    walletAddress: buyer,
+    recentBlockhash: DUMMY_BLOCKHASH,
+    resultHash,
+  });
+  assertPayload(refund, { action: "refund", signerRole: "buyer", dataHex: "0x04", accountCount: 7 });
+  assert(refund.settlement.destination_role === "buyer", "refund destination role mismatch");
+
+  const timeoutFunding = loadJson(SOLANA_TIMEOUT_FUNDING);
+  const timeoutAccountFixture = loadJson(SOLANA_TIMEOUT_ACCOUNT);
+  const timeoutPlan = loadJson(SOLANA_TIMEOUT_PLAN);
+  const timeoutEntry = entryFromFunding(timeoutFunding);
+  const timeoutAccount = core.decodeSolanaTaskAccountBase64(timeoutAccountFixture.data_base64, {
+    programId: timeoutAccountFixture.owner,
+    taskPda: timeoutAccountFixture.pubkey,
+  });
+  const timeoutRefund = await core.buildSolanaLifecycleTransaction({
+    entry: timeoutEntry,
+    account: timeoutAccount,
+    action: "timeout refund",
+    walletAddress: timeoutAccount.buyer,
+    recentBlockhash: DUMMY_BLOCKHASH,
+    resultHash: timeoutAccount.result_hash,
+  });
+  assertPayload(timeoutRefund, { action: "timeout-refund", signerRole: "buyer", dataHex: "0x04", accountCount: 8 });
+  assert(timeoutRefund.accounts[7].pubkey === core.CLOCK_SYSVAR_ID, "timeout refund clock sysvar mismatch");
+  assert(timeoutRefund.settlement.vault_authority === timeoutPlan.vault_authority, "timeout vault authority mismatch");
+  assert(timeoutRefund.settlement.destination_token_account === timeoutPlan.destination_token_account, "timeout destination token account mismatch");
+}
+
 function assertDecodeMatchesFundingFixture() {
   const log = loadJson(LOG);
   const expected = loadJson(FUNDING);
@@ -128,12 +257,13 @@ function assertFilterAndHandoff() {
   assert(filter.toBlock === "0x1e240", "filter to block mismatch");
 }
 
-function main() {
+async function main() {
   assertNoExternalRuntimeDependencies();
   assertDecodeMatchesFundingFixture();
   assertFilterAndHandoff();
   assertBundledSolanaIndexMatchesFixture();
   assertSolanaTaskAccountDecode();
+  await assertSolanaLifecycleTransactionBuilds();
 
   process.stdout.write(`${JSON.stringify({
     ok: true,
@@ -142,16 +272,15 @@ function main() {
     handoff_fixture: HANDOFF,
     bundled_solana_index: SOLANA_INDEX,
     solana_task_account_fixture: SOLANA_LIFECYCLE_ACCOUNT,
+    solana_wallet_transaction_builds: ["claim", "attest", "release", "refund", "timeout-refund"],
     external_runtime_dependencies: 0,
     next: "Open web/index.html or deploy web/ as static files.",
   }, null, 2)}\n`);
 }
 
 if (require.main === module) {
-  try {
-    main();
-  } catch (error) {
+  main().catch((error) => {
     console.error(`validate-web: ${error.message}`);
     process.exit(1);
-  }
+  });
 }

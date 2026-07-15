@@ -26,9 +26,11 @@ Done:
 - validators exist
 - Apache-2.0 license exists
 - GitHub topics and starter issues exist
+- guarded Solana wallet transaction construction exists in the static operator console
 
 Next:
 
+- live-test the guarded wallet send flow with Phantom or another injected Solana wallet
 - add a short demo video or GIF
 - keep starter issues updated as protocol milestones land
 
@@ -65,7 +67,7 @@ The current static web proof should become the main public demo:
 
 - load `examples/index/solana.spl.live.index.json`
 - show task title, reward, deadline, status, chain, vault, and proof coordinates
-- connect a Solana wallet and show live task-account status plus role/action readiness
+- connect a Solana wallet and show live task-account status plus guarded role/action sends
 - link to docs explaining what is real and what is simulated
 
 ### 4. Recruit The First Contributors
@@ -77,7 +79,7 @@ Open issues for:
 - `protocol`: implement program-signed SPL token release/refund CPI
 - `indexer`: discover funded task accounts from program-owned accounts
 - `indexer`: scan post-funding lifecycle state
-- `web`: turn role/action readiness into wallet transaction submission
+- `web`: live-test wallet transaction submission in injected wallet browsers
 - `security`: define pre-mainnet audit checklist
 
 ### 5. Get External Feedback
@@ -99,7 +101,7 @@ Ask for specific feedback:
 
 ## Next Engineering Steps
 
-1. Add guarded wallet transaction submission for Solana claim/attest/release/refund from the static operator console.
+1. Live-test guarded Solana wallet sends from the static operator console in a normal wallet-extension browser.
 2. Turn proof bundles into loadable task-feed artifacts instead of only a local runner output.
 3. Add finality windows, duplicate-task suppression, and multi-RPC fallback to the browser/indexer boundary.
 4. Start the dispute/reviewer path once pass/fail/timeout UX is usable end to end.
@@ -112,5 +114,5 @@ Early users are actually using Tasc when:
 - someone can inspect the live devnet proof from README links
 - someone can add a new task fixture and verifier rule
 - someone can serve a static claimable feed
-- someone can connect a wallet and see the correct live role/action readiness
+- someone can connect a wallet and submit the correct guarded live role/action transaction
 - a worker can complete a devnet task and see token release proof

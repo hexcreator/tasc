@@ -20,6 +20,17 @@
     "Disputed",
   ];
   const BASE58_ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+  const CLOCK_SYSVAR_ID = "SysvarC1ock11111111111111111111111111111111";
+  const TOKEN_PROGRAM_ID = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
+  const SOLANA_INSTRUCTION_TAGS = {
+    claim: 1,
+    attest: 2,
+    release: 3,
+    refund: 4,
+  };
+  const SOLANA_PDA_MARKER = "ProgramDerivedAddress";
+  const ED25519_P = (1n << 255n) - 19n;
+  const ED25519_D = mod(-121665n * modInv(121666n));
 
   function assert(condition, message) {
     if (!condition) throw new Error(message);
@@ -198,6 +209,35 @@
     return encoded || "1";
   }
 
+  function base58Decode(value) {
+    const text = String(value || "");
+    assert(text.length > 0, "base58 value is required");
+    let decoded = 0n;
+    for (const char of text) {
+      const index = BASE58_ALPHABET.indexOf(char);
+      assert(index !== -1, "base58 value contains invalid character");
+      decoded = (decoded * 58n) + BigInt(index);
+    }
+
+    let hex = decoded.toString(16);
+    if (hex.length % 2) hex = `0${hex}`;
+    let bytes = hex === "00" && decoded === 0n
+      ? []
+      : hex.match(/.{2}/g).map((part) => Number.parseInt(part, 16));
+    for (const char of text) {
+      if (char !== "1") break;
+      bytes = [0, ...bytes];
+    }
+    return bytes;
+  }
+
+  function assertSolanaAddress(address, label) {
+    const value = String(address || "");
+    assert(/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(value), `${label} must be a Solana base58 address`);
+    assert(base58Decode(value).length === 32, `${label} must decode to 32 bytes`);
+    return value;
+  }
+
   function bytesFromBase64(value) {
     const raw = String(value || "");
     if (typeof Buffer !== "undefined") return Array.from(Buffer.from(raw, "base64"));
@@ -207,10 +247,457 @@
     return bytes;
   }
 
+  function base64FromBytes(bytes) {
+    const source = Uint8Array.from(bytes || []);
+    if (typeof Buffer !== "undefined") return Buffer.from(source).toString("base64");
+    let binary = "";
+    const chunkSize = 0x8000;
+    for (let index = 0; index < source.length; index += chunkSize) {
+      binary += String.fromCharCode(...source.slice(index, index + chunkSize));
+    }
+    return btoa(binary);
+  }
+
+  function base64UrlFromBytes(bytes) {
+    return base64FromBytes(bytes).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  }
+
   function hexFromBytes(bytes) {
     return Array.from(bytes || [])
       .map((byte) => byte.toString(16).padStart(2, "0"))
       .join("");
+  }
+
+  function bytesFromHex(value, bytes, label) {
+    const raw = assertHex(value, bytes, label).slice(2);
+    return raw.match(/.{2}/g).map((part) => Number.parseInt(part, 16));
+  }
+
+  function bytesFromUtf8(value) {
+    const text = String(value);
+    if (typeof TextEncoder !== "undefined") return Array.from(new TextEncoder().encode(text));
+    return unescape(encodeURIComponent(text)).split("").map((char) => char.charCodeAt(0));
+  }
+
+  function concatBytes(parts) {
+    const out = [];
+    for (const part of parts) out.push(...Array.from(part || []));
+    return out;
+  }
+
+  function mod(value) {
+    const result = value % ED25519_P;
+    return result >= 0n ? result : result + ED25519_P;
+  }
+
+  function modPow(base, exponent) {
+    let result = 1n;
+    let value = mod(base);
+    let power = BigInt(exponent);
+    while (power > 0n) {
+      if (power & 1n) result = mod(result * value);
+      value = mod(value * value);
+      power >>= 1n;
+    }
+    return result;
+  }
+
+  function modInv(value) {
+    return modPow(value, ED25519_P - 2n);
+  }
+
+  function bytesToLittleEndianInt(bytes) {
+    let value = 0n;
+    for (let index = bytes.length - 1; index >= 0; index -= 1) {
+      value = (value << 8n) + BigInt(bytes[index]);
+    }
+    return value;
+  }
+
+  function isEd25519CompressedPoint(bytes) {
+    const raw = Array.from(bytes || []);
+    if (raw.length !== 32) return false;
+    const sign = raw[31] >> 7;
+    raw[31] &= 0x7f;
+    const y = bytesToLittleEndianInt(raw);
+    if (y >= ED25519_P) return false;
+    const y2 = mod(y * y);
+    const denominator = mod(ED25519_D * y2 + 1n);
+    if (denominator === 0n) return false;
+    const x2 = mod((y2 - 1n) * modInv(denominator));
+    if (x2 === 0n) return sign === 0;
+    return modPow(x2, (ED25519_P - 1n) / 2n) === 1n;
+  }
+
+  async function sha256Bytes(bytes) {
+    assert(root.crypto && root.crypto.subtle && root.crypto.subtle.digest, "WebCrypto SHA-256 is required");
+    const digest = await root.crypto.subtle.digest("SHA-256", Uint8Array.from(bytes || []));
+    return Array.from(new Uint8Array(digest));
+  }
+
+  async function sha256HexFromText(value) {
+    return hexFromBytes(await sha256Bytes(bytesFromUtf8(value)));
+  }
+
+  async function seedFrom(label, parts) {
+    const digest = await sha256HexFromText(parts.join(":"));
+    return `${label}-${digest.slice(0, 27)}`;
+  }
+
+  async function createWithSeedAddress(base, seed, owner) {
+    const seedBytes = bytesFromUtf8(seed);
+    assert(seedBytes.length <= 32, "Solana seed must be 32 bytes or shorter");
+    const address = await sha256Bytes(concatBytes([
+      base58Decode(assertSolanaAddress(base, "base")),
+      seedBytes,
+      base58Decode(assertSolanaAddress(owner, "owner")),
+    ]));
+    return base58Encode(address);
+  }
+
+  function seedBuffer(seed, label) {
+    const bytes = Array.isArray(seed) || seed instanceof Uint8Array ? Array.from(seed) : bytesFromUtf8(seed);
+    assert(bytes.length <= 32, `${label} seed must be 32 bytes or shorter`);
+    return bytes;
+  }
+
+  async function createProgramAddress(seeds, programId) {
+    const seedBytes = seeds.map((seed, index) => seedBuffer(seed, `program address ${index}`));
+    const address = await sha256Bytes(concatBytes([
+      ...seedBytes,
+      base58Decode(assertSolanaAddress(programId, "program_id")),
+      bytesFromUtf8(SOLANA_PDA_MARKER),
+    ]));
+    assert(!isEd25519CompressedPoint(address), "derived program address must be off curve");
+    return base58Encode(address);
+  }
+
+  async function findProgramAddress(seeds, programId) {
+    for (let bump = 255; bump >= 0; bump -= 1) {
+      try {
+        return {
+          address: await createProgramAddress([...seeds, [bump]], programId),
+          bump,
+        };
+      } catch (_error) {
+        // Keep searching for the Solana bump that derives an off-curve address.
+      }
+    }
+    throw new Error("unable to find a valid program address");
+  }
+
+  async function splBuyerTokenAddress(buyer, mint) {
+    assertSolanaAddress(buyer, "buyer");
+    assertSolanaAddress(mint, "mint");
+    const seed = await seedFrom("btok", [buyer, mint]);
+    return createWithSeedAddress(buyer, seed, TOKEN_PROGRAM_ID);
+  }
+
+  async function splWorkerTokenAddress(worker, mint) {
+    assertSolanaAddress(worker, "worker");
+    assertSolanaAddress(mint, "mint");
+    const seed = await seedFrom("wtok", [worker, mint]);
+    return createWithSeedAddress(worker, seed, TOKEN_PROGRAM_ID);
+  }
+
+  async function vaultAuthorityPda(programId, taskHash, mint) {
+    return findProgramAddress([
+      bytesFromUtf8("global-tasc-vault"),
+      bytesFromHex(taskHash, 32, "task_hash"),
+      base58Decode(assertSolanaAddress(mint, "mint")),
+    ], programId);
+  }
+
+  function encodeShortVectorLength(length) {
+    assert(Number.isSafeInteger(length) && length >= 0, "short vector length must be non-negative");
+    const bytes = [];
+    let value = length;
+    while (true) {
+      let elem = value & 0x7f;
+      value >>= 7;
+      if (value === 0) {
+        bytes.push(elem);
+        break;
+      }
+      elem |= 0x80;
+      bytes.push(elem);
+    }
+    return bytes;
+  }
+
+  function accountMeta(pubkey, signer, writable) {
+    return {
+      pubkey: assertSolanaAddress(pubkey, "account pubkey"),
+      signer: Boolean(signer),
+      writable: Boolean(writable),
+    };
+  }
+
+  function mergeAccountMeta(map, meta) {
+    const existing = map.get(meta.pubkey);
+    if (!existing) {
+      map.set(meta.pubkey, { ...meta });
+      return;
+    }
+    existing.signer ||= meta.signer;
+    existing.writable ||= meta.writable;
+  }
+
+  function orderedAccountKeys(payer, instructions) {
+    const map = new Map();
+    mergeAccountMeta(map, accountMeta(payer, true, true));
+    for (const ix of instructions) {
+      for (const meta of ix.accounts) mergeAccountMeta(map, meta);
+      mergeAccountMeta(map, accountMeta(ix.programId, false, false));
+    }
+    const metas = [...map.values()];
+    const payerMeta = metas.find((meta) => meta.pubkey === payer);
+    const rest = metas.filter((meta) => meta.pubkey !== payer);
+    const signedWritable = [payerMeta, ...rest.filter((meta) => meta.signer && meta.writable)];
+    const signedReadonly = rest.filter((meta) => meta.signer && !meta.writable);
+    const unsignedWritable = rest.filter((meta) => !meta.signer && meta.writable);
+    const unsignedReadonly = rest.filter((meta) => !meta.signer && !meta.writable);
+    return [...signedWritable, ...signedReadonly, ...unsignedWritable, ...unsignedReadonly];
+  }
+
+  function compileLegacyMessage(input) {
+    const payer = assertSolanaAddress(input.payer, "payer");
+    const accountKeys = orderedAccountKeys(payer, input.instructions);
+    const keyIndex = new Map(accountKeys.map((meta, index) => [meta.pubkey, index]));
+    const signers = accountKeys.filter((meta) => meta.signer);
+    const readonlySigners = signers.filter((meta) => !meta.writable);
+    const readonlyUnsigned = accountKeys.filter((meta) => !meta.signer && !meta.writable);
+    const recentBlockhash = base58Decode(input.recentBlockhash);
+    assert(recentBlockhash.length === 32, "recent blockhash must decode to 32 bytes");
+
+    const compiledInstructions = input.instructions.map((ix) => {
+      const data = Array.from(ix.data || []);
+      const accountIndexes = ix.accounts.map((meta) => {
+        const index = keyIndex.get(meta.pubkey);
+        assert(index !== undefined, `missing account key ${meta.pubkey}`);
+        return index;
+      });
+      const programIndex = keyIndex.get(ix.programId);
+      assert(programIndex !== undefined, `missing program id ${ix.programId}`);
+      return concatBytes([
+        [programIndex],
+        encodeShortVectorLength(accountIndexes.length),
+        accountIndexes,
+        encodeShortVectorLength(data.length),
+        data,
+      ]);
+    });
+
+    return {
+      accountKeys,
+      message: concatBytes([
+        [signers.length, readonlySigners.length, readonlyUnsigned.length],
+        encodeShortVectorLength(accountKeys.length),
+        ...accountKeys.map((meta) => base58Decode(meta.pubkey)),
+        recentBlockhash,
+        encodeShortVectorLength(compiledInstructions.length),
+        ...compiledInstructions,
+      ]),
+    };
+  }
+
+  function encodeInstruction(name, fields) {
+    const input = fields || {};
+    if (name === "attest") {
+      const verdict = String(input.verdict || "pass").toLowerCase();
+      assert(verdict === "pass" || verdict === "fail", "attest verdict must be pass or fail");
+      return [
+        SOLANA_INSTRUCTION_TAGS.attest,
+        verdict === "pass" ? 1 : 0,
+        ...bytesFromHex(input.result_hash, 32, "result_hash"),
+      ];
+    }
+    assert(Object.prototype.hasOwnProperty.call(SOLANA_INSTRUCTION_TAGS, name), `unsupported Solana instruction ${name}`);
+    return [SOLANA_INSTRUCTION_TAGS[name]];
+  }
+
+  function normalizeSolanaAction(action) {
+    const normalized = String(action || "").toLowerCase().replace(/[_\s]+/g, "-");
+    assert(["claim", "attest", "release", "refund", "timeout-refund"].includes(normalized), "unsupported Solana action");
+    return normalized;
+  }
+
+  function solanaInstructionName(action) {
+    return action === "timeout-refund" ? "refund" : action;
+  }
+
+  function solanaSignerRoleForAction(action) {
+    if (action === "claim") return "worker";
+    if (action === "attest") return "verifier";
+    if (action === "refund" || action === "timeout-refund") return "buyer";
+    return "worker";
+  }
+
+  function requireSolanaTask(entry, account) {
+    const settlement = (entry && entry.settlement) || {};
+    const fundingCustody = entry && entry.funding ? entry.funding.custody || {} : {};
+    const task = {
+      program_id: (account && (account.program_id || account.owner)) || settlement.program_id,
+      task_account: (account && account.task_pda) || settlement.task_pda,
+      task_hash: (account && account.task_hash) || (entry && entry.task_hash),
+      buyer: (account && account.buyer) || (entry && entry.buyer),
+      worker: account && account.worker,
+      verifier: (account && account.verifier) || (entry && entry.verifier),
+      token_mint: (account && account.token_mint) || (entry && entry.token_mint),
+      vault: (account && account.vault) || settlement.vault || fundingCustody.vault_token_account,
+      status: (account && account.status) || (entry && entry.status),
+      deadline_unix: (account && account.deadline_unix) || (entry && entry.deadline_unix),
+      vault_authority: fundingCustody.vault_authority || null,
+    };
+    assertSolanaAddress(task.program_id, "program_id");
+    assertSolanaAddress(task.task_account, "task_account");
+    assertHex(task.task_hash, 32, "task_hash");
+    assertSolanaAddress(task.buyer, "buyer");
+    assertSolanaAddress(task.verifier, "verifier");
+    assertSolanaAddress(task.token_mint, "token_mint");
+    assertSolanaAddress(task.vault, "vault");
+    return task;
+  }
+
+  async function solanaSettlementAccountsForAction(action, task, signerAddress) {
+    if (!["release", "refund", "timeout-refund"].includes(action)) return null;
+    const vaultAuthority = await vaultAuthorityPda(task.program_id, task.task_hash, task.token_mint);
+    const destination = action === "release"
+      ? await splWorkerTokenAddress(signerAddress, task.token_mint)
+      : await splBuyerTokenAddress(task.buyer, task.token_mint);
+    return {
+      destination_role: action === "release" ? "worker" : "buyer",
+      vault_token_account: task.vault,
+      token_mint: task.token_mint,
+      destination_token_account: destination,
+      vault_authority: vaultAuthority.address,
+      vault_authority_bump: vaultAuthority.bump,
+      token_program_id: TOKEN_PROGRAM_ID,
+      vault_authority_matches_custody: task.vault_authority ? task.vault_authority === vaultAuthority.address : null,
+      outer_accounts: [
+        accountMeta(task.vault, false, true),
+        accountMeta(task.token_mint, false, false),
+        accountMeta(destination, false, true),
+        accountMeta(vaultAuthority.address, false, false),
+        accountMeta(TOKEN_PROGRAM_ID, false, false),
+      ],
+    };
+  }
+
+  function clockAccountsForAction(action) {
+    if (action !== "claim" && action !== "timeout-refund") return [];
+    return [accountMeta(CLOCK_SYSVAR_ID, false, false)];
+  }
+
+  async function buildSolanaLifecycleTransaction(input) {
+    const settings = input || {};
+    const action = normalizeSolanaAction(settings.action);
+    const signer = assertSolanaAddress(settings.walletAddress, "walletAddress");
+    const task = requireSolanaTask(settings.entry, settings.account);
+    const programInstruction = solanaInstructionName(action);
+    const data = encodeInstruction(programInstruction, {
+      verdict: settings.verdict,
+      result_hash: settings.resultHash || settings.result_hash,
+    });
+    const settlement = await solanaSettlementAccountsForAction(action, task, signer);
+    const accounts = [
+      accountMeta(signer, true, true),
+      accountMeta(task.task_account, false, true),
+      ...(settlement ? settlement.outer_accounts : []),
+      ...clockAccountsForAction(action),
+    ];
+    const instruction = {
+      name: action,
+      programId: task.program_id,
+      accounts,
+      data,
+    };
+    const compiled = compileLegacyMessage({
+      payer: signer,
+      recentBlockhash: settings.recentBlockhash,
+      instructions: [instruction],
+    });
+    const message = compiled.message;
+    const unsignedTransaction = concatBytes([
+      encodeShortVectorLength(1),
+      new Array(64).fill(0),
+      message,
+    ]);
+    return {
+      ok: true,
+      action,
+      signer_role: solanaSignerRoleForAction(action),
+      signer,
+      program_id: task.program_id,
+      task_account: task.task_account,
+      recent_blockhash: settings.recentBlockhash,
+      program_instruction: programInstruction,
+      instruction_data_hex: `0x${hexFromBytes(data)}`,
+      accounts: accounts.map(({ pubkey, signer: isSigner, writable }) => ({ pubkey, signer: isSigner, writable })),
+      account_keys: compiled.accountKeys.map(({ pubkey, signer: isSigner, writable }) => ({ pubkey, signer: isSigner, writable })),
+      message_bytes: message,
+      message_base64: base64FromBytes(message),
+      unsigned_transaction_bytes: unsignedTransaction,
+      unsigned_transaction_base64: base64FromBytes(unsignedTransaction),
+      unsigned_transaction_base64url: base64UrlFromBytes(unsignedTransaction),
+      clock_sysvar: clockAccountsForAction(action)[0]?.pubkey || null,
+      settlement: settlement ? {
+        destination_role: settlement.destination_role,
+        vault_token_account: settlement.vault_token_account,
+        destination_token_account: settlement.destination_token_account,
+        vault_authority: settlement.vault_authority,
+        vault_authority_bump: settlement.vault_authority_bump,
+        vault_authority_matches_custody: settlement.vault_authority_matches_custody,
+        token_program_id: settlement.token_program_id,
+      } : null,
+    };
+  }
+
+  function encodeSignedSolanaTransactionBytes(message, signature) {
+    const signatureBytes = Array.from(signature || []);
+    assert(signatureBytes.length === 64, "Solana transaction signature must be 64 bytes");
+    return concatBytes([
+      encodeShortVectorLength(1),
+      signatureBytes,
+      message,
+    ]);
+  }
+
+  function solanaPublicKeyObject(address) {
+    const value = assertSolanaAddress(address, "public key");
+    return {
+      toString: () => value,
+      toBase58: () => value,
+      toBytes: () => Uint8Array.from(base58Decode(value)),
+      equals: (other) => Boolean(other && (other === value || (other.toString && other.toString() === value))),
+    };
+  }
+
+  function createSolanaWalletTransaction(payload) {
+    assert(payload && Array.isArray(payload.message_bytes), "Solana transaction payload is required");
+    const payer = solanaPublicKeyObject(payload.signer);
+    const signatures = [{ publicKey: payer, signature: null }];
+    return {
+      feePayer: payer,
+      recentBlockhash: payload.recent_blockhash,
+      signatures,
+      serializeMessage() {
+        return Uint8Array.from(payload.message_bytes);
+      },
+      addSignature(publicKey, signature) {
+        const signatureBytes = Uint8Array.from(signature || []);
+        assert(signatureBytes.length === 64, "wallet signature must be 64 bytes");
+        signatures[0] = { publicKey: publicKey || payer, signature: signatureBytes };
+      },
+      serialize(options) {
+        const signature = signatures[0] && signatures[0].signature;
+        const requireAllSignatures = !options || options.requireAllSignatures !== false;
+        if (!signature && requireAllSignatures) throw new Error("wallet did not attach a signature");
+        const signatureBytes = signature ? Array.from(signature) : new Array(64).fill(0);
+        return Uint8Array.from(encodeSignedSolanaTransactionBytes(payload.message_bytes, signatureBytes));
+      },
+      _tasc: payload,
+    };
   }
 
   function readU64Le(bytes, offset) {
@@ -338,17 +825,26 @@
     DEFAULT_CHUNK_SIZE,
     DEFAULT_CONFIRMATIONS,
     DEFAULT_SOLANA_RPC_URL,
+    CLOCK_SYSVAR_ID,
     FUNDED_TOPIC,
+    TOKEN_PROGRAM_ID,
     ZERO_SOLANA_PUBKEY,
+    base58Decode,
+    base58Encode,
+    base64FromBytes,
     buildFundedFilter,
+    buildSolanaLifecycleTransaction,
+    createSolanaWalletTransaction,
     decodeFundedLog,
     decodeSolanaTaskAccountBase64,
     deriveConfigFromHandoff,
+    encodeShortVectorLength,
     formatTokenAmount,
     mergeEntries,
     normalizeAddress,
     numberFromRpcQuantity,
     numberToRpcQuantity,
+    solanaSettlementAccountsForAction,
     solanaNextAction,
     solanaWalletRole,
     taskKey,

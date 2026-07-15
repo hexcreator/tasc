@@ -4,12 +4,16 @@
   const core = window.TascWebCore;
   const demoIndex = window.TascDemoIndex;
   const storageKey = "global-tasc.web.feed.v1";
+  const defaultAttestResultHash = "0x0bdfacb7e0ec2c3241da82c7b812b1a0fa28945b47c7f8a6b113b4de3779776f";
 
   const el = {
     loadDemo: document.querySelector("#load-demo"),
     solanaRpcUrl: document.querySelector("#solana-rpc-url"),
     connectSolana: document.querySelector("#connect-solana"),
     refreshSolana: document.querySelector("#refresh-solana"),
+    attestVerdict: document.querySelector("#attest-verdict"),
+    attestResultHash: document.querySelector("#attest-result-hash"),
+    enableSolanaSubmit: document.querySelector("#enable-solana-submit"),
     solanaWallet: document.querySelector("#solana-wallet"),
     walletRole: document.querySelector("#wallet-role"),
     rpcUrl: document.querySelector("#rpc-url"),
@@ -51,6 +55,9 @@
     const config = state.config || {};
     const solana = state.solana || {};
     el.solanaRpcUrl.value = solana.rpcUrl || core.DEFAULT_SOLANA_RPC_URL;
+    el.attestVerdict.value = solana.attestVerdict || "pass";
+    el.attestResultHash.value = solana.attestResultHash || defaultAttestResultHash;
+    el.enableSolanaSubmit.checked = Boolean(solana.enableSubmit);
     el.rpcUrl.value = config.rpcUrl || "";
     el.escrow.value = config.escrow || "";
     el.chainId.value = config.chainId || String(core.DEFAULT_CHAIN_ID);
@@ -73,6 +80,9 @@
   function readSolanaConfig() {
     return {
       rpcUrl: el.solanaRpcUrl.value.trim() || core.DEFAULT_SOLANA_RPC_URL,
+      attestVerdict: el.attestVerdict.value,
+      attestResultHash: el.attestResultHash.value.trim() || defaultAttestResultHash,
+      enableSubmit: el.enableSolanaSubmit.checked,
     };
   }
 
@@ -197,6 +207,22 @@
     return state.solana && state.solana.walletAddress ? state.solana.walletAddress : "";
   }
 
+  function solanaProvider() {
+    if (window.solana && window.solana.isPhantom) return window.solana;
+    if (window.phantom && window.phantom.solana) return window.phantom.solana;
+    return window.solana || null;
+  }
+
+  function solanaSubmissionKey(entry, action) {
+    const taskPda = entry.settlement && entry.settlement.task_pda ? entry.settlement.task_pda : entry.task_hash;
+    return `${taskPda}:${String(action || "").toLowerCase().replace(/\s+/g, "-")}`;
+  }
+
+  function solanaSubmissionForEntry(state, entry, action) {
+    const submissions = state.solana && state.solana.submissions ? state.solana.submissions : {};
+    return submissions[solanaSubmissionKey(entry, action)] || null;
+  }
+
   function walletReadout(state) {
     const wallet = connectedWallet(state);
     if (!wallet) return "No wallet connected";
@@ -257,9 +283,11 @@
     const reward = `${core.formatTokenAmount(entry.amount, custody.decimals ?? 6)} USDC`;
     const liveAccount = solanaAccountForEntry(state, entry);
     const wallet = connectedWallet(state);
+    const solanaConfig = readSolanaConfig();
     const action = settlement.chain === "solana"
       ? core.solanaNextAction(entry, liveAccount, wallet)
       : { status: entry.status, role: "operator", action: "watch", actor: "operator", enabled: false };
+    const lastSubmission = solanaSubmissionForEntry(state, entry, action.action);
 
     const header = document.createElement("div");
     header.className = "claimable-card-header";
@@ -294,6 +322,9 @@
     if (liveAccount && liveAccount.worker !== core.ZERO_SOLANA_PUBKEY) {
       meta.append(metaItem("Worker", shortMiddle(liveAccount.worker), solanaExplorerUrl(`address/${liveAccount.worker}`, cluster)));
     }
+    if (lastSubmission) {
+      meta.append(metaItem("Last send", shortMiddle(lastSubmission.signature), solanaExplorerUrl(`tx/${lastSubmission.signature}`, cluster)));
+    }
 
     const footer = document.createElement("div");
     footer.className = "claimable-card-footer";
@@ -307,11 +338,16 @@
     const next = document.createElement("strong");
     next.textContent = `Next: ${action.action}`;
     actionGroup.append(live, role, next);
-    const claim = document.createElement("button");
-    claim.type = "button";
-    claim.disabled = true;
-    claim.textContent = action.enabled ? `${action.action} ready` : `${action.actor} action`;
-    footer.append(actionGroup, claim);
+    const actionButton = document.createElement("button");
+    actionButton.type = "button";
+    actionButton.disabled = !action.enabled || !solanaConfig.enableSubmit;
+    actionButton.textContent = action.enabled
+      ? solanaConfig.enableSubmit
+        ? `Send ${action.action}`
+        : "Enable sends"
+      : `${action.actor} action`;
+    actionButton.addEventListener("click", () => onSubmitSolanaAction(entry, action.action, actionButton));
+    footer.append(actionGroup, actionButton);
 
     card.append(header, meta, footer);
     return card;
@@ -360,6 +396,9 @@
     state.solana = {
       ...(state.solana || {}),
       rpcUrl: readSolanaConfig().rpcUrl,
+      attestVerdict: readSolanaConfig().attestVerdict,
+      attestResultHash: readSolanaConfig().attestResultHash,
+      enableSubmit: readSolanaConfig().enableSubmit,
     };
     writeState(state);
     render();
@@ -442,6 +481,9 @@
       state.solana = {
         ...(state.solana || {}),
         rpcUrl: solana.rpcUrl,
+        attestVerdict: solana.attestVerdict,
+        attestResultHash: solana.attestResultHash,
+        enableSubmit: solana.enableSubmit,
         accounts,
         refreshedAt: new Date().toISOString(),
       };
@@ -457,8 +499,8 @@
 
   async function onConnectSolana() {
     try {
-      const provider = window.solana;
-      if (!provider || !provider.isPhantom) throw new Error("Solana wallet provider not found");
+      const provider = solanaProvider();
+      if (!provider || !provider.connect) throw new Error("Solana wallet provider not found");
       const result = await provider.connect();
       const address = result && result.publicKey ? result.publicKey.toString() : "";
       if (!address) throw new Error("Wallet did not return a public key");
@@ -466,6 +508,9 @@
       state.solana = {
         ...(state.solana || {}),
         rpcUrl: readSolanaConfig().rpcUrl,
+        attestVerdict: readSolanaConfig().attestVerdict,
+        attestResultHash: readSolanaConfig().attestResultHash,
+        enableSubmit: readSolanaConfig().enableSubmit,
         walletAddress: address,
       };
       writeState(state);
@@ -473,6 +518,107 @@
       setStatus(`Connected ${shortMiddle(address)}`, "success");
     } catch (error) {
       setStatus(error.message, "error");
+    }
+  }
+
+  function walletResultSignature(result) {
+    if (typeof result === "string") return result;
+    if (result && typeof result.signature === "string") return result.signature;
+    if (result && typeof result.hash === "string") return result.hash;
+    if (result && result.signature && result.signature.toString) return result.signature.toString();
+    return "";
+  }
+
+  async function sendWalletSolanaTransaction(provider, rpcUrl, payload) {
+    const transaction = core.createSolanaWalletTransaction(payload);
+    if (provider.signAndSendTransaction) {
+      const result = await provider.signAndSendTransaction(transaction);
+      const signature = walletResultSignature(result);
+      if (!signature) throw new Error("Wallet did not return a transaction signature");
+      return { signature, transport: "wallet.signAndSendTransaction" };
+    }
+    if (provider.signTransaction) {
+      const signed = await provider.signTransaction(transaction);
+      const raw = signed && signed.serialize
+        ? signed.serialize()
+        : transaction.serialize();
+      const signature = await solanaRpcCall(rpcUrl, "sendTransaction", [
+        core.base64FromBytes(Array.from(raw)),
+        {
+          encoding: "base64",
+          preflightCommitment: "confirmed",
+        },
+      ]);
+      return { signature, transport: "wallet.signTransaction+rpc.sendTransaction" };
+    }
+    throw new Error("Wallet cannot sign Solana transactions");
+  }
+
+  async function pollSolanaSignature(rpcUrl, signature) {
+    for (let attempt = 0; attempt < 12; attempt += 1) {
+      const status = await solanaRpcCall(rpcUrl, "getSignatureStatuses", [
+        [signature],
+        { searchTransactionHistory: true },
+      ]);
+      const value = status.value && status.value[0];
+      if (value && (value.confirmationStatus === "confirmed" || value.confirmationStatus === "finalized")) {
+        return value.confirmationStatus;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+    }
+    return "pending";
+  }
+
+  async function onSubmitSolanaAction(entry, actionName, button) {
+    try {
+      const solana = readSolanaConfig();
+      if (!solana.enableSubmit) throw new Error("Enable wallet sends first");
+      const provider = solanaProvider();
+      if (!provider) throw new Error("Solana wallet provider not found");
+      const state = readState();
+      const wallet = connectedWallet(state);
+      if (!wallet) throw new Error("Connect a Solana wallet first");
+      const account = solanaAccountForEntry(state, entry);
+      if (!account) throw new Error("Refresh the Solana task account first");
+      if (button) button.disabled = true;
+      setStatus(`Building ${actionName} transaction`, "neutral");
+      const latest = await solanaRpcCall(solana.rpcUrl, "getLatestBlockhash", [{ commitment: "confirmed" }]);
+      const payload = await core.buildSolanaLifecycleTransaction({
+        entry,
+        account,
+        action: actionName,
+        walletAddress: wallet,
+        recentBlockhash: latest.value.blockhash,
+        verdict: solana.attestVerdict,
+        resultHash: solana.attestResultHash,
+      });
+      setStatus(`Waiting for wallet signature: ${payload.action}`, "neutral");
+      const sent = await sendWalletSolanaTransaction(provider, solana.rpcUrl, payload);
+      const confirmationStatus = await pollSolanaSignature(solana.rpcUrl, sent.signature);
+      const nextState = readState();
+      nextState.solana = {
+        ...(nextState.solana || {}),
+        rpcUrl: solana.rpcUrl,
+        attestVerdict: solana.attestVerdict,
+        attestResultHash: solana.attestResultHash,
+        enableSubmit: solana.enableSubmit,
+        submissions: {
+          ...((nextState.solana && nextState.solana.submissions) || {}),
+          [solanaSubmissionKey(entry, payload.action)]: {
+            action: payload.action,
+            signature: sent.signature,
+            transport: sent.transport,
+            confirmationStatus,
+            submittedAt: new Date().toISOString(),
+          },
+        },
+      };
+      writeState(nextState);
+      render();
+      setStatus(`Submitted ${payload.action}: ${shortMiddle(sent.signature)} (${confirmationStatus})`, "success");
+    } catch (error) {
+      setStatus(error.message, "error");
+      render();
     }
   }
 
@@ -507,6 +653,22 @@
     el.loadDemo.addEventListener("click", onLoadDemo);
     el.connectSolana.addEventListener("click", onConnectSolana);
     el.refreshSolana.addEventListener("click", onRefreshSolana);
+    el.attestVerdict.addEventListener("change", () => {
+      const state = readState();
+      state.solana = { ...(state.solana || {}), ...readSolanaConfig() };
+      writeState(state);
+    });
+    el.attestResultHash.addEventListener("change", () => {
+      const state = readState();
+      state.solana = { ...(state.solana || {}), ...readSolanaConfig() };
+      writeState(state);
+    });
+    el.enableSolanaSubmit.addEventListener("change", () => {
+      const state = readState();
+      state.solana = { ...(state.solana || {}), ...readSolanaConfig() };
+      writeState(state);
+      render();
+    });
     el.scan.addEventListener("click", onScan);
     el.importHandoff.addEventListener("click", onImportHandoff);
     el.clear.addEventListener("click", onClear);

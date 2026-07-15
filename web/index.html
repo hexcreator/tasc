@@ -47,6 +47,23 @@
               <button id="connect-solana" type="button">Connect Wallet</button>
               <button id="refresh-solana" type="button">Refresh Status</button>
             </div>
+            <div class="grid-two">
+              <label>
+                Attest verdict
+                <select id="attest-verdict">
+                  <option value="pass">Pass</option>
+                  <option value="fail">Fail</option>
+                </select>
+              </label>
+              <label class="checkline">
+                <input id="enable-solana-submit" type="checkbox">
+                <span>Enable wallet sends</span>
+              </label>
+            </div>
+            <label>
+              Result hash
+              <input id="attest-result-hash" autocomplete="off" spellcheck="false" placeholder="0x...">
+            </label>
             <div id="solana-wallet" class="wallet-readout">No wallet connected</div>
           </section>
 

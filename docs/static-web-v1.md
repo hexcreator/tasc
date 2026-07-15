@@ -19,6 +19,7 @@ There is no build step, no bundled dependency, no hosted database, and no requir
 ```text
 EVM:     browser -> RPC eth_blockNumber -> confirmed range -> RPC eth_getLogs -> Funded events -> local task cache
 Solana:  browser -> RPC getAccountInfo(task_pda) -> decode 276-byte task account -> role/action readiness
+Solana:  browser -> wallet sign -> RPC sendTransaction -> refreshed task-account status
 ```
 
 The browser reads only `TascEscrow.Funded` logs. It decodes the same event shape used by the CLI scanner:
@@ -40,7 +41,7 @@ The local cache uses browser storage. It stores:
 
 The browser can connect to an injected Solana wallet provider, refresh bundled Solana task accounts from a devnet RPC, decode the live task-account status, and classify the connected wallet as buyer, verifier, worker, worker candidate, or spectator.
 
-The action readiness model is intentionally read-only for now:
+The action readiness model gates guarded wallet sends:
 
 - `Funded` before deadline -> worker claim
 - `Funded` after deadline -> buyer timeout refund
@@ -48,6 +49,16 @@ The action readiness model is intentionally read-only for now:
 - `Passed` -> worker release
 - `Failed` -> buyer refund
 - `Released` / `Refunded` -> complete
+
+The send path is dependencyless:
+
+- builds Global Tasc instruction bytes in `tasc-web-core.js`
+- derives SPL buyer/worker token accounts and the vault-authority PDA in-browser
+- compiles a legacy Solana message with a fresh RPC blockhash
+- hands the transaction to an injected wallet provider
+- falls back to `signTransaction` plus raw RPC `sendTransaction` when the wallet does not expose `signAndSendTransaction`
+
+The UI requires the operator to enable wallet sends before any action button can submit a transaction.
 
 Repeated scans advance from the cached cursor instead of rescanning the full range.
 
@@ -97,13 +108,14 @@ The validator checks that:
 - handoff import derives the expected scanner config
 - the generated `eth_getLogs` filter matches the escrow and `Funded` topic
 - the browser Solana task-account decoder matches a committed live Solana lifecycle account fixture
+- the browser can build wallet transaction payloads for Solana `claim`, `attest`, `release`, `refund`, and `timeout-refund`
 
 ## Limits
 
-This is still a read-only operator surface. It still needs:
+This is now a guarded operator surface, but still needs:
 
-- claim transaction UI
-- attest/release transaction UI
+- live wallet QA in a normal browser extension environment
 - richer task metadata retrieval
+- proof-bundle import beyond the single bundled demo index
 - multi-RPC fallback
 - reorg handling for cached entries
