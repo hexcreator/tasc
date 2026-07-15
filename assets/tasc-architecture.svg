@@ -1,0 +1,80 @@
+<svg width="1120" height="560" viewBox="0 0 1120 560" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">Tasc architecture</title>
+  <desc id="desc">Architecture diagram showing task language, signed intent, funding, scanner admission, worker claim, verification, and settlement.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1120" y2="560" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#071512"/>
+      <stop offset="1" stop-color="#111817"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="116" y1="132" x2="1004" y2="132" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#45E0B8"/>
+      <stop offset="0.5" stop-color="#7DD3FC"/>
+      <stop offset="1" stop-color="#F8C35B"/>
+    </linearGradient>
+    <style>
+      .label { font: 700 24px Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #F5FFF9; }
+      .body { font: 500 15px Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #B9D7CE; }
+      .small { font: 700 13px Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #0B1815; }
+      .node { fill: #102520; stroke: #2D5B50; stroke-width: 1.5; }
+      .node2 { fill: #10222B; stroke: #2C5D77; stroke-width: 1.5; }
+      .node3 { fill: #2A2414; stroke: #7C6126; stroke-width: 1.5; }
+      .line { stroke: #5B776F; stroke-width: 2.5; stroke-linecap: round; }
+    </style>
+  </defs>
+  <rect width="1120" height="560" rx="24" fill="url(#bg)"/>
+  <text x="56" y="70" class="label" font-size="30">Tasc V1 System Shape</text>
+  <text x="56" y="100" class="body">A constrained task language plus signed funding evidence creates claimable work without a central job board.</text>
+  <path d="M120 180H1000" stroke="url(#accent)" stroke-width="5" stroke-linecap="round"/>
+  <g>
+    <rect x="56" y="146" width="190" height="112" rx="12" class="node"/>
+    <text x="82" y="185" class="label">TascLang</text>
+    <text x="82" y="214" class="body">Canonical task hash</text>
+    <text x="82" y="237" class="body">Verifier policy</text>
+  </g>
+  <g>
+    <rect x="286" y="146" width="190" height="112" rx="12" class="node"/>
+    <text x="312" y="185" class="label">Intent</text>
+    <text x="312" y="214" class="body">Buyer signature</text>
+    <text x="312" y="237" class="body">Amount + deadline</text>
+  </g>
+  <g>
+    <rect x="516" y="146" width="190" height="112" rx="12" class="node2"/>
+    <text x="542" y="185" class="label">Escrow</text>
+    <text x="542" y="214" class="body">EVM or Solana</text>
+    <text x="542" y="237" class="body">SPL custody proof</text>
+  </g>
+  <g>
+    <rect x="746" y="146" width="190" height="112" rx="12" class="node2"/>
+    <text x="772" y="185" class="label">Indexer</text>
+    <text x="772" y="214" class="body">Admit funded tasks</text>
+    <text x="772" y="237" class="body">Reject mismatches</text>
+  </g>
+  <g>
+    <rect x="516" y="326" width="190" height="112" rx="12" class="node3"/>
+    <text x="542" y="365" class="label">Worker</text>
+    <text x="542" y="394" class="body">Claim inventory</text>
+    <text x="542" y="417" class="body">Submit result</text>
+  </g>
+  <g>
+    <rect x="746" y="326" width="190" height="112" rx="12" class="node3"/>
+    <text x="772" y="365" class="label">Verifier</text>
+    <text x="772" y="394" class="body">Check artifact</text>
+    <text x="772" y="417" class="body">Attest pass/fail</text>
+  </g>
+  <g>
+    <rect x="286" y="326" width="190" height="112" rx="12" class="node"/>
+    <text x="312" y="365" class="label">Task Feed</text>
+    <text x="312" y="394" class="body">Static or indexed</text>
+    <text x="312" y="417" class="body">No backend required</text>
+  </g>
+  <path d="M476 382H516" class="line"/>
+  <path d="M706 382H746" class="line"/>
+  <path d="M841 258V326" class="line"/>
+  <path d="M611 258V326" class="line"/>
+  <path d="M381 258V326" class="line"/>
+  <path d="M706 202H746" class="line"/>
+  <path d="M476 202H516" class="line"/>
+  <path d="M246 202H286" class="line"/>
+  <rect x="438" y="487" width="244" height="34" rx="17" fill="url(#accent)"/>
+  <text x="481" y="510" class="small">funded -> claimed -> verified -> paid</text>
+</svg>

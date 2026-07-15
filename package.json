@@ -5,6 +5,8 @@
   "type": "commonjs",
   "description": "Seed prototype for a decentralized instant micro-work task protocol.",
   "scripts": {
+    "demo": "npm run compile:example && npm run verify:example && npm run demo:market && npm run validate:indexer && npm run validate:solana-spl-escrow",
+    "devnet:proof": "npm run solana:fund-spl-plan:live && npm run index:admit-solana-spl-live",
     "compile:example": "node bin/tasclang.js compile examples/summarize_url.tasc",
     "verify:example": "node bin/tascverify.js examples/summarize_url.tasc examples/submissions/summarize_url.pass.md --input url=https://docs.cdp.coinbase.com/x402/welcome --ledger examples/ledger.json",
     "demo:market": "node bin/tascmarket.js demo examples/summarize_url.tasc examples/submissions/summarize_url.pass.md --input url=https://docs.cdp.coinbase.com/x402/welcome --ledger examples/ledger.json",
