@@ -2,7 +2,7 @@
 
 This document defines the minimal Solana program/scanner boundary for Global Tasc.
 
-It is not deployed yet. It is the executable ABI and minimal account-mutating processor a Solana program should satisfy so indexers can decode live task accounts into `tasc.funding.solana` evidence.
+The fund processor has been deployed on Solana devnet, and the lifecycle-enabled upgrade is built locally. This document describes the executable ABI and minimal account-mutating processor indexers use to decode live task accounts into `tasc.funding.solana` evidence.
 
 ## Why This Exists
 
@@ -138,6 +138,17 @@ npm run solana:build-sbf
 
 That emits `build/solana/global_tasc_solana_program.so` plus `build/solana-tasc.sbf.json`. The artifact exports the Solana `entrypoint` symbol, parses the loader-provided runtime buffer, validates the first five fund accounts, and writes the `276` byte task account for a valid fund instruction.
 
+The entrypoint now also routes lifecycle instruction tags:
+
+```text
+0x01 claim   worker signer + task account, Funded -> Claimed
+0x02 attest  verifier signer + task account, Claimed -> Passed/Failed
+0x03 release signer + task account, Passed -> Released
+0x04 refund  buyer signer + task account, Failed -> Refunded
+```
+
+These are task-account state transitions only. `release` and `refund` do not yet invoke SPL Token CPI, so they must not be represented as payment-complete until program-signed vault transfer support lands.
+
 The current processor expects a pre-created task account owned by the program. It does not yet create accounts by CPI or move SPL tokens into the vault.
 
 The devnet transaction sender creates the task and vault placeholder accounts with System Program `create_account_with_seed`, using the buyer as the base address. This keeps the task and vault addresses deterministic from the signed intent and generated program id without adding task/vault private keys.
@@ -146,13 +157,14 @@ The live scanner reads that deterministic task account with `getAccountInfo`, de
 
 ## Next Step
 
-The guarded deploy/fund/scan sequence has been executed on devnet. The next implementation step is real SPL token escrow movement, followed by live `claim`, `attest`, `release`, and `refund` instructions.
+The guarded deploy/fund/scan sequence has been executed on devnet. The next implementation step is to redeploy the lifecycle-enabled program, send guarded live `claim` and `attest` transactions against the funded SPL task, then add real SPL token escrow movement for `release` and `refund`.
 
 Run:
 
 ```sh
 npm run validate:solana-source
 npm run validate:solana-fund-tx
+npm run validate:solana-lifecycle-tx
 npm run validate:solana-live-scan
 ```
 

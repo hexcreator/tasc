@@ -6,7 +6,7 @@ The next goal is not broad hype. It is getting the right early people to run the
 
 | Audience | Why They Matter | First Ask |
 | --- | --- | --- |
-| Solana program builders | Finish live claim/attest/release safely. | Review account layout and settlement instructions. |
+| Solana program builders | Finish live claim/attest/release safely. | Review lifecycle account transitions and SPL vault authority design. |
 | Indexer/search builders | Turn signed-and-funded evidence into public inventory. | Run admission validators and propose account discovery. |
 | Verification engineers | Make task completion objectively checkable. | Add verifier fixtures and artifact-hash flows. |
 | Static web/product builders | Make the feed usable without hosted infra. | Improve `web/` into a public demo. |
@@ -23,12 +23,12 @@ Done:
 - devnet SPL custody proof exists
 - validators exist
 - Apache-2.0 license exists
+- GitHub topics and starter issues exist
 
 Next:
 
 - add a short demo video or GIF
-- add GitHub topics: `solana`, `microtasks`, `escrow`, `usdc`, `task-language`, `devnet`
-- create labeled issues for the first contribution tracks
+- keep starter issues updated as protocol milestones land
 
 ### 2. Make The Proof Easy To Run
 
@@ -47,6 +47,7 @@ npm run verify:example
 npm run demo:market
 npm run validate:indexer
 npm run validate:solana-spl-escrow
+npm run validate:solana-lifecycle-tx
 ```
 
 Next:
@@ -61,7 +62,7 @@ The current static web proof should become the main public demo:
 
 - load `examples/index/solana.spl.live.index.json`
 - show task title, reward, deadline, status, chain, vault, and proof coordinates
-- make "claim" visibly disabled until live claim exists
+- keep "claim" visibly disabled until wallet-backed live claim is exposed in the browser
 - link to docs explaining what is real and what is simulated
 
 ### 4. Recruit The First Contributors
@@ -70,10 +71,11 @@ Open issues for:
 
 - `good first issue`: create another `.tasc` task fixture
 - `good first issue`: add README walkthrough screenshots
-- `protocol`: design live Solana claim account transition
-- `protocol`: implement verifier attestation instruction
+- `protocol`: redeploy and send live Solana claim/attest against the funded SPL task
+- `protocol`: implement program-signed SPL token release/refund CPI
 - `indexer`: discover funded task accounts from program-owned accounts
-- `web`: render the claimable index in the static UI
+- `indexer`: scan post-funding lifecycle state
+- `web`: add wallet-backed claim controls once live claim is proven
 - `security`: define pre-mainnet audit checklist
 
 ### 5. Get External Feedback
@@ -95,13 +97,12 @@ Ask for specific feedback:
 
 ## Next Engineering Steps
 
-1. Implement live Solana claim.
-2. Implement live verifier attestation.
-3. Implement live SPL token release/refund.
+1. Redeploy the lifecycle-enabled Solana program.
+2. Send live worker claim and verifier attestation transactions.
+3. Implement program-signed SPL token release/refund CPI.
 4. Extend scanner/indexer from "funded" to lifecycle state.
-5. Turn `web/` into the public proof page.
+5. Add wallet-backed browser claim controls after live claim is proven.
 6. Add one-command local demo.
-7. Choose license and contribution policy.
 
 ## Success Criteria For Early Use
 

@@ -13,7 +13,8 @@ pub const TASK_ACCOUNT_SIZE: usize = 276;
 pub const FUND_INSTRUCTION_SIZE: usize = 121;
 pub const ATTEST_INSTRUCTION_SIZE: usize = 34;
 pub const VERSION: u8 = 1;
-pub const RUNTIME_MIN_ACCOUNTS: usize = 5;
+pub const RUNTIME_MIN_ACCOUNTS: usize = 2;
+pub const RUNTIME_FUND_ACCOUNTS: usize = 5;
 pub const NON_DUP_MARKER: u8 = u8::MAX;
 pub const BPF_ALIGN_OF_U128: usize = 8;
 pub const MAX_PERMITTED_DATA_INCREASE: usize = 1_024 * 10;
@@ -84,10 +85,10 @@ unsafe fn process_entrypoint(input: *mut u8) -> u64 {
 }
 
 #[derive(Clone, Copy)]
-struct RuntimeFundAccounts {
-    buyer_key: PubkeyBytes,
-    buyer_signer: bool,
-    buyer_writable: bool,
+struct RuntimeAccounts {
+    signer_key: PubkeyBytes,
+    signer_signer: bool,
+    signer_writable: bool,
     task_owner: PubkeyBytes,
     task_writable: bool,
     task_data: *mut u8,
@@ -98,12 +99,12 @@ struct RuntimeFundAccounts {
     verifier_key: PubkeyBytes,
 }
 
-impl RuntimeFundAccounts {
+impl RuntimeAccounts {
     fn empty() -> Self {
         Self {
-            buyer_key: [0u8; 32],
-            buyer_signer: false,
-            buyer_writable: false,
+            signer_key: [0u8; 32],
+            signer_signer: false,
+            signer_writable: false,
             task_owner: [0u8; 32],
             task_writable: false,
             task_data: core::ptr::null_mut(),
@@ -123,7 +124,7 @@ unsafe fn process_serialized_runtime_input(input: *mut u8) -> Result<(), TascErr
         return Err(TascError::MissingAccount);
     }
 
-    let mut accounts = RuntimeFundAccounts::empty();
+    let mut accounts = RuntimeAccounts::empty();
     for index in 0..num_accounts {
         let duplicate_marker = read_runtime_u8(input, &mut offset);
         if duplicate_marker != NON_DUP_MARKER {
@@ -141,14 +142,31 @@ unsafe fn process_serialized_runtime_input(input: *mut u8) -> Result<(), TascErr
     offset += instruction_data_len;
 
     let program_id = read_runtime_pubkey(input, &mut offset);
-    process_fund_runtime(&program_id, &accounts, instruction_data)
+    match instruction_data.first().copied() {
+        Some(TAG_FUND) => {
+            process_fund_runtime(&program_id, &accounts, num_accounts, instruction_data)
+        }
+        Some(TAG_CLAIM) => {
+            process_claim_runtime(&program_id, &accounts, num_accounts, instruction_data)
+        }
+        Some(TAG_ATTEST) => {
+            process_attest_runtime(&program_id, &accounts, num_accounts, instruction_data)
+        }
+        Some(TAG_RELEASE) => {
+            process_release_runtime(&program_id, &accounts, num_accounts, instruction_data)
+        }
+        Some(TAG_REFUND) => {
+            process_refund_runtime(&program_id, &accounts, num_accounts, instruction_data)
+        }
+        _ => Err(TascError::InvalidInstruction),
+    }
 }
 
 unsafe fn read_runtime_account(
     input: *mut u8,
     mut offset: usize,
     index: usize,
-    accounts: &mut RuntimeFundAccounts,
+    accounts: &mut RuntimeAccounts,
 ) -> Result<usize, TascError> {
     let is_signer = read_runtime_u8(input, &mut offset) != 0;
     let is_writable = read_runtime_u8(input, &mut offset) != 0;
@@ -164,9 +182,9 @@ unsafe fn read_runtime_account(
 
     match index {
         0 => {
-            accounts.buyer_key = key;
-            accounts.buyer_signer = is_signer;
-            accounts.buyer_writable = is_writable;
+            accounts.signer_key = key;
+            accounts.signer_signer = is_signer;
+            accounts.signer_writable = is_writable;
         }
         1 => {
             accounts.task_owner = owner;
@@ -193,25 +211,24 @@ unsafe fn read_runtime_account(
 
 fn process_fund_runtime(
     program_id: &PubkeyBytes,
-    accounts: &RuntimeFundAccounts,
+    accounts: &RuntimeAccounts,
+    account_count: usize,
     instruction_data: &[u8],
 ) -> Result<(), TascError> {
+    if account_count < RUNTIME_FUND_ACCOUNTS {
+        return Err(TascError::MissingAccount);
+    }
     let ix = decode_fund_instruction(instruction_data)?;
     if ix.amount == 0 {
         return Err(TascError::InvalidInstruction);
     }
-    if !accounts.buyer_signer {
+    if !accounts.signer_signer {
         return Err(TascError::InvalidSigner);
     }
-    if !accounts.buyer_writable || !accounts.task_writable || !accounts.vault_writable {
+    if !accounts.signer_writable || !accounts.task_writable || !accounts.vault_writable {
         return Err(TascError::InvalidWritable);
     }
-    if accounts.task_owner != *program_id {
-        return Err(TascError::InvalidOwner);
-    }
-    if accounts.task_data.is_null() || accounts.task_data_len != TASK_ACCOUNT_SIZE {
-        return Err(TascError::InvalidLength);
-    }
+    validate_task_metadata(program_id, accounts)?;
     if accounts.token_mint_key != ix.token_mint || accounts.verifier_key != ix.verifier {
         return Err(TascError::InvalidAccount);
     }
@@ -222,8 +239,111 @@ fn process_fund_runtime(
         return Err(TascError::AlreadyInitialized);
     }
 
-    let account = build_funded_task_account(&ix, accounts.buyer_key, accounts.vault_key, 0);
+    let account = build_funded_task_account(&ix, accounts.signer_key, accounts.vault_key, 0);
     encode_task_account(&account, task_data)
+}
+
+fn process_claim_runtime(
+    program_id: &PubkeyBytes,
+    accounts: &RuntimeAccounts,
+    account_count: usize,
+    instruction_data: &[u8],
+) -> Result<(), TascError> {
+    decode_unit_instruction(instruction_data, TAG_CLAIM)?;
+    validate_lifecycle_accounts(program_id, accounts, account_count)?;
+    let task_data =
+        unsafe { slice::from_raw_parts_mut(accounts.task_data, accounts.task_data_len) };
+    let mut account = decode_task_account(task_data)?;
+    apply_claim(&mut account, accounts.signer_key, 0)?;
+    encode_task_account(&account, task_data)
+}
+
+fn process_attest_runtime(
+    program_id: &PubkeyBytes,
+    accounts: &RuntimeAccounts,
+    account_count: usize,
+    instruction_data: &[u8],
+) -> Result<(), TascError> {
+    validate_lifecycle_accounts(program_id, accounts, account_count)?;
+    let ix = decode_attest_instruction(instruction_data)?;
+    let task_data =
+        unsafe { slice::from_raw_parts_mut(accounts.task_data, accounts.task_data_len) };
+    let mut account = decode_task_account(task_data)?;
+    if account.verifier != accounts.signer_key {
+        return Err(TascError::InvalidSigner);
+    }
+    apply_attest(&mut account, &ix, 0)?;
+    encode_task_account(&account, task_data)
+}
+
+fn process_release_runtime(
+    program_id: &PubkeyBytes,
+    accounts: &RuntimeAccounts,
+    account_count: usize,
+    instruction_data: &[u8],
+) -> Result<(), TascError> {
+    decode_unit_instruction(instruction_data, TAG_RELEASE)?;
+    validate_lifecycle_accounts(program_id, accounts, account_count)?;
+    let task_data =
+        unsafe { slice::from_raw_parts_mut(accounts.task_data, accounts.task_data_len) };
+    let mut account = decode_task_account(task_data)?;
+    apply_release(&mut account, 0)?;
+    encode_task_account(&account, task_data)
+}
+
+fn process_refund_runtime(
+    program_id: &PubkeyBytes,
+    accounts: &RuntimeAccounts,
+    account_count: usize,
+    instruction_data: &[u8],
+) -> Result<(), TascError> {
+    decode_unit_instruction(instruction_data, TAG_REFUND)?;
+    validate_lifecycle_accounts(program_id, accounts, account_count)?;
+    let task_data =
+        unsafe { slice::from_raw_parts_mut(accounts.task_data, accounts.task_data_len) };
+    let mut account = decode_task_account(task_data)?;
+    if account.buyer != accounts.signer_key {
+        return Err(TascError::InvalidSigner);
+    }
+    apply_refund(&mut account, 0)?;
+    encode_task_account(&account, task_data)
+}
+
+fn decode_unit_instruction(data: &[u8], tag: u8) -> Result<(), TascError> {
+    if data.len() != 1 || data[0] != tag {
+        return Err(TascError::InvalidInstruction);
+    }
+    Ok(())
+}
+
+fn validate_lifecycle_accounts(
+    program_id: &PubkeyBytes,
+    accounts: &RuntimeAccounts,
+    account_count: usize,
+) -> Result<(), TascError> {
+    if account_count < RUNTIME_MIN_ACCOUNTS {
+        return Err(TascError::MissingAccount);
+    }
+    if !accounts.signer_signer {
+        return Err(TascError::InvalidSigner);
+    }
+    validate_task_metadata(program_id, accounts)
+}
+
+fn validate_task_metadata(
+    program_id: &PubkeyBytes,
+    accounts: &RuntimeAccounts,
+) -> Result<(), TascError> {
+    if !accounts.task_writable {
+        return Err(TascError::InvalidWritable);
+    }
+    if accounts.task_owner != *program_id {
+        return Err(TascError::InvalidOwner);
+    }
+    if accounts.task_data.is_null() || accounts.task_data_len != TASK_ACCOUNT_SIZE {
+        return Err(TascError::InvalidLength);
+    }
+    Ok(())
 }
 
 fn is_zeroed(data: &[u8]) -> bool {
@@ -444,6 +564,15 @@ pub fn apply_release(account: &mut TaskAccount, slot: u64) -> Result<(), TascErr
     Ok(())
 }
 
+pub fn apply_refund(account: &mut TaskAccount, slot: u64) -> Result<(), TascError> {
+    if account.status != STATUS_FAILED {
+        return Err(TascError::InvalidStatus);
+    }
+    account.status = STATUS_REFUNDED;
+    account.updated_slot = slot;
+    Ok(())
+}
+
 fn validate_status(status: u8) -> Result<(), TascError> {
     if status <= STATUS_DISPUTED {
         Ok(())
@@ -525,6 +654,100 @@ mod tests {
         data[49..57].copy_from_slice(&nonce.to_le_bytes());
         data[57..89].copy_from_slice(&token_mint);
         data[89..121].copy_from_slice(&verifier);
+        data
+    }
+
+    fn attest_instruction_bytes(
+        passed: bool,
+        result_hash: HashBytes,
+    ) -> [u8; ATTEST_INSTRUCTION_SIZE] {
+        let mut data = [0u8; ATTEST_INSTRUCTION_SIZE];
+        data[0] = TAG_ATTEST;
+        data[1] = u8::from(passed);
+        data[2..34].copy_from_slice(&result_hash);
+        data
+    }
+
+    fn funded_account_data(
+        buyer: PubkeyBytes,
+        vault: PubkeyBytes,
+        token_mint: PubkeyBytes,
+        verifier: PubkeyBytes,
+    ) -> Vec<u8> {
+        let ix = FundInstruction {
+            task_hash: key(1),
+            amount: 10_000_000,
+            deadline_unix: 1_800_000_060,
+            nonce: 1,
+            token_mint,
+            verifier,
+        };
+        let account = build_funded_task_account(&ix, buyer, vault, 42);
+        let mut data = vec![0u8; TASK_ACCOUNT_SIZE];
+        encode_task_account(&account, &mut data).unwrap();
+        let decoded = decode_task_account(&data).unwrap();
+        assert_eq!(decoded.buyer, buyer);
+        assert_eq!(decoded.vault, vault);
+        data
+    }
+
+    fn claimed_account_data(
+        buyer: PubkeyBytes,
+        worker: PubkeyBytes,
+        vault: PubkeyBytes,
+        token_mint: PubkeyBytes,
+        verifier: PubkeyBytes,
+    ) -> Vec<u8> {
+        let mut data = funded_account_data(buyer, vault, token_mint, verifier);
+        let mut account = decode_task_account(&data).unwrap();
+        apply_claim(&mut account, worker, 43).unwrap();
+        encode_task_account(&account, &mut data).unwrap();
+        data
+    }
+
+    fn passed_account_data(
+        buyer: PubkeyBytes,
+        worker: PubkeyBytes,
+        vault: PubkeyBytes,
+        token_mint: PubkeyBytes,
+        verifier: PubkeyBytes,
+        result_hash: HashBytes,
+    ) -> Vec<u8> {
+        let mut data = claimed_account_data(buyer, worker, vault, token_mint, verifier);
+        let mut account = decode_task_account(&data).unwrap();
+        apply_attest(
+            &mut account,
+            &AttestInstruction {
+                passed: true,
+                result_hash,
+            },
+            44,
+        )
+        .unwrap();
+        encode_task_account(&account, &mut data).unwrap();
+        data
+    }
+
+    fn failed_account_data(
+        buyer: PubkeyBytes,
+        worker: PubkeyBytes,
+        vault: PubkeyBytes,
+        token_mint: PubkeyBytes,
+        verifier: PubkeyBytes,
+        result_hash: HashBytes,
+    ) -> Vec<u8> {
+        let mut data = claimed_account_data(buyer, worker, vault, token_mint, verifier);
+        let mut account = decode_task_account(&data).unwrap();
+        apply_attest(
+            &mut account,
+            &AttestInstruction {
+                passed: false,
+                result_hash,
+            },
+            44,
+        )
+        .unwrap();
+        encode_task_account(&account, &mut data).unwrap();
         data
     }
 
@@ -668,6 +891,28 @@ mod tests {
     }
 
     #[test]
+    fn refund_transition_requires_failed_status() {
+        let ix = FundInstruction {
+            task_hash: key(1),
+            amount: 10_000_000,
+            deadline_unix: 1_800_000_060,
+            nonce: 1,
+            token_mint: key(2),
+            verifier: key(3),
+        };
+        let mut account = build_funded_task_account(&ix, key(4), key(5), 42);
+        apply_claim(&mut account, key(6), 43).unwrap();
+        let attestation = AttestInstruction {
+            passed: false,
+            result_hash: key(7),
+        };
+        apply_attest(&mut account, &attestation, 44).unwrap();
+        apply_refund(&mut account, 45).unwrap();
+        assert_eq!(account.status, STATUS_REFUNDED);
+        assert_eq!(account.updated_slot, 45);
+    }
+
+    #[test]
     fn entrypoint_fund_instruction_writes_task_account() {
         let program_id = key(9);
         let buyer = key(4);
@@ -741,5 +986,145 @@ mod tests {
 
         let status = unsafe { entrypoint(input.as_mut_ptr()) };
         assert_eq!(status, TascError::InvalidOwner as u64);
+    }
+
+    #[test]
+    fn entrypoint_claim_instruction_updates_worker() {
+        let program_id = key(9);
+        let buyer = key(4);
+        let worker = key(6);
+        let task = key(8);
+        let verifier = key(3);
+        let accounts = [
+            TestAccount {
+                key: worker,
+                owner: key(0),
+                is_signer: true,
+                is_writable: true,
+                data: Vec::new(),
+            },
+            TestAccount::new(task, program_id, false, true, TASK_ACCOUNT_SIZE),
+        ];
+        let mut accounts = accounts;
+        accounts[1].data = funded_account_data(buyer, key(5), key(2), verifier);
+        let mut input = serialized_runtime_input(&accounts, &[TAG_CLAIM], program_id);
+
+        let status = unsafe { entrypoint(input.as_mut_ptr()) };
+        assert_eq!(status, 0);
+
+        let task_data_offset = data_offset_for_account(&input, 1);
+        let decoded =
+            decode_task_account(&input[task_data_offset..task_data_offset + TASK_ACCOUNT_SIZE])
+                .unwrap();
+        assert_eq!(decoded.status, STATUS_CLAIMED);
+        assert_eq!(decoded.worker, worker);
+        assert_eq!(decoded.updated_slot, 0);
+    }
+
+    #[test]
+    fn entrypoint_attest_instruction_requires_verifier() {
+        let program_id = key(9);
+        let buyer = key(4);
+        let worker = key(6);
+        let verifier = key(3);
+        let task = key(8);
+        let instruction = attest_instruction_bytes(true, key(7));
+        let accounts = [
+            TestAccount {
+                key: verifier,
+                owner: key(0),
+                is_signer: true,
+                is_writable: true,
+                data: Vec::new(),
+            },
+            TestAccount {
+                key: task,
+                owner: program_id,
+                is_signer: false,
+                is_writable: true,
+                data: claimed_account_data(buyer, worker, key(5), key(2), verifier),
+            },
+        ];
+        let mut input = serialized_runtime_input(&accounts, &instruction, program_id);
+
+        let status = unsafe { entrypoint(input.as_mut_ptr()) };
+        assert_eq!(status, 0);
+
+        let task_data_offset = data_offset_for_account(&input, 1);
+        let decoded =
+            decode_task_account(&input[task_data_offset..task_data_offset + TASK_ACCOUNT_SIZE])
+                .unwrap();
+        assert_eq!(decoded.status, STATUS_PASSED);
+        assert_eq!(decoded.result_hash, key(7));
+    }
+
+    #[test]
+    fn entrypoint_release_instruction_requires_passed_status() {
+        let program_id = key(9);
+        let buyer = key(4);
+        let worker = key(6);
+        let verifier = key(3);
+        let task = key(8);
+        let accounts = [
+            TestAccount {
+                key: worker,
+                owner: key(0),
+                is_signer: true,
+                is_writable: true,
+                data: Vec::new(),
+            },
+            TestAccount {
+                key: task,
+                owner: program_id,
+                is_signer: false,
+                is_writable: true,
+                data: passed_account_data(buyer, worker, key(5), key(2), verifier, key(7)),
+            },
+        ];
+        let mut input = serialized_runtime_input(&accounts, &[TAG_RELEASE], program_id);
+
+        let status = unsafe { entrypoint(input.as_mut_ptr()) };
+        assert_eq!(status, 0);
+
+        let task_data_offset = data_offset_for_account(&input, 1);
+        let decoded =
+            decode_task_account(&input[task_data_offset..task_data_offset + TASK_ACCOUNT_SIZE])
+                .unwrap();
+        assert_eq!(decoded.status, STATUS_RELEASED);
+    }
+
+    #[test]
+    fn entrypoint_refund_instruction_requires_buyer_and_failed_status() {
+        let program_id = key(9);
+        let buyer = key(4);
+        let worker = key(6);
+        let verifier = key(3);
+        let task = key(8);
+        let accounts = [
+            TestAccount {
+                key: buyer,
+                owner: key(0),
+                is_signer: true,
+                is_writable: true,
+                data: Vec::new(),
+            },
+            TestAccount {
+                key: task,
+                owner: program_id,
+                is_signer: false,
+                is_writable: true,
+                data: failed_account_data(buyer, worker, key(5), key(2), verifier, key(7)),
+            },
+        ];
+        let mut input = serialized_runtime_input(&accounts, &[TAG_REFUND], program_id);
+
+        let status = unsafe { entrypoint(input.as_mut_ptr()) };
+        assert_eq!(status, 0);
+
+        let task_data_offset = data_offset_for_account(&input, 1);
+        let decoded =
+            decode_task_account(&input[task_data_offset..task_data_offset + TASK_ACCOUNT_SIZE])
+                .unwrap();
+        assert_eq!(decoded.status, STATUS_REFUNDED);
     }
 }

@@ -417,7 +417,7 @@ function plan(options = {}) {
         "spl_token.transfer_checked(buyer_token_account -> vault_token_account)",
         "global_tasc.fund",
       ],
-      note: "The live sender still uses the placeholder vault path. SPL escrow is staged offline until token accounts and release authority are validated.",
+      note: "The plain fund sender uses the placeholder vault path. Use plan-spl/send-spl for live SPL custody; release/refund token movement is handled by the lifecycle/SPL CPI follow-up.",
     },
     send_requirements: [
       "buyer keypair in local env must match the signed intent buyer",

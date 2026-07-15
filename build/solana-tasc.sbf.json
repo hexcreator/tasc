@@ -4,8 +4,8 @@
   "out_dir": "build/solana",
   "artifact": {
     "path": "build/solana/global_tasc_solana_program.so",
-    "bytes": 6360,
-    "sha256": "ec6793c4353360ca243caea97a3a15263808afff344e31eafaa39ca05e53c9bf",
+    "bytes": 9992,
+    "sha256": "2c8422f6479491e10703759c0c40166cb3267bf137725330d8d4267064469ba3",
     "entrypoint_symbol": {
       "checked": true,
       "ok": true

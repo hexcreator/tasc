@@ -188,6 +188,20 @@ function spec() {
         { name: "token_mint", offset: 57, size: 32, type: "pubkey" },
         { name: "verifier", offset: 89, size: 32, type: "pubkey" },
       ],
+      claim_data: [
+        { name: "tag", offset: 0, size: 1, type: "u8", value: INSTRUCTION_TAGS.claim },
+      ],
+      attest_data: [
+        { name: "tag", offset: 0, size: 1, type: "u8", value: INSTRUCTION_TAGS.attest },
+        { name: "passed", offset: 1, size: 1, type: "u8 bool" },
+        { name: "result_hash", offset: 2, size: 32, type: "bytes32" },
+      ],
+      release_data: [
+        { name: "tag", offset: 0, size: 1, type: "u8", value: INSTRUCTION_TAGS.release },
+      ],
+      refund_data: [
+        { name: "tag", offset: 0, size: 1, type: "u8", value: INSTRUCTION_TAGS.refund },
+      ],
     },
     scanner_contract: {
       input: "Solana task account owned by the Global Tasc program plus the matching signed buyer intent",

@@ -29,6 +29,19 @@ function run(command, args, options = {}) {
   };
 }
 
+function sanitizeSolanaOutput(value) {
+  const text = String(value || "");
+  return text
+    .replace(
+      /={10,}\nRecover the intermediate account's ephemeral keypair file with[\s\S]*?Error:/m,
+      "Solana CLI emitted a recoverable intermediate-buffer keypair message; seed phrase redacted.\nError:",
+    )
+    .replace(
+      /Recover the intermediate account's ephemeral keypair file with[\s\S]*?Error:/m,
+      "Solana CLI emitted a recoverable intermediate-buffer keypair message; seed phrase redacted.\nError:",
+    );
+}
+
 function commandExists(command) {
   return run("which", [command]).status === 0;
 }
@@ -117,7 +130,7 @@ function deploy(state, env) {
       ...env,
     },
   });
-  assert(result.status === 0, `solana deploy failed: ${result.stderr || result.stdout || result.error || "unknown error"}`);
+  assert(result.status === 0, `solana deploy failed: ${sanitizeSolanaOutput(result.stderr || result.stdout || result.error || "unknown error")}`);
 
   let solanaOutput = null;
   if (result.stdout) {

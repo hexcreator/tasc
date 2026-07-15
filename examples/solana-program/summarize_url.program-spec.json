@@ -173,6 +173,54 @@
         "size": 32,
         "type": "pubkey"
       }
+    ],
+    "claim_data": [
+      {
+        "name": "tag",
+        "offset": 0,
+        "size": 1,
+        "type": "u8",
+        "value": 1
+      }
+    ],
+    "attest_data": [
+      {
+        "name": "tag",
+        "offset": 0,
+        "size": 1,
+        "type": "u8",
+        "value": 2
+      },
+      {
+        "name": "passed",
+        "offset": 1,
+        "size": 1,
+        "type": "u8 bool"
+      },
+      {
+        "name": "result_hash",
+        "offset": 2,
+        "size": 32,
+        "type": "bytes32"
+      }
+    ],
+    "release_data": [
+      {
+        "name": "tag",
+        "offset": 0,
+        "size": 1,
+        "type": "u8",
+        "value": 3
+      }
+    ],
+    "refund_data": [
+      {
+        "name": "tag",
+        "offset": 0,
+        "size": 1,
+        "type": "u8",
+        "value": 4
+      }
     ]
   },
   "scanner_contract": {

@@ -58,9 +58,10 @@ buyer funds -> indexer admits -> worker claims -> verifier attests -> escrow rel
 
 Required additions before this mode:
 
-- live claim instruction
-- live verifier attestation instruction
-- live release/refund instruction
+- lifecycle-enabled Solana program redeployed to devnet
+- live claim transaction confirmed
+- live verifier attestation transaction confirmed
+- program-signed SPL token release/refund CPI
 - scanner output for post-funding lifecycle state
 - duplicate claim and timeout tests
 

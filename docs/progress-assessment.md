@@ -6,8 +6,8 @@ This repo is now a credible protocol prototype, not yet a product.
 
 | Target | Estimated Progress | Notes |
 | --- | ---: | --- |
-| Technical protocol skeleton | 98% | Hashable task language, verifier, signed intents, escrow ABI/contract, event-derived funding, admission gate, scanner cursor, testnet handoff, static web discovery proof, scanner-batch index admission, Solana devnet substrate, local Solana adapter, Solana account ABI, dependencyless Rust source core, SBF fund processor, guarded Solana fund transaction builder, live devnet deploy/fund proof, live account scanner, SPL custody boundary, live SPL setup scanner, and live SPL token-backed funding proof exist. |
-| Testnet MVP | 84% | Base Sepolia is blocked by faucet friction; Solana devnet now has a finalized program deploy, finalized account-state fund transaction, live account scan, claimable index admission, finalized SPL mint/token-account setup, decoded live SPL account evidence, and a guarded token-backed funding transaction admitted with live vault custody. The remaining testnet gap is live claim/attest/release. |
+| Technical protocol skeleton | 99% | Hashable task language, verifier, signed intents, escrow ABI/contract, event-derived funding, admission gate, scanner cursor, testnet handoff, static web discovery proof, scanner-batch index admission, Solana devnet substrate, local Solana adapter, Solana account ABI, dependencyless Rust source core, SBF fund/lifecycle processor, guarded Solana fund/lifecycle transaction builders, live devnet deploy/fund proof, live account scanner, SPL custody boundary, live SPL setup scanner, and live SPL token-backed funding proof exist. |
+| Testnet MVP | 87% | Base Sepolia is blocked by faucet friction; Solana devnet now has a finalized program deploy, finalized account-state fund transaction, live account scan, claimable index admission, finalized SPL mint/token-account setup, decoded live SPL account evidence, a guarded token-backed funding transaction admitted with live vault custody, and guarded claim/attest/release/refund transaction builders. The remaining testnet gap is redeploying the lifecycle program, sending live claim/attest, and adding SPL payout/refund CPI. |
 | Private beta product | 25% | Missing buyer/worker wallet flows, real task inventory, verifier service, reputation, disputes, and durable metadata. |
 | Production decentralized marketplace | 10% | Missing decentralization, economic security, audits, abuse controls, governance, and real liquidity/demand. |
 
@@ -26,7 +26,7 @@ This repo is now a credible protocol prototype, not yet a product.
 - Solana devnet keys can be generated locally without dependencies, the harness can request airdrops/read balances through raw JSON-RPC, and one funded devnet wallet can transfer SOL to the other roles with a locally signed System Program transfer.
 - A Solana-style buyer intent can be signed and verified with Ed25519, mapped to task/vault addresses, simulated through `funded -> claimed -> passed -> released`, emitted as `tasc.funding.solana`, and admitted into the same indexer boundary as EVM funding.
 - A Solana task-account ABI can encode a funded task into a 276-byte account, round-trip a 121-byte fund instruction, scan that account into `tasc.funding.solana`, reject released or mismatched accounts, and admit the evidence as claimable inventory.
-- A dependencyless Rust core crate now compiles/tests the same task-account layout, fund instruction, and claim/attest/release state transitions.
+- A dependencyless Rust core crate now compiles/tests the same task-account layout, fund instruction, and claim/attest/release/refund state transitions.
 - A guarded SBF build emits `build/solana/global_tasc_solana_program.so`, records its SHA-256 manifest, exposes the Solana `entrypoint` symbol, parses runtime input, and writes the funded task account without adding npm or Cargo dependencies.
 - A guarded Solana transaction sender can create deterministic task/vault accounts with `create_account_with_seed`, then call the Global Tasc fund instruction. A live devnet signed intent now matches the local buyer and generated program id.
 - The Solana program was deployed to devnet at `FAqKhKke5pZr4TK6kXq9aKR98hWFy19SMQG9eGfXQrRM`; the deploy transaction `4veC8ijRVhzgCcUU6DKXmB7RoF7YRZmtRxz5Esxfm9kzdAzuAPr3cHATe6gNjp1YyVD7JaVqmhSF1GPps5fvBqMg` finalized.
@@ -36,11 +36,12 @@ This repo is now a credible protocol prototype, not yet a product.
 - A guarded SPL setup transaction finalized on devnet at `2p6vSHtZDa6FM48jwA1Ck4EQb1hTaE2b7eNf1YDB159HdkMoE9ZN59kXeLCboxvazaqW1Wh2Z5KVjS6UrVXr8DE3`, creating mint `8WdRRCNVr8Du5Q1C1EeiMvqCRpSTBwWnHRjnx3FZ7KbC`, buyer token account `532DEeJ1PHjgd56Tzk86G5zFavXVwj4NBVHRrQaoUf6E`, and PDA-owned vault token account `5pzDYJ55KMtFC5aH6uQSmRpBBBTyuENLCLsb2Ng9fexc`.
 - A read-only SPL scanner decodes the live mint supply as `10000000`, token account owners, and current balances. After the token-backed funding transaction, the original buyer token account is `0`, the original setup vault is `0`, and the fresh funded task vault holds `10000000`.
 - A guarded live SPL funding transaction confirmed at `zhrqMMYfXQAK37hLVkuvmqNwb2VzkdM4ZyHZMhpBhci97j3L38A7dswKhA9PsjimMPEFczf9NoWu5pR4jnudsm1`, creating funded task account `37hA4KUeR6eLPP1g1mBoTMYHKCPq7LECpLryQc61TmRi`, transferring `10000000` token base units into vault token account `ChfKa5tEUjeSdaEhmjiDCWQE1Q6YT1oVaZt62HHR43b4`, scanning that custody, and admitting it as claimable at `examples/index/solana.spl.live.index.json`.
+- Guarded Solana lifecycle transaction builders now emit dependencyless claim, attest, release, and refund instructions. Release/refund currently update task-account status only; SPL token movement is still pending program-signed CPI from the vault authority PDA.
 - The current npm dependency tree has no production vulnerabilities, all 17 registry signatures verify, and 2 registry attestations verify.
 
 ## Biggest Missing Pieces
 
-1. Live claim/release protocol: signed worker claims, concurrency control, lock expiry, verifier attestation, and payout/refund transitions on chain.
+1. Live payout/refund protocol: program-signed SPL Token CPI from the vault authority PDA, lock expiry, concurrency tests, and completed payout/refund scans.
 2. Verifier service: deterministic verifier runners, artifact storage, result attestations, and paid verifier incentives.
 3. Reputation and abuse controls: worker/buyer/verifier histories, duplicate detection, bonds, rate limits, and spam economics.
 4. Dispute path: reviewer selection, evidence packaging, deadlines, and appeal/ruling settlement.
@@ -56,6 +57,6 @@ The fastest useful path is not full decentralization first. It is a narrow testn
 buyer signs and funds -> scanner batch -> index admission -> worker claims -> verifier attests -> escrow releases
 ```
 
-That is probably 1 serious engineering increment away in this prototype on Solana: implement live claim/attest/release against the token-backed task vault. A production system that can safely support a global market for instant `$10` work is much farther: likely months of focused buildout after the testnet loop works, because the hard parts become abuse resistance, demand liquidity, dispute quality, and reliable user experience.
+That is probably 1 serious engineering increment away in this prototype on Solana: redeploy the lifecycle-enabled program, send live claim/attest against the token-backed task vault, and implement SPL release/refund CPI. A production system that can safely support a global market for instant `$10` work is much farther: likely months of focused buildout after the testnet loop works, because the hard parts become abuse resistance, demand liquidity, dispute quality, and reliable user experience.
 
-If Solana is the preferred path, the next increment is now concrete: add worker claim, verifier attestation, and token release/refund instructions, then scan the completed lifecycle into the same indexer boundary.
+If Solana is the preferred path, the next increment is now concrete: deploy the lifecycle account-transition program, send worker claim and verifier attestation, add program-signed token release/refund, then scan the completed lifecycle into the same indexer boundary.

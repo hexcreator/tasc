@@ -144,10 +144,10 @@ funded -> claimed -> passed -> released
 The live Solana devnet path currently covers:
 
 ```text
-signed intent -> SPL vault custody -> funded task account -> scanner -> claimable index
+signed intent -> SPL vault custody -> funded task account -> scanner -> claimable index -> guarded claim/attest tx builders
 ```
 
-The next protocol implementation step is live Solana `claim`, `attest`, `release`, and `refund` instructions.
+The next protocol implementation step is program-signed SPL token movement for `release` and `refund`. The current Solana program and CLI support task-account lifecycle transitions; payout/refund transfer CPI is still intentionally marked pending.
 
 ## Repository Map
 

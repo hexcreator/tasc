@@ -221,6 +221,17 @@ The local adapter currently models:
 - buyer, worker, verifier, amount, deadline, and status fields
 - local `fund`, `claim`, `attest`, and `release` state transitions
 
+The live program processor now accepts the same lifecycle instruction tags for task-account status transitions:
+
+```text
+claim:   worker signer + writable task account -> Claimed
+attest:  verifier signer + writable task account -> Passed/Failed
+release: signer + writable task account -> Released after Passed
+refund:  buyer signer + writable task account -> Refunded after Failed
+```
+
+The guarded CLI builder for those transactions is `bin/run-solana-lifecycle.js`. It intentionally keeps `release` and `refund` status-only until the program can sign an SPL Token `TransferChecked` CPI from the vault authority PDA.
+
 The TascLang source should stay chain-agnostic. It should compile to the same canonical task hash and then generate Solana-specific settlement bindings separately.
 
 The adapter is intentionally dependencyless. It uses Node built-ins for Ed25519 signing/verification and reuses the local base58 implementation from the devnet harness instead of adding `@solana/web3.js`.
@@ -236,6 +247,7 @@ Current fixture facts:
 ```text
 task account size: 276 bytes
 fund instruction size: 121 bytes
+attest instruction size: 34 bytes
 funded status code: 1
 scanner output: tasc.funding.solana
 ```
@@ -295,9 +307,10 @@ The EVM scanner reads `Funded` logs. The Solana scanner reads task account state
 
 Solana devnet now works well enough to continue on the faster-chain path. The next real implementation step is:
 
-1. Add live `claim`, `attest`, `release`, and `refund` instructions.
-2. Scan lifecycle state after claim/attest/release, not only funding state.
-3. Keep the browser/static index path chain-neutral by admitting Solana and EVM evidence through the same indexer boundary.
-4. Add production-style finality/reorg handling and duplicate-task suppression before treating devnet behavior as production-ready.
+1. Redeploy the lifecycle-enabled program, then send guarded `claim` and `attest` transactions against the live funded SPL task.
+2. Add program-signed SPL Token CPI for `release` and `refund`.
+3. Scan lifecycle state after claim/attest/release, not only funding state.
+4. Keep the browser/static index path chain-neutral by admitting Solana and EVM evidence through the same indexer boundary.
+5. Add production-style finality/reorg handling and duplicate-task suppression before treating devnet behavior as production-ready.
 
 That gives Global Tasc a credible faster-chain path without throwing away the EVM work.

@@ -64,8 +64,18 @@ function main() {
 
   const taskSize = parseNumber(extractConst(source, "TASK_ACCOUNT_SIZE"));
   const fundInstructionSize = parseNumber(extractConst(source, "FUND_INSTRUCTION_SIZE"));
+  const attestInstructionSize = parseNumber(extractConst(source, "ATTEST_INSTRUCTION_SIZE"));
   const tagFund = parseNumber(extractConst(source, "TAG_FUND"));
+  const tagClaim = parseNumber(extractConst(source, "TAG_CLAIM"));
+  const tagAttest = parseNumber(extractConst(source, "TAG_ATTEST"));
+  const tagRelease = parseNumber(extractConst(source, "TAG_RELEASE"));
+  const tagRefund = parseNumber(extractConst(source, "TAG_REFUND"));
   const statusFunded = parseNumber(extractConst(source, "STATUS_FUNDED"));
+  const statusClaimed = parseNumber(extractConst(source, "STATUS_CLAIMED"));
+  const statusPassed = parseNumber(extractConst(source, "STATUS_PASSED"));
+  const statusFailed = parseNumber(extractConst(source, "STATUS_FAILED"));
+  const statusReleased = parseNumber(extractConst(source, "STATUS_RELEASED"));
+  const statusRefunded = parseNumber(extractConst(source, "STATUS_REFUNDED"));
   const amountOffset = parseNumber(extractConst(source, "AMOUNT_OFFSET"));
   const updatedSlotOffset = parseNumber(extractConst(source, "UPDATED_SLOT_OFFSET"));
 
@@ -73,8 +83,18 @@ function main() {
   assert(discriminatorMatch, "Rust discriminator does not match JS ABI");
   assert(taskSize === abi.task_account.size, "Rust task account size does not match JS ABI");
   assert(fundInstructionSize === 121, "Rust fund instruction size mismatch");
+  assert(attestInstructionSize === 34, "Rust attest instruction size mismatch");
   assert(tagFund === abi.instructions.tags.fund, "Rust fund tag does not match JS ABI");
+  assert(tagClaim === abi.instructions.tags.claim, "Rust claim tag does not match JS ABI");
+  assert(tagAttest === abi.instructions.tags.attest, "Rust attest tag does not match JS ABI");
+  assert(tagRelease === abi.instructions.tags.release, "Rust release tag does not match JS ABI");
+  assert(tagRefund === abi.instructions.tags.refund, "Rust refund tag does not match JS ABI");
   assert(statusFunded === abi.task_account.statuses.Funded, "Rust Funded status does not match JS ABI");
+  assert(statusClaimed === abi.task_account.statuses.Claimed, "Rust Claimed status does not match JS ABI");
+  assert(statusPassed === abi.task_account.statuses.Passed, "Rust Passed status does not match JS ABI");
+  assert(statusFailed === abi.task_account.statuses.Failed, "Rust Failed status does not match JS ABI");
+  assert(statusReleased === abi.task_account.statuses.Released, "Rust Released status does not match JS ABI");
+  assert(statusRefunded === abi.task_account.statuses.Refunded, "Rust Refunded status does not match JS ABI");
   assert(amountOffset === 204, "Rust amount offset mismatch");
   assert(updatedSlotOffset === 268, "Rust updated_slot offset mismatch");
 
@@ -88,9 +108,24 @@ function main() {
     rust_checks: {
       task_account_size: taskSize,
       fund_instruction_size: fundInstructionSize,
+      attest_instruction_size: attestInstructionSize,
       discriminator: abi.task_account.discriminator_hex,
       status_funded: statusFunded,
-      tag_fund: tagFund,
+      lifecycle_statuses: {
+        funded: statusFunded,
+        claimed: statusClaimed,
+        passed: statusPassed,
+        failed: statusFailed,
+        released: statusReleased,
+        refunded: statusRefunded,
+      },
+      instruction_tags: {
+        fund: tagFund,
+        claim: tagClaim,
+        attest: tagAttest,
+        release: tagRelease,
+        refund: tagRefund,
+      },
       amount_offset: amountOffset,
       updated_slot_offset: updatedSlotOffset,
     },
