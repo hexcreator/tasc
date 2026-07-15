@@ -1,0 +1,23 @@
+{
+  "ok": true,
+  "mode": "send-refund",
+  "rpc_host": "solana-devnet.g.alchemy.com",
+  "cluster": "devnet",
+  "program_id": "FAqKhKke5pZr4TK6kXq9aKR98hWFy19SMQG9eGfXQrRM",
+  "task_account": "CDK1cd9ghTj1Je8yXEVXZmDWJijJFQmctoNXKv9rqTZw",
+  "signer_role": "buyer",
+  "signer": "6Apg3YonZ8yCnhSnEVPx3EoUZYnhH9297EuCf5A1beTR",
+  "instruction_data_hex": "0x04",
+  "signature": "TmTDr1U2GKRdPQm1oq6CSDXs3nuuxiNyDFAY9wryjSdRQpgb8oBnghbYDzaEHH5V8GyAoPNsQxALevXxfKpcqxk",
+  "confirmation_status": "confirmed",
+  "token_movement": "program_cpi_transfer_checked",
+  "settlement": {
+    "destination_role": "buyer",
+    "vault_token_account": "9TmntNGZPy2Pnj3kiRM8CNdbaxiFMcV85s7V2cwLWZbB",
+    "destination_token_account": "3Vho8KJa6gfMMFi3LQk5EJPrComjZiHmCMb7BX7Scqxf",
+    "vault_authority": "EDikDxfRBjJnXkYepJu4P2RU2ukhKssR5QWvYZqg9bEw",
+    "vault_authority_bump": 255,
+    "token_program_id": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+  },
+  "key_material_printed": false
+}

@@ -1,0 +1,32 @@
+{
+  "kind": "tasc.intent.solana",
+  "version": "0.1",
+  "task_file": "examples/summarize_url_refund_job.tasc",
+  "task_name": "summarize_url_refund_job",
+  "display_reward": {
+    "amount": "10",
+    "currency": "USDC"
+  },
+  "chain_reward": {
+    "amount": "10000000",
+    "decimals": 6,
+    "token_mint": "3WkGDdNk6FuipY2Vsf7gKK93ehCHpqCEWPJ4wDwN3y1o"
+  },
+  "relative_deadline": {
+    "raw": "60s",
+    "seconds": 60
+  },
+  "generated_at_unix": 1800000000,
+  "message": {
+    "cluster": "devnet",
+    "program_id": "FAqKhKke5pZr4TK6kXq9aKR98hWFy19SMQG9eGfXQrRM",
+    "buyer": "6Apg3YonZ8yCnhSnEVPx3EoUZYnhH9297EuCf5A1beTR",
+    "task_hash": "0x6abd6b80222aaced393b21c91598ac1696013b86719dc32867f7ecaca947a5f6",
+    "token_mint": "3WkGDdNk6FuipY2Vsf7gKK93ehCHpqCEWPJ4wDwN3y1o",
+    "amount": "10000000",
+    "deadline_unix": "1800000060",
+    "verifier": "3Siw3mYu8yQVaZ8qvXH5z4quyhhk6vBySn5d3KhNW9Tt",
+    "nonce": "1"
+  },
+  "intent_hash": "sha256:533f6f5f1c6c63a503b58f1eafc4bed6140ce0e9330b4b0cabe62a75d5bb863e"
+}

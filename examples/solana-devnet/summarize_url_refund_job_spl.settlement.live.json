@@ -1,0 +1,93 @@
+{
+  "kind": "tasc.settlement.solana.spl_token",
+  "version": "0.1",
+  "status": "Refunded",
+  "action": "refund",
+  "cluster": "devnet",
+  "program_id": "FAqKhKke5pZr4TK6kXq9aKR98hWFy19SMQG9eGfXQrRM",
+  "task_hash": "0x6abd6b80222aaced393b21c91598ac1696013b86719dc32867f7ecaca947a5f6",
+  "task_pda": "CDK1cd9ghTj1Je8yXEVXZmDWJijJFQmctoNXKv9rqTZw",
+  "vault": "9TmntNGZPy2Pnj3kiRM8CNdbaxiFMcV85s7V2cwLWZbB",
+  "vault_authority": "EDikDxfRBjJnXkYepJu4P2RU2ukhKssR5QWvYZqg9bEw",
+  "vault_authority_bump": 255,
+  "token_program_id": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+  "buyer": "6Apg3YonZ8yCnhSnEVPx3EoUZYnhH9297EuCf5A1beTR",
+  "worker": "BfRmLmH7ksPRCRxNBi7c8SspN7zKoyuAPKrJMDL5uQCJ",
+  "token_mint": "3WkGDdNk6FuipY2Vsf7gKK93ehCHpqCEWPJ4wDwN3y1o",
+  "amount": "10000000",
+  "deadline_unix": "1800000060",
+  "verifier": "3Siw3mYu8yQVaZ8qvXH5z4quyhhk6vBySn5d3KhNW9Tt",
+  "nonce": "1",
+  "result_hash": "0x1111111111111111111111111111111111111111111111111111111111111111",
+  "destination_role": "buyer",
+  "destination_owner": "6Apg3YonZ8yCnhSnEVPx3EoUZYnhH9297EuCf5A1beTR",
+  "destination_token_account": "3Vho8KJa6gfMMFi3LQk5EJPrComjZiHmCMb7BX7Scqxf",
+  "vault_balance_after": "0",
+  "destination_balance_after": "10000000",
+  "signature": "TmTDr1U2GKRdPQm1oq6CSDXs3nuuxiNyDFAY9wryjSdRQpgb8oBnghbYDzaEHH5V8GyAoPNsQxALevXxfKpcqxk",
+  "slot": "476510957",
+  "instruction_index": "0",
+  "confirmation_status": "confirmed",
+  "scan_accounts": {
+    "task_account": {
+      "pubkey": "CDK1cd9ghTj1Je8yXEVXZmDWJijJFQmctoNXKv9rqTZw",
+      "owner": "FAqKhKke5pZr4TK6kXq9aKR98hWFy19SMQG9eGfXQrRM",
+      "slot": "476510998",
+      "status": "Refunded"
+    },
+    "vault_token_account": {
+      "pubkey": "9TmntNGZPy2Pnj3kiRM8CNdbaxiFMcV85s7V2cwLWZbB",
+      "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+      "slot": "476510999",
+      "amount": "0"
+    },
+    "destination_token_account": {
+      "pubkey": "3Vho8KJa6gfMMFi3LQk5EJPrComjZiHmCMb7BX7Scqxf",
+      "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+      "slot": "476510999",
+      "amount": "10000000"
+    }
+  },
+  "checks": [
+    {
+      "name": "intent_match",
+      "pass": true
+    },
+    {
+      "name": "token_program_vault",
+      "pass": true
+    },
+    {
+      "name": "token_program_destination",
+      "pass": true
+    },
+    {
+      "name": "vault_pubkey",
+      "pass": true
+    },
+    {
+      "name": "vault_mint",
+      "pass": true
+    },
+    {
+      "name": "vault_authority",
+      "pass": true
+    },
+    {
+      "name": "vault_empty",
+      "pass": true
+    },
+    {
+      "name": "destination_mint",
+      "pass": true
+    },
+    {
+      "name": "destination_owner",
+      "pass": true
+    },
+    {
+      "name": "destination_amount",
+      "pass": true
+    }
+  ]
+}

@@ -1,0 +1,40 @@
+{
+  "kind": "tasc.intent.signature.solana",
+  "version": "0.1",
+  "intent_hash": "sha256:56d24d1fd4ad218ce92dc0dfdcbf641735c9a9a436060195369e21f7d8045037",
+  "signer": "6Apg3YonZ8yCnhSnEVPx3EoUZYnhH9297EuCf5A1beTR",
+  "buyer": "6Apg3YonZ8yCnhSnEVPx3EoUZYnhH9297EuCf5A1beTR",
+  "signature": "8iBerRy2xr16Fy2WrTkUvxVkKBcC7XTgihVA29dibUWj8zf65u6tZh7gqmU6vuW1fkfYAXoVzozHAKPpDZ6uaZw",
+  "intent": {
+    "kind": "tasc.intent.solana",
+    "version": "0.1",
+    "task_file": "examples/summarize_url_refund.tasc",
+    "task_name": "summarize_url_refund",
+    "display_reward": {
+      "amount": "10",
+      "currency": "USDC"
+    },
+    "chain_reward": {
+      "amount": "10000000",
+      "decimals": 6,
+      "token_mint": "3WkGDdNk6FuipY2Vsf7gKK93ehCHpqCEWPJ4wDwN3y1o"
+    },
+    "relative_deadline": {
+      "raw": "60s",
+      "seconds": 60
+    },
+    "generated_at_unix": 1800000000,
+    "message": {
+      "cluster": "devnet",
+      "program_id": "FAqKhKke5pZr4TK6kXq9aKR98hWFy19SMQG9eGfXQrRM",
+      "buyer": "6Apg3YonZ8yCnhSnEVPx3EoUZYnhH9297EuCf5A1beTR",
+      "task_hash": "0x5f5d9bc685551cea755a44e7214b848dbf00942e7ef20d8701c9356eebb27084",
+      "token_mint": "3WkGDdNk6FuipY2Vsf7gKK93ehCHpqCEWPJ4wDwN3y1o",
+      "amount": "10000000",
+      "deadline_unix": "1800000060",
+      "verifier": "3Siw3mYu8yQVaZ8qvXH5z4quyhhk6vBySn5d3KhNW9Tt",
+      "nonce": "1"
+    },
+    "intent_hash": "sha256:56d24d1fd4ad218ce92dc0dfdcbf641735c9a9a436060195369e21f7d8045037"
+  }
+}

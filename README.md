@@ -148,10 +148,10 @@ funded -> claimed -> passed -> released
 The live Solana devnet path currently covers:
 
 ```text
-signed intent -> SPL vault custody -> funded task account -> scanner -> claimable index -> live claim -> live verifier attest -> worker token account -> live program-signed SPL release -> completed index
+signed intent -> SPL vault custody -> funded task account -> scanner -> claimable index -> live claim -> live verifier attest -> live program-signed SPL release/refund -> completed index
 ```
 
-The current Solana program and CLI support program-signed SPL Token `TransferChecked` CPI for `release` and `refund`. The live devnet happy path has released `10000000` token base units from the PDA-owned vault to the worker token account.
+The current Solana program and CLI support program-signed SPL Token `TransferChecked` CPI for `release` and `refund`. Live devnet proofs have released `10000000` token base units from a PDA-owned vault to the worker token account, and refunded `10000000` token base units from a fresh failed task back to the buyer token account.
 
 ## Repository Map
 
@@ -190,8 +190,8 @@ The near-term product should not be "ask the world for $10." It should be "claim
 
 The best first contributions are narrow and verifiable:
 
-- implement live Solana `claim`, `attest`, `release`, and `refund`
-- implement program-signed SPL token CPI from the documented release/refund plan
+- harden live Solana `claim`, `attest`, `release`, and `refund`
+- add timeout policy and dispute handling around release/refund eligibility
 - turn the static task feed into a public demo
 - add more TascLang task examples with deterministic verifier rules
 - build an indexer process that watches live Solana task accounts

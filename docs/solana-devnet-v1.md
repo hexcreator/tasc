@@ -347,6 +347,29 @@ settlement evidence:  examples/solana-devnet/summarize_url_spl.settlement.live.j
 settlement index:     examples/index/solana.spl.release.index.json
 ```
 
+Current live SPL refund proof:
+
+```text
+setup tx:             bt81DL9JTfChfsNJhA8eWq4iZsmWxr6HEt1UM6dFn3aK93ARc2GgsKfjV1sg7sQFMFVgBij8KhzRsMEEMaoTFE9
+fund tx:              5EjrMf1vZifxJCufdVJRgx9ZSBASLS4j7vejXQ8wtYdEwR9La9YYFECc8o5rEQZ2GnNs4TNN8KQfXwofJuEqgnuu
+claim tx:             5bk9oGPPbC7wyEv1JyBAXwKcKrqii36hQNQBW8SfSWiFiG3FgEGiBtgNTLaviy3TWvywhZjCz2uuGNPHFLjzQPbP
+fail attest tx:       7gS9gQXJhwUpqsW65Wu83wV13U8UxwPwQ3dgk5wVLApWtJEJknbCXtHp1egE6UsPRhEccYdCG2Jp4oo6TwfhVfP
+refund tx:            TmTDr1U2GKRdPQm1oq6CSDXs3nuuxiNyDFAY9wryjSdRQpgb8oBnghbYDzaEHH5V8GyAoPNsQxALevXxfKpcqxk
+task account:         CDK1cd9ghTj1Je8yXEVXZmDWJijJFQmctoNXKv9rqTZw
+post-refund status:   Refunded
+vault token balance:  0
+buyer token balance:  10000000
+mint:                 3WkGDdNk6FuipY2Vsf7gKK93ehCHpqCEWPJ4wDwN3y1o
+refund vault:         9TmntNGZPy2Pnj3kiRM8CNdbaxiFMcV85s7V2cwLWZbB
+buyer token account:  3Vho8KJa6gfMMFi3LQk5EJPrComjZiHmCMb7BX7Scqxf
+funding evidence:     examples/solana-devnet/summarize_url_refund_job_spl.funding.live.json
+lifecycle scan output: examples/solana-devnet/summarize_url_refund_job_spl.lifecycle-account.live.json
+settlement evidence:  examples/solana-devnet/summarize_url_refund_job_spl.settlement.live.json
+settlement index:     examples/index/solana.spl.refund.index.json
+```
+
+The refund proof uses two task hashes on purpose. `summarize_url_refund.tasc` creates a fresh SPL mint and buyer token setup; `summarize_url_refund_job.tasc` is the actual funded task, so its deterministic vault account is fresh when funding runs.
+
 ## Scanner Shape
 
 The EVM scanner reads `Funded` logs. The Solana scanner reads task account state:
@@ -363,10 +386,10 @@ Solana devnet now works well enough to continue on the faster-chain path. The co
 
 The next real implementation step is:
 
-1. Exercise the failed-task `refund` path on a fresh devnet task.
-2. Add timeout policy around refund eligibility.
-3. Add wallet-backed browser claim/attest controls once the static proof should become interactive.
-4. Keep the browser/static index path chain-neutral by admitting Solana and EVM evidence through the same indexer boundary.
-5. Add production-style finality/reorg handling and duplicate-task suppression before treating devnet behavior as production-ready.
+1. Add timeout policy around refund eligibility.
+2. Add wallet-backed browser claim/attest controls once the static proof should become interactive.
+3. Keep the browser/static index path chain-neutral by admitting Solana and EVM evidence through the same indexer boundary.
+4. Add production-style finality/reorg handling and duplicate-task suppression before treating devnet behavior as production-ready.
+5. Start dispute-path design once pass/fail/timeout settlement is mechanically covered.
 
 That gives Global Tasc a credible faster-chain path without throwing away the EVM work.

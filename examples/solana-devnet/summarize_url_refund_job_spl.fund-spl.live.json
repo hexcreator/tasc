@@ -1,0 +1,28 @@
+{
+  "ok": true,
+  "mode": "send-spl",
+  "rpc_host": "solana-devnet.g.alchemy.com",
+  "program_id": "FAqKhKke5pZr4TK6kXq9aKR98hWFy19SMQG9eGfXQrRM",
+  "buyer": "6Apg3YonZ8yCnhSnEVPx3EoUZYnhH9297EuCf5A1beTR",
+  "task_account": "CDK1cd9ghTj1Je8yXEVXZmDWJijJFQmctoNXKv9rqTZw",
+  "buyer_token_account": "3Vho8KJa6gfMMFi3LQk5EJPrComjZiHmCMb7BX7Scqxf",
+  "vault_token_account": "9TmntNGZPy2Pnj3kiRM8CNdbaxiFMcV85s7V2cwLWZbB",
+  "vault_authority": "EDikDxfRBjJnXkYepJu4P2RU2ukhKssR5QWvYZqg9bEw",
+  "token_mint": "3WkGDdNk6FuipY2Vsf7gKK93ehCHpqCEWPJ4wDwN3y1o",
+  "amount": "10000000",
+  "token_decimals": 6,
+  "task_rent_lamports": "2811840",
+  "vault_token_rent_lamports": "2039280",
+  "transfer_instruction_index": "3",
+  "fund_instruction_index": "4",
+  "instructions": [
+    "create_task_account",
+    "create_vault_token_account",
+    "spl_token.initialize_account3",
+    "spl_token.transfer_checked",
+    "fund"
+  ],
+  "signature": "5EjrMf1vZifxJCufdVJRgx9ZSBASLS4j7vejXQ8wtYdEwR9La9YYFECc8o5rEQZ2GnNs4TNN8KQfXwofJuEqgnuu",
+  "confirmation_status": "confirmed",
+  "key_material_printed": false
+}

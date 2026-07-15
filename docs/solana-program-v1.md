@@ -157,7 +157,7 @@ The live scanner reads that deterministic task account with `getAccountInfo`, de
 
 ## Next Step
 
-The guarded deploy/fund/scan/claim/attest/release sequence has been executed on devnet, and release evidence now admits as a completed index entry. The next implementation step is a fresh failed-task refund run and timeout policy around refund eligibility.
+The guarded deploy/fund/scan/claim/attest/release sequence has been executed on devnet, and release evidence now admits as a completed index entry. A separate fresh failed-task run has also executed `claim -> fail attest -> refund`, drained the PDA-owned vault, restored `10000000` token base units to the buyer token account, and admitted refund evidence as a completed index entry. The next implementation step is timeout policy around refund eligibility.
 
 Run:
 

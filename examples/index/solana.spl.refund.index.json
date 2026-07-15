@@ -1,0 +1,50 @@
+{
+  "kind": "tasc.index",
+  "version": "0.1",
+  "entries": [
+    {
+      "kind": "tasc.index.entry",
+      "version": "0.1",
+      "status": "completed",
+      "completed_status": "Refunded",
+      "admitted_at": "1970-01-01T00:00:00.000Z",
+      "intent_hash": "sha256:533f6f5f1c6c63a503b58f1eafc4bed6140ce0e9330b4b0cabe62a75d5bb863e",
+      "task_hash": "0x6abd6b80222aaced393b21c91598ac1696013b86719dc32867f7ecaca947a5f6",
+      "settlement": {
+        "chain": "solana",
+        "cluster": "devnet",
+        "program_id": "FAqKhKke5pZr4TK6kXq9aKR98hWFy19SMQG9eGfXQrRM",
+        "task_pda": "CDK1cd9ghTj1Je8yXEVXZmDWJijJFQmctoNXKv9rqTZw",
+        "vault": "9TmntNGZPy2Pnj3kiRM8CNdbaxiFMcV85s7V2cwLWZbB",
+        "token_program_id": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+        "vault_authority": "EDikDxfRBjJnXkYepJu4P2RU2ukhKssR5QWvYZqg9bEw",
+        "destination_token_account": "3Vho8KJa6gfMMFi3LQk5EJPrComjZiHmCMb7BX7Scqxf",
+        "destination_owner": "6Apg3YonZ8yCnhSnEVPx3EoUZYnhH9297EuCf5A1beTR",
+        "destination_role": "buyer"
+      },
+      "buyer": "6Apg3YonZ8yCnhSnEVPx3EoUZYnhH9297EuCf5A1beTR",
+      "worker": "BfRmLmH7ksPRCRxNBi7c8SspN7zKoyuAPKrJMDL5uQCJ",
+      "token_mint": "3WkGDdNk6FuipY2Vsf7gKK93ehCHpqCEWPJ4wDwN3y1o",
+      "amount": "10000000",
+      "deadline_unix": "1800000060",
+      "verifier": "3Siw3mYu8yQVaZ8qvXH5z4quyhhk6vBySn5d3KhNW9Tt",
+      "nonce": "1",
+      "completed_settlement": {
+        "kind": "tasc.settlement.solana.spl_token",
+        "action": "refund",
+        "status": "Refunded",
+        "signature": "TmTDr1U2GKRdPQm1oq6CSDXs3nuuxiNyDFAY9wryjSdRQpgb8oBnghbYDzaEHH5V8GyAoPNsQxALevXxfKpcqxk",
+        "slot": "476510957",
+        "instruction_index": "0",
+        "confirmation_status": "confirmed",
+        "vault_balance_after": "0",
+        "destination_balance_after": "10000000",
+        "result_hash": "0x1111111111111111111111111111111111111111111111111111111111111111"
+      },
+      "signature": {
+        "signer": "6Apg3YonZ8yCnhSnEVPx3EoUZYnhH9297EuCf5A1beTR",
+        "valid": true
+      }
+    }
+  ]
+}

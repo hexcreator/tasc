@@ -7,7 +7,7 @@ This repo is now a credible protocol prototype, not yet a product.
 | Target | Estimated Progress | Notes |
 | --- | ---: | --- |
 | Technical protocol skeleton | 99% | Hashable task language, verifier, signed intents, escrow ABI/contract, event-derived funding, admission gate, scanner cursor, testnet handoff, static web discovery proof, scanner-batch index admission, Solana devnet substrate, local Solana adapter, Solana account ABI, dependencyless Rust source core, SBF fund/lifecycle/CPI processor, guarded Solana fund/lifecycle transaction builders, live devnet deploy/fund/claim/attest/release proof, live account scanner, SPL custody boundary, live SPL setup scanner, and live SPL token-backed funding proof exist. |
-| Testnet MVP | 93% | Base Sepolia is blocked by faucet friction; Solana devnet now has a finalized CPI-enabled program deploy, finalized token-backed fund transaction admitted with live vault custody, confirmed live claim/attest transactions, a confirmed program-signed SPL release from vault to worker token account, and completed-settlement evidence admitted as a `completed` index entry. Remaining testnet gaps are fresh-task refund exercise, timeout/dispute policy, and product wallet flows. |
+| Testnet MVP | 95% | Base Sepolia is blocked by faucet friction; Solana devnet now has a finalized CPI-enabled program deploy, finalized token-backed fund transactions admitted with live vault custody, confirmed live claim/attest transactions, confirmed program-signed SPL release and refund transactions, and completed-settlement evidence admitted as `completed` index entries. Remaining testnet gaps are timeout/dispute policy and product wallet flows. |
 | Private beta product | 25% | Missing buyer/worker wallet flows, real task inventory, verifier service, reputation, disputes, and durable metadata. |
 | Production decentralized marketplace | 10% | Missing decentralization, economic security, audits, abuse controls, governance, and real liquidity/demand. |
 
@@ -40,11 +40,13 @@ This repo is now a credible protocol prototype, not yet a product.
 - The lifecycle-enabled program redeploy confirmed at `3sg2FKp3GBxHt4Du1MCKfWaKvTUk9PGR4yTMo34Z4uZsLmyFpTVCAtkDwUNChXcNJs4T3pwhgUKtQreU9geGXpyu`; live claim confirmed at `3eQLPK2SsMFJySopM6W27YapKLAoxdFANy9qjf4JjoXe3suSt8yZLZrruFCTzBfqAkF4MvXPNieFQFasSoY4rBG6`; live verifier attest confirmed at `4ttsWrawCvg3v981Yyrsy8SYpr9ayzYmfLeVK72bvQmUBEHaaGyEiVCE9MLY3hYiTtR1ZZrS3NmMSsBnYA9sMUw1`, moving the live task account to `Passed`.
 - The CPI-enabled program redeploy confirmed at `65J6aVdNgrmfqZAtCa2j6WCDUSUCypCHQuxgbnz1DDjK5vZJu1qXWwctsyYJiMZELWgNTb8FWqJVgxESbxBhucVf`; live release confirmed at `2dG66jTY9KTxzZhXFDLmiLcP6bM4mFEdtwb1FV28Zf3pNEr2Qxf4w7tc7P8E3NY4EWiLcCVX71B1nRaTVcPCEX3V`, moving the live task to `Released`, emptying vault token account `ChfKa5tEUjeSdaEhmjiDCWQE1Q6YT1oVaZt62HHR43b4`, and moving `10000000` token base units to worker token account `8KJmiwZR42u5pv5CKkxap6qFE1LYu4bKKye5DWXxbUJ8`.
 - A reusable completed-settlement scanner now emits `tasc.settlement.solana.spl_token` evidence at `examples/solana-devnet/summarize_url_spl.settlement.live.json`, and the indexer admits it as `completed` at `examples/index/solana.spl.release.index.json` rather than re-admitting it as claimable inventory.
+- A fresh failed-task refund proof confirmed on devnet: funding `5EjrMf1vZifxJCufdVJRgx9ZSBASLS4j7vejXQ8wtYdEwR9La9YYFECc8o5rEQZ2GnNs4TNN8KQfXwofJuEqgnuu`, claim `5bk9oGPPbC7wyEv1JyBAXwKcKrqii36hQNQBW8SfSWiFiG3FgEGiBtgNTLaviy3TWvywhZjCz2uuGNPHFLjzQPbP`, fail attest `7gS9gQXJhwUpqsW65Wu83wV13U8UxwPwQ3dgk5wVLApWtJEJknbCXtHp1egE6UsPRhEccYdCG2Jp4oo6TwfhVfP`, and refund `TmTDr1U2GKRdPQm1oq6CSDXs3nuuxiNyDFAY9wryjSdRQpgb8oBnghbYDzaEHH5V8GyAoPNsQxALevXxfKpcqxk`; the task account `CDK1cd9ghTj1Je8yXEVXZmDWJijJFQmctoNXKv9rqTZw` is `Refunded`, vault `9TmntNGZPy2Pnj3kiRM8CNdbaxiFMcV85s7V2cwLWZbB` is `0`, and buyer token account `3Vho8KJa6gfMMFi3LQk5EJPrComjZiHmCMb7BX7Scqxf` holds `10000000`.
+- The completed-settlement scanner now validates both release and refund evidence; the refund evidence lives at `examples/solana-devnet/summarize_url_refund_job_spl.settlement.live.json` and admits as `completed` at `examples/index/solana.spl.refund.index.json`.
 - The current npm dependency tree has no production vulnerabilities, all 17 registry signatures verify, and 2 registry attestations verify.
 
 ## Biggest Missing Pieces
 
-1. Refund and timeout path: fresh-task refund exercise, lock expiry, and concurrency tests.
+1. Timeout path: lock expiry, refund eligibility windows, and concurrency tests.
 2. Verifier service: deterministic verifier runners, artifact storage, result attestations, and paid verifier incentives.
 3. Reputation and abuse controls: worker/buyer/verifier histories, duplicate detection, bonds, rate limits, and spam economics.
 4. Dispute path: reviewer selection, evidence packaging, deadlines, and appeal/ruling settlement.
@@ -57,9 +59,9 @@ This repo is now a credible protocol prototype, not yet a product.
 The fastest useful path is not full decentralization first. It is a narrow testnet marketplace loop:
 
 ```text
-buyer signs and funds -> scanner batch -> index admission -> worker claims -> verifier attests -> escrow releases
+buyer signs and funds -> scanner batch -> index admission -> worker claims -> verifier attests -> escrow releases/refunds
 ```
 
-The happy-path Solana testnet loop now works at protocol level. A production system that can safely support a global market for instant `$10` work is still much farther: likely months of focused buildout after refund/dispute paths work, because the hard parts become abuse resistance, demand liquidity, dispute quality, and reliable user experience.
+The happy-path and failed-task Solana testnet loops now work at protocol level. A production system that can safely support a global market for instant `$10` work is still much farther: likely months of focused buildout after timeout/dispute paths work, because the hard parts become abuse resistance, demand liquidity, dispute quality, and reliable user experience.
 
-If Solana is the preferred path, the next increment is now concrete: exercise refund on a fresh failed task, then add timeout policy around refund eligibility.
+If Solana is the preferred path, the next increment is now concrete: add timeout policy around refund eligibility, then make the live task loop usable through wallet-backed product flows.
