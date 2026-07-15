@@ -148,10 +148,10 @@ funded -> claimed -> passed -> released
 The live Solana devnet path currently covers:
 
 ```text
-signed intent -> SPL vault custody -> funded task account -> scanner -> claimable index -> live claim -> live verifier attest -> worker token account -> release CPI plan
+signed intent -> SPL vault custody -> funded task account -> scanner -> claimable index -> live claim -> live verifier attest -> worker token account -> live program-signed SPL release
 ```
 
-The next protocol implementation step is program-signed SPL token movement for `release` and `refund`. The current Solana program and CLI support live task-account lifecycle transitions through `Passed`; payout/refund transfer CPI is still intentionally marked pending.
+The current Solana program and CLI support program-signed SPL Token `TransferChecked` CPI for `release` and `refund`. The live devnet happy path has released `10000000` token base units from the PDA-owned vault to the worker token account.
 
 ## Repository Map
 

@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+const fs = require("fs");
 const { decodeInitializeAccount3Data } = require("./tascsolana-spl");
 const {
   TOKEN_PROGRAM_ID,
@@ -14,6 +15,10 @@ const {
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
+}
+
+function loadJson(file) {
+  return JSON.parse(fs.readFileSync(file, "utf8"));
 }
 
 function main() {
@@ -43,7 +48,18 @@ function main() {
       state: 1,
     },
   };
-  const releasePlan = buildSettlementPlan("release", { workerToken });
+  const liveLifecycle = loadJson("examples/solana-devnet/summarize_url_spl.lifecycle-account.live.json").decoded;
+  const liveFunding = loadJson("examples/solana-devnet/summarize_url_spl.funding.live.json");
+  const passedTask = {
+    ...liveLifecycle,
+    status: "Passed",
+    status_code: 3,
+  };
+  const releasePlan = buildSettlementPlan("release", {
+    task: passedTask,
+    funding: liveFunding,
+    workerToken,
+  });
   assert(releasePlan.sends_transactions === false, "release plan must not send");
   assert(releasePlan.cpi_required === true, "release plan should require CPI");
   assert(releasePlan.task_status === "Passed", "release plan should require Passed task state");
@@ -66,7 +82,7 @@ function main() {
   } catch (error) {
     refundRejected = /requires task status Failed/.test(error.message);
   }
-  assert(refundRejected, "refund plan should reject the current Passed live task");
+  assert(refundRejected, "refund plan should reject the current non-Failed live task");
 
   const failedTask = {
     ...releasePlan,

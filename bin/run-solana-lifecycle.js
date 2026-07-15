@@ -18,6 +18,13 @@ const {
 const { fundAddresses, compileLegacyMessage } = require("./run-solana-fund");
 const { encodeInstruction } = require("./tascsolana-program");
 const { verifySignedSolanaIntent } = require("./tascsolana");
+const {
+  TOKEN_PROGRAM_ID,
+  splBuyerTokenAddress,
+  splVaultAddress,
+  splWorkerTokenAddress,
+  vaultAuthorityPda,
+} = require("./tascsolana-spl");
 
 const DEFAULT_ENV_FILE = ".env.solana-devnet.local";
 const DEFAULT_SIGNED_INTENT = "examples/solana-devnet/summarize_url_spl.signature.json";
@@ -39,10 +46,10 @@ function usage() {
     "  node bin/run-solana-lifecycle.js send-claim [signed-solana-intent.json] [--env file] [--task-account address] [--out file]",
     "  node bin/run-solana-lifecycle.js plan-attest [signed-solana-intent.json] [--env file] [--task-account address] [--signer address] [--verdict pass|fail] [--result-hash 0x...]",
     "  node bin/run-solana-lifecycle.js send-attest [signed-solana-intent.json] [--env file] [--task-account address] [--verdict pass|fail] [--result-hash 0x...] [--out file]",
-    "  node bin/run-solana-lifecycle.js plan-release [signed-solana-intent.json] [--env file] [--task-account address] [--signer address]",
-    "  node bin/run-solana-lifecycle.js send-release [signed-solana-intent.json] [--env file] [--task-account address] [--out file]",
-    "  node bin/run-solana-lifecycle.js plan-refund [signed-solana-intent.json] [--env file] [--task-account address] [--signer address]",
-    "  node bin/run-solana-lifecycle.js send-refund [signed-solana-intent.json] [--env file] [--task-account address] [--out file]",
+    "  node bin/run-solana-lifecycle.js plan-release [signed-solana-intent.json] [--env file] [--task-account address] [--signer address] [--destination-token-account address]",
+    "  node bin/run-solana-lifecycle.js send-release [signed-solana-intent.json] [--env file] [--task-account address] [--destination-token-account address] [--out file]",
+    "  node bin/run-solana-lifecycle.js plan-refund [signed-solana-intent.json] [--env file] [--task-account address] [--signer address] [--destination-token-account address]",
+    "  node bin/run-solana-lifecycle.js send-refund [signed-solana-intent.json] [--env file] [--task-account address] [--destination-token-account address] [--out file]",
     "",
     "send-* commands are guarded by GLOBAL_TASC_ALLOW_SOLANA_<ACTION>=1.",
   ].join("\n"));
@@ -71,6 +78,7 @@ function parseOptions(rest) {
     out: null,
     verdict: null,
     resultHash: null,
+    destinationTokenAccount: null,
     submission: DEFAULT_SUBMISSION,
     ledger: DEFAULT_LEDGER,
     inputs: {},
@@ -90,6 +98,7 @@ function parseOptions(rest) {
     else if (arg === "--out") options.out = args[++i];
     else if (arg === "--verdict") options.verdict = args[++i];
     else if (arg === "--result-hash") options.resultHash = args[++i];
+    else if (arg === "--destination-token-account") options.destinationTokenAccount = args[++i];
     else if (arg === "--submission") options.submission = args[++i];
     else if (arg === "--ledger") options.ledger = args[++i];
     else if (arg === "--input") {
@@ -166,9 +175,54 @@ function accountMeta(pubkey, signer, writable) {
   return { pubkey, signer: Boolean(signer), writable: Boolean(writable) };
 }
 
+function isSettlementAction(action) {
+  return action === "release" || action === "refund";
+}
+
+function settlementAccountsForAction(action, message, signerAddress, options = {}) {
+  if (!isSettlementAction(action)) return null;
+  const vaultAuthority = vaultAuthorityPda(message.program_id, message.task_hash, message.token_mint);
+  const vaultTokenAccount = splVaultAddress(
+    message.program_id,
+    message.buyer,
+    message.task_hash,
+    message.token_mint,
+  );
+  const defaultDestination = action === "release"
+    ? splWorkerTokenAddress(signerAddress, message.token_mint)
+    : splBuyerTokenAddress(message.buyer, message.token_mint);
+  const destinationTokenAccount = assertBase58Address(
+    options.destinationTokenAccount || defaultDestination,
+    "destination_token_account",
+  );
+  return {
+    vault_token_account: vaultTokenAccount,
+    token_mint: message.token_mint,
+    destination_token_account: destinationTokenAccount,
+    destination_role: action === "release" ? "worker" : "buyer",
+    vault_authority: vaultAuthority.address,
+    vault_authority_bump: vaultAuthority.bump,
+    token_program_id: TOKEN_PROGRAM_ID,
+    outer_accounts: [
+      accountMeta(vaultTokenAccount, false, true),
+      accountMeta(message.token_mint, false, false),
+      accountMeta(destinationTokenAccount, false, true),
+      accountMeta(vaultAuthority.address, false, false),
+      accountMeta(TOKEN_PROGRAM_ID, false, false),
+    ],
+    cpi_transfer_checked_accounts: [
+      accountMeta(vaultTokenAccount, false, true),
+      accountMeta(message.token_mint, false, false),
+      accountMeta(destinationTokenAccount, false, true),
+      accountMeta(vaultAuthority.address, true, false),
+    ],
+  };
+}
+
 function buildLifecycleInstruction(action, signed, signerAddress, options = {}) {
   const message = signed.intent.message;
   const instruction = instructionForAction(action, signed, options);
+  const settlement = settlementAccountsForAction(action, message, signerAddress, options);
   return {
     action,
     signer_role: signerRoleForAction(action),
@@ -178,10 +232,12 @@ function buildLifecycleInstruction(action, signed, signerAddress, options = {}) 
     accounts: [
       accountMeta(signerAddress, true, true),
       accountMeta(instruction.task_account, false, true),
+      ...(settlement ? settlement.outer_accounts : []),
     ],
     data: instruction.data,
     data_hex: `0x${instruction.data.toString("hex")}`,
     verdict: instruction.verdict || null,
+    settlement,
   };
 }
 
@@ -225,9 +281,18 @@ function planAction(action, options = {}) {
       data_hex: instruction.data_hex,
       accounts: instruction.accounts.map(({ pubkey, signer, writable }) => ({ pubkey, signer, writable })),
       verdict: instruction.verdict,
+      settlement: instruction.settlement ? {
+        destination_role: instruction.settlement.destination_role,
+        vault_token_account: instruction.settlement.vault_token_account,
+        destination_token_account: instruction.settlement.destination_token_account,
+        vault_authority: instruction.settlement.vault_authority,
+        vault_authority_bump: instruction.settlement.vault_authority_bump,
+        token_program_id: instruction.settlement.token_program_id,
+        cpi_transfer_checked_accounts: instruction.settlement.cpi_transfer_checked_accounts,
+      } : null,
     },
-    token_movement: action === "release" || action === "refund"
-      ? "not yet: this transition updates task-account status; SPL vault transfer CPI is still the next protocol step"
+    token_movement: isSettlementAction(action)
+      ? "program_cpi_transfer_checked"
       : "none",
   };
 }
@@ -274,7 +339,15 @@ async function sendAction(action, options = {}) {
     instruction_data_hex: lifecycle.data_hex,
     signature: txSignature,
     confirmation_status: status ? status.confirmationStatus : "pending",
-    token_movement: action === "release" || action === "refund" ? "not yet implemented" : "none",
+    token_movement: isSettlementAction(action) ? "program_cpi_transfer_checked" : "none",
+    settlement: lifecycle.settlement ? {
+      destination_role: lifecycle.settlement.destination_role,
+      vault_token_account: lifecycle.settlement.vault_token_account,
+      destination_token_account: lifecycle.settlement.destination_token_account,
+      vault_authority: lifecycle.settlement.vault_authority,
+      vault_authority_bump: lifecycle.settlement.vault_authority_bump,
+      token_program_id: lifecycle.settlement.token_program_id,
+    } : null,
     key_material_printed: false,
   };
   if (options.out) writeJson(options.out, result);

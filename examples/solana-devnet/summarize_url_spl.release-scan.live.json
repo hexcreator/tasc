@@ -1,0 +1,67 @@
+{
+  "kind": "tasc.solana.release.scan",
+  "version": "0.1",
+  "signed_intent": "examples/solana-devnet/summarize_url_spl.signature.json",
+  "release_tx": "examples/solana-devnet/summarize_url_spl.release.live.json",
+  "rpc_host": "solana-devnet.g.alchemy.com",
+  "rpc_url_printed": false,
+  "sends_transactions": false,
+  "program_id": "FAqKhKke5pZr4TK6kXq9aKR98hWFy19SMQG9eGfXQrRM",
+  "task_account": {
+    "pubkey": "37hA4KUeR6eLPP1g1mBoTMYHKCPq7LECpLryQc61TmRi",
+    "owner": "FAqKhKke5pZr4TK6kXq9aKR98hWFy19SMQG9eGfXQrRM",
+    "slot": "476503628",
+    "decoded": {
+      "kind": "tasc.solana.task_account",
+      "version": "0.1",
+      "program_id": "FAqKhKke5pZr4TK6kXq9aKR98hWFy19SMQG9eGfXQrRM",
+      "task_pda": "37hA4KUeR6eLPP1g1mBoTMYHKCPq7LECpLryQc61TmRi",
+      "status": "Released",
+      "status_code": 5,
+      "bump": 0,
+      "flags": 0,
+      "task_hash": "0x103317ad603569805133b51ddd3447461a5ff998e8bca2642728205f7f7db65e",
+      "buyer": "6Apg3YonZ8yCnhSnEVPx3EoUZYnhH9297EuCf5A1beTR",
+      "worker": "BfRmLmH7ksPRCRxNBi7c8SspN7zKoyuAPKrJMDL5uQCJ",
+      "verifier": "3Siw3mYu8yQVaZ8qvXH5z4quyhhk6vBySn5d3KhNW9Tt",
+      "token_mint": "8WdRRCNVr8Du5Q1C1EeiMvqCRpSTBwWnHRjnx3FZ7KbC",
+      "vault": "ChfKa5tEUjeSdaEhmjiDCWQE1Q6YT1oVaZt62HHR43b4",
+      "amount": "10000000",
+      "deadline_unix": "1800000060",
+      "nonce": "1",
+      "result_hash": "0x0bdfacb7e0ec2c3241da82c7b812b1a0fa28945b47c7f8a6b113b4de3779776f",
+      "created_slot": "0",
+      "updated_slot": "0"
+    }
+  },
+  "vault_token_account": {
+    "pubkey": "ChfKa5tEUjeSdaEhmjiDCWQE1Q6YT1oVaZt62HHR43b4",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "slot": "476503629",
+    "decoded": {
+      "mint": "8WdRRCNVr8Du5Q1C1EeiMvqCRpSTBwWnHRjnx3FZ7KbC",
+      "owner": "8ysLbdWSpBQCPV5De2GWonQWM5cCjNw93d44ihh2Hv9F",
+      "amount": "0",
+      "state": 1
+    }
+  },
+  "worker_token_account": {
+    "pubkey": "8KJmiwZR42u5pv5CKkxap6qFE1LYu4bKKye5DWXxbUJ8",
+    "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "slot": "476503629",
+    "decoded": {
+      "mint": "8WdRRCNVr8Du5Q1C1EeiMvqCRpSTBwWnHRjnx3FZ7KbC",
+      "owner": "BfRmLmH7ksPRCRxNBi7c8SspN7zKoyuAPKrJMDL5uQCJ",
+      "amount": "10000000",
+      "state": 1
+    }
+  },
+  "checks": {
+    "task_released": true,
+    "vault_zero": true,
+    "worker_received_amount": true,
+    "worker_owner_matches": true,
+    "mint_matches": true
+  },
+  "ok": true
+}

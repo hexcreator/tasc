@@ -143,13 +143,13 @@ The entrypoint now also routes lifecycle instruction tags:
 ```text
 0x01 claim   worker signer + task account, Funded -> Claimed
 0x02 attest  verifier signer + task account, Claimed -> Passed/Failed
-0x03 release signer + task account, Passed -> Released
-0x04 refund  buyer signer + task account, Failed -> Refunded
+0x03 release worker signer + task account + SPL settlement accounts, Passed -> TransferChecked -> Released
+0x04 refund  buyer signer + task account + SPL settlement accounts, Failed -> TransferChecked -> Refunded
 ```
 
-These are task-account state transitions only. `release` and `refund` do not yet invoke SPL Token CPI, so they must not be represented as payment-complete until program-signed vault transfer support lands.
+For `release` and `refund`, accounts must be ordered as signer, task account, vault token account, mint, destination token account, vault authority PDA, and SPL Token Program. The vault authority PDA is unsigned in the outer transaction; the program signs it internally for SPL Token `TransferChecked` with seeds `["global-tasc-vault", task_hash, token_mint]`.
 
-The current processor expects a pre-created task account owned by the program. It does not yet create accounts by CPI or move SPL tokens into the vault.
+The current processor expects a pre-created task account owned by the program and pre-created SPL token accounts. It does not create accounts by CPI.
 
 The devnet transaction sender creates the task and vault placeholder accounts with System Program `create_account_with_seed`, using the buyer as the base address. This keeps the task and vault addresses deterministic from the signed intent and generated program id without adding task/vault private keys.
 
@@ -157,7 +157,7 @@ The live scanner reads that deterministic task account with `getAccountInfo`, de
 
 ## Next Step
 
-The guarded deploy/fund/scan/claim/attest sequence has been executed on devnet. The next implementation step is real SPL token escrow movement for `release` and `refund`.
+The guarded deploy/fund/scan/claim/attest/release sequence has been executed on devnet. The next implementation step is a reusable completed-settlement scanner for release/refund evidence and a fresh failed-task refund run.
 
 Run:
 

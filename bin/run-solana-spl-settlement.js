@@ -55,7 +55,7 @@ function usage() {
     "  node bin/run-solana-spl-settlement.js plan-refund [signed-solana-intent.json] [--task-account file] [--funding file] [--buyer-token-account address] [--out file]",
     "",
     `send-worker-token is guarded by ${ALLOW_WORKER_TOKEN_ENV}=1.`,
-    "release/refund plans do not send transactions; they define the future program-signed SPL Token CPI shape.",
+    "release/refund plans do not send transactions; they define the program-signed SPL Token CPI shape used by lifecycle send commands.",
   ].join("\n"));
   process.exit(1);
 }
@@ -386,10 +386,10 @@ function buildSettlementPlan(action, options = {}) {
       data_hex: `0x${transfer.data.toString("hex")}`,
       decoded_data: decodeTransferCheckedData(transfer.data),
     },
-    on_chain_requirements_remaining: [
-      "program release/refund handlers must invoke SPL Token transfer_checked",
-      "program must sign the CPI as the vault_authority PDA with the documented seeds",
-      "task account should transition to Released or Refunded only after the CPI succeeds",
+    lifecycle_send_requirements: [
+      "run the guarded lifecycle release/refund sender with the same settlement accounts",
+      "program signs the CPI as the vault_authority PDA with the documented seeds",
+      "task account transitions to Released or Refunded only after the CPI succeeds",
     ],
     key_material_printed: false,
   };

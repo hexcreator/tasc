@@ -227,11 +227,11 @@ The live program processor now accepts the same lifecycle instruction tags for t
 ```text
 claim:   worker signer + writable task account -> Claimed
 attest:  verifier signer + writable task account -> Passed/Failed
-release: signer + writable task account -> Released after Passed
-refund:  buyer signer + writable task account -> Refunded after Failed
+release: worker signer + writable task account + SPL settlement accounts -> TransferChecked + Released after Passed
+refund:  buyer signer + writable task account + SPL settlement accounts -> TransferChecked + Refunded after Failed
 ```
 
-The guarded CLI builder for those transactions is `bin/run-solana-lifecycle.js`. It intentionally keeps `release` and `refund` status-only until the program can sign an SPL Token `TransferChecked` CPI from the vault authority PDA.
+The guarded CLI builder for those transactions is `bin/run-solana-lifecycle.js`. `release` and `refund` pass the vault token account, mint, destination token account, vault authority PDA, and SPL Token Program account so the on-chain program can sign an SPL Token `TransferChecked` CPI from the vault authority PDA.
 
 The SPL settlement prep CLI is `bin/run-solana-spl-settlement.js`:
 
@@ -242,7 +242,7 @@ npm run solana:spl-release-plan
 npm run validate:solana-spl-settlement
 ```
 
-`plan-release` is read-only. It validates the signed intent, live task account, funding evidence, vault authority PDA, and worker token account before emitting the exact `spl_token.transfer_checked` account list/data that the on-chain program must invoke. `plan-refund` uses the same shape for failed tasks and intentionally rejects the current live task because its status is `Passed`, not `Failed`.
+`plan-release` is read-only. It validates the signed intent, live task account, funding evidence, vault authority PDA, and worker token account before emitting the exact `spl_token.transfer_checked` CPI account shape. `plan-refund` uses the same shape for failed tasks.
 
 The TascLang source should stay chain-agnostic. It should compile to the same canonical task hash and then generate Solana-specific settlement bindings separately.
 
@@ -332,7 +332,18 @@ worker token output:   examples/solana-devnet/summarize_url_spl.worker-token.liv
 release plan output:   examples/solana-devnet/summarize_url_spl.release-plan.live.json
 ```
 
-This is not a payout transaction yet. It proves the destination account exists and pins the transfer CPI that the program-signed release handler needs to execute.
+Current live SPL release proof:
+
+```text
+cpi deploy tx:        65J6aVdNgrmfqZAtCa2j6WCDUSUCypCHQuxgbnz1DDjK5vZJu1qXWwctsyYJiMZELWgNTb8FWqJVgxESbxBhucVf
+release tx:           2dG66jTY9KTxzZhXFDLmiLcP6bM4mFEdtwb1FV28Zf3pNEr2Qxf4w7tc7P8E3NY4EWiLcCVX71B1nRaTVcPCEX3V
+task account:         37hA4KUeR6eLPP1g1mBoTMYHKCPq7LECpLryQc61TmRi
+post-release status:  Released
+vault token balance:  0
+worker token balance: 10000000
+release output:       examples/solana-devnet/summarize_url_spl.release.live.json
+release scan output:  examples/solana-devnet/summarize_url_spl.release-scan.live.json
+```
 
 ## Scanner Shape
 
@@ -348,8 +359,8 @@ The EVM scanner reads `Funded` logs. The Solana scanner reads task account state
 
 Solana devnet now works well enough to continue on the faster-chain path. The next real implementation step is:
 
-1. Add program-signed SPL Token CPI for `release` and `refund`.
-2. Scan lifecycle state after release/refund, not only funding and attestation state.
+1. Turn the one-off post-release scan evidence into a reusable completed-settlement scanner/indexer boundary.
+2. Exercise the failed-task `refund` path on a fresh devnet task.
 3. Add wallet-backed browser claim/attest controls once the static proof should become interactive.
 4. Keep the browser/static index path chain-neutral by admitting Solana and EVM evidence through the same indexer boundary.
 5. Add production-style finality/reorg handling and duplicate-task suppression before treating devnet behavior as production-ready.

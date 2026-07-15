@@ -15,9 +15,24 @@ pub const ATTEST_INSTRUCTION_SIZE: usize = 34;
 pub const VERSION: u8 = 1;
 pub const RUNTIME_MIN_ACCOUNTS: usize = 2;
 pub const RUNTIME_FUND_ACCOUNTS: usize = 5;
+pub const RUNTIME_SETTLEMENT_ACCOUNTS: usize = 7;
+pub const RUNTIME_MAX_TRACKED_ACCOUNTS: usize = RUNTIME_SETTLEMENT_ACCOUNTS;
 pub const NON_DUP_MARKER: u8 = u8::MAX;
 pub const BPF_ALIGN_OF_U128: usize = 8;
 pub const MAX_PERMITTED_DATA_INCREASE: usize = 1_024 * 10;
+pub const SPL_TOKEN_ACCOUNT_SIZE: usize = 165;
+pub const SPL_MINT_ACCOUNT_SIZE: usize = 82;
+pub const SPL_TOKEN_AMOUNT_OFFSET: usize = 64;
+pub const SPL_TOKEN_STATE_OFFSET: usize = 108;
+pub const SPL_MINT_DECIMALS_OFFSET: usize = 44;
+pub const SPL_MINT_INITIALIZED_OFFSET: usize = 45;
+pub const SPL_ACCOUNT_STATE_INITIALIZED: u8 = 1;
+pub const SPL_TRANSFER_CHECKED_TAG: u8 = 12;
+pub const VAULT_AUTHORITY_SEED: &[u8; 17] = b"global-tasc-vault";
+pub const SPL_TOKEN_PROGRAM_ID: PubkeyBytes = [
+    6, 221, 246, 225, 215, 101, 161, 147, 217, 203, 225, 70, 206, 235, 121, 172, 28, 180, 133, 237,
+    95, 91, 55, 145, 58, 140, 245, 133, 126, 255, 0, 169,
+];
 
 pub const TAG_FUND: u8 = 0;
 pub const TAG_CLAIM: u8 = 1;
@@ -67,6 +82,72 @@ pub enum TascError {
     InvalidOwner = 11,
     InvalidAccount = 12,
     DuplicateAccount = 13,
+    CpiFailed = 14,
+}
+
+#[derive(Clone, Copy)]
+#[repr(C)]
+struct SolAccountMeta {
+    pubkey_addr: u64,
+    is_writable: bool,
+    is_signer: bool,
+}
+
+#[derive(Clone, Copy)]
+#[repr(C)]
+struct SolInstruction {
+    program_id_addr: u64,
+    accounts_addr: u64,
+    accounts_len: u64,
+    data_addr: u64,
+    data_len: u64,
+}
+
+#[derive(Clone, Copy)]
+#[repr(C)]
+struct SolAccountInfo {
+    key_addr: u64,
+    lamports_addr: u64,
+    data_len: u64,
+    data_addr: u64,
+    owner_addr: u64,
+    rent_epoch: u64,
+    is_signer: bool,
+    is_writable: bool,
+    executable: bool,
+}
+
+#[derive(Clone, Copy)]
+#[repr(C)]
+struct SolSignerSeed {
+    addr: *const u8,
+    len: u64,
+}
+
+#[derive(Clone, Copy)]
+#[repr(C)]
+struct SolSignerSeeds {
+    addr: *const SolSignerSeed,
+    len: u64,
+}
+
+#[cfg(target_os = "solana")]
+extern "C" {
+    fn sol_invoke_signed_c(
+        instruction_addr: *const u8,
+        account_infos_addr: *const u8,
+        account_infos_len: u64,
+        signers_seeds_addr: *const u8,
+        signers_seeds_len: u64,
+    ) -> u64;
+
+    fn sol_try_find_program_address(
+        seeds_addr: *const u8,
+        seeds_len: u64,
+        program_id_addr: *const u8,
+        address_bytes_addr: *mut u8,
+        bump_seed_addr: *mut u8,
+    ) -> u64;
 }
 
 #[no_mangle]
@@ -85,7 +166,56 @@ unsafe fn process_entrypoint(input: *mut u8) -> u64 {
 }
 
 #[derive(Clone, Copy)]
+struct RuntimeAccountInfo {
+    key: PubkeyBytes,
+    owner: PubkeyBytes,
+    key_addr: *const u8,
+    owner_addr: *const u8,
+    lamports: *mut u64,
+    data: *mut u8,
+    data_len: usize,
+    rent_epoch: u64,
+    is_signer: bool,
+    is_writable: bool,
+    executable: bool,
+}
+
+impl RuntimeAccountInfo {
+    const fn empty() -> Self {
+        Self {
+            key: [0u8; 32],
+            owner: [0u8; 32],
+            key_addr: core::ptr::null(),
+            owner_addr: core::ptr::null(),
+            lamports: core::ptr::null_mut(),
+            data: core::ptr::null_mut(),
+            data_len: 0,
+            rent_epoch: 0,
+            is_signer: false,
+            is_writable: false,
+            executable: false,
+        }
+    }
+
+    fn sol_account_info(&self) -> SolAccountInfo {
+        SolAccountInfo {
+            key_addr: self.key_addr as u64,
+            lamports_addr: self.lamports as u64,
+            data_len: self.data_len as u64,
+            data_addr: self.data as u64,
+            owner_addr: self.owner_addr as u64,
+            rent_epoch: self.rent_epoch,
+            is_signer: self.is_signer,
+            is_writable: self.is_writable,
+            executable: self.executable,
+        }
+    }
+}
+
+#[derive(Clone, Copy)]
 struct RuntimeAccounts {
+    items: [RuntimeAccountInfo; RUNTIME_MAX_TRACKED_ACCOUNTS],
+    count: usize,
     signer_key: PubkeyBytes,
     signer_signer: bool,
     signer_writable: bool,
@@ -102,6 +232,8 @@ struct RuntimeAccounts {
 impl RuntimeAccounts {
     fn empty() -> Self {
         Self {
+            items: [RuntimeAccountInfo::empty(); RUNTIME_MAX_TRACKED_ACCOUNTS],
+            count: 0,
             signer_key: [0u8; 32],
             signer_signer: false,
             signer_writable: false,
@@ -117,6 +249,16 @@ impl RuntimeAccounts {
     }
 }
 
+fn runtime_account(
+    accounts: &RuntimeAccounts,
+    index: usize,
+) -> Result<&RuntimeAccountInfo, TascError> {
+    if index >= accounts.count || index >= RUNTIME_MAX_TRACKED_ACCOUNTS {
+        return Err(TascError::MissingAccount);
+    }
+    Ok(&accounts.items[index])
+}
+
 unsafe fn process_serialized_runtime_input(input: *mut u8) -> Result<(), TascError> {
     let mut offset = 0usize;
     let num_accounts = read_runtime_u64(input, &mut offset) as usize;
@@ -129,7 +271,7 @@ unsafe fn process_serialized_runtime_input(input: *mut u8) -> Result<(), TascErr
         let duplicate_marker = read_runtime_u8(input, &mut offset);
         if duplicate_marker != NON_DUP_MARKER {
             offset += 7;
-            if index < RUNTIME_MIN_ACCOUNTS {
+            if index < RUNTIME_SETTLEMENT_ACCOUNTS {
                 return Err(TascError::DuplicateAccount);
             }
             continue;
@@ -170,15 +312,40 @@ unsafe fn read_runtime_account(
 ) -> Result<usize, TascError> {
     let is_signer = read_runtime_u8(input, &mut offset) != 0;
     let is_writable = read_runtime_u8(input, &mut offset) != 0;
-    let _executable = read_runtime_u8(input, &mut offset);
+    let executable = read_runtime_u8(input, &mut offset) != 0;
     offset += size_of::<u32>();
 
+    let key_addr = input.add(offset) as *const u8;
     let key = read_runtime_pubkey(input, &mut offset);
+    let owner_addr = input.add(offset) as *const u8;
     let owner = read_runtime_pubkey(input, &mut offset);
+    let lamports = input.add(offset) as *mut u64;
     offset += size_of::<u64>();
 
     let data_len = read_runtime_u64(input, &mut offset) as usize;
     let data = input.add(offset);
+    let rent_epoch_offset = offset + data_len + MAX_PERMITTED_DATA_INCREASE;
+    let rent_epoch = read_runtime_u64_at(input, rent_epoch_offset);
+
+    let info = RuntimeAccountInfo {
+        key,
+        owner,
+        key_addr,
+        owner_addr,
+        lamports,
+        data,
+        data_len,
+        rent_epoch,
+        is_signer,
+        is_writable,
+        executable,
+    };
+    if index < RUNTIME_MAX_TRACKED_ACCOUNTS {
+        accounts.items[index] = info;
+        if accounts.count <= index {
+            accounts.count = index + 1;
+        }
+    }
 
     match index {
         0 => {
@@ -287,6 +454,13 @@ fn process_release_runtime(
     let task_data =
         unsafe { slice::from_raw_parts_mut(accounts.task_data, accounts.task_data_len) };
     let mut account = decode_task_account(task_data)?;
+    if account.worker != accounts.signer_key {
+        return Err(TascError::InvalidSigner);
+    }
+    if account.status != STATUS_PASSED {
+        return Err(TascError::InvalidStatus);
+    }
+    invoke_spl_transfer_checked(program_id, accounts, &account, account.worker)?;
     apply_release(&mut account, 0)?;
     encode_task_account(&account, task_data)
 }
@@ -305,8 +479,298 @@ fn process_refund_runtime(
     if account.buyer != accounts.signer_key {
         return Err(TascError::InvalidSigner);
     }
+    if account.status != STATUS_FAILED {
+        return Err(TascError::InvalidStatus);
+    }
+    invoke_spl_transfer_checked(program_id, accounts, &account, account.buyer)?;
     apply_refund(&mut account, 0)?;
     encode_task_account(&account, task_data)
+}
+
+fn invoke_spl_transfer_checked(
+    program_id: &PubkeyBytes,
+    accounts: &RuntimeAccounts,
+    task: &TaskAccount,
+    destination_owner: PubkeyBytes,
+) -> Result<(), TascError> {
+    if accounts.count < RUNTIME_SETTLEMENT_ACCOUNTS {
+        return Err(TascError::MissingAccount);
+    }
+
+    let vault = runtime_account(accounts, 2)?;
+    let mint = runtime_account(accounts, 3)?;
+    let destination = runtime_account(accounts, 4)?;
+    let vault_authority = runtime_account(accounts, 5)?;
+    let token_program = runtime_account(accounts, 6)?;
+    let (expected_authority, bump) = derive_vault_authority(program_id, task, vault_authority)?;
+    if vault_authority.key != expected_authority {
+        return Err(TascError::InvalidAccount);
+    }
+
+    let decimals = validate_spl_transfer_accounts(
+        task,
+        destination_owner,
+        vault,
+        mint,
+        destination,
+        vault_authority,
+        token_program,
+    )?;
+
+    let mut transfer_data = [0u8; 10];
+    transfer_data[0] = SPL_TRANSFER_CHECKED_TAG;
+    transfer_data[1..9].copy_from_slice(&task.amount.to_le_bytes());
+    transfer_data[9] = decimals;
+
+    let metas = [
+        SolAccountMeta {
+            pubkey_addr: vault.key.as_ptr() as u64,
+            is_writable: true,
+            is_signer: false,
+        },
+        SolAccountMeta {
+            pubkey_addr: mint.key.as_ptr() as u64,
+            is_writable: false,
+            is_signer: false,
+        },
+        SolAccountMeta {
+            pubkey_addr: destination.key.as_ptr() as u64,
+            is_writable: true,
+            is_signer: false,
+        },
+        SolAccountMeta {
+            pubkey_addr: vault_authority.key.as_ptr() as u64,
+            is_writable: false,
+            is_signer: true,
+        },
+    ];
+    let instruction = SolInstruction {
+        program_id_addr: token_program.key.as_ptr() as u64,
+        accounts_addr: metas.as_ptr() as u64,
+        accounts_len: metas.len() as u64,
+        data_addr: transfer_data.as_ptr() as u64,
+        data_len: transfer_data.len() as u64,
+    };
+    let cpi_infos = [
+        vault.sol_account_info(),
+        mint.sol_account_info(),
+        destination.sol_account_info(),
+        vault_authority.sol_account_info(),
+        token_program.sol_account_info(),
+    ];
+    let bump_seed = [bump];
+    let signer_seed_values = [
+        SolSignerSeed {
+            addr: VAULT_AUTHORITY_SEED.as_ptr(),
+            len: VAULT_AUTHORITY_SEED.len() as u64,
+        },
+        SolSignerSeed {
+            addr: task.task_hash.as_ptr(),
+            len: task.task_hash.len() as u64,
+        },
+        SolSignerSeed {
+            addr: task.token_mint.as_ptr(),
+            len: task.token_mint.len() as u64,
+        },
+        SolSignerSeed {
+            addr: bump_seed.as_ptr(),
+            len: bump_seed.len() as u64,
+        },
+    ];
+    let signer_seeds = [SolSignerSeeds {
+        addr: signer_seed_values.as_ptr(),
+        len: signer_seed_values.len() as u64,
+    }];
+
+    invoke_signed_transfer_checked(
+        &instruction,
+        &cpi_infos,
+        &signer_seeds,
+        vault,
+        destination,
+        task.amount,
+    )
+}
+
+fn validate_spl_transfer_accounts(
+    task: &TaskAccount,
+    destination_owner: PubkeyBytes,
+    vault: &RuntimeAccountInfo,
+    mint: &RuntimeAccountInfo,
+    destination: &RuntimeAccountInfo,
+    vault_authority: &RuntimeAccountInfo,
+    token_program: &RuntimeAccountInfo,
+) -> Result<u8, TascError> {
+    if vault.key != task.vault || mint.key != task.token_mint {
+        return Err(TascError::InvalidAccount);
+    }
+    if token_program.key != SPL_TOKEN_PROGRAM_ID || !token_program.executable {
+        return Err(TascError::InvalidAccount);
+    }
+    if vault.owner != SPL_TOKEN_PROGRAM_ID
+        || mint.owner != SPL_TOKEN_PROGRAM_ID
+        || destination.owner != SPL_TOKEN_PROGRAM_ID
+    {
+        return Err(TascError::InvalidOwner);
+    }
+    if !vault.is_writable || !destination.is_writable {
+        return Err(TascError::InvalidWritable);
+    }
+
+    let vault_token = decode_spl_token_account(vault)?;
+    let destination_token = decode_spl_token_account(destination)?;
+    let decimals = decode_spl_mint_decimals(mint)?;
+    if vault_token.mint != task.token_mint
+        || destination_token.mint != task.token_mint
+        || vault_token.owner != vault_authority.key
+        || destination_token.owner != destination_owner
+        || vault_token.state != SPL_ACCOUNT_STATE_INITIALIZED
+        || destination_token.state != SPL_ACCOUNT_STATE_INITIALIZED
+        || vault_token.amount < task.amount
+    {
+        return Err(TascError::InvalidAccount);
+    }
+    Ok(decimals)
+}
+
+#[cfg(target_os = "solana")]
+fn derive_vault_authority(
+    program_id: &PubkeyBytes,
+    task: &TaskAccount,
+    _expected_authority: &RuntimeAccountInfo,
+) -> Result<(PubkeyBytes, u8), TascError> {
+    let seed_values = [
+        SolSignerSeed {
+            addr: VAULT_AUTHORITY_SEED.as_ptr(),
+            len: VAULT_AUTHORITY_SEED.len() as u64,
+        },
+        SolSignerSeed {
+            addr: task.task_hash.as_ptr(),
+            len: task.task_hash.len() as u64,
+        },
+        SolSignerSeed {
+            addr: task.token_mint.as_ptr(),
+            len: task.token_mint.len() as u64,
+        },
+    ];
+    let mut address = [0u8; 32];
+    let mut bump = 0u8;
+    let result = unsafe {
+        sol_try_find_program_address(
+            seed_values.as_ptr() as *const u8,
+            seed_values.len() as u64,
+            program_id.as_ptr(),
+            address.as_mut_ptr(),
+            &mut bump as *mut u8,
+        )
+    };
+    if result != 0 {
+        return Err(TascError::InvalidAccount);
+    }
+    Ok((address, bump))
+}
+
+#[cfg(not(target_os = "solana"))]
+fn derive_vault_authority(
+    _program_id: &PubkeyBytes,
+    _task: &TaskAccount,
+    expected_authority: &RuntimeAccountInfo,
+) -> Result<(PubkeyBytes, u8), TascError> {
+    Ok((expected_authority.key, 255))
+}
+
+#[cfg(target_os = "solana")]
+fn invoke_signed_transfer_checked(
+    instruction: &SolInstruction,
+    cpi_infos: &[SolAccountInfo],
+    signer_seeds: &[SolSignerSeeds],
+    _vault: &RuntimeAccountInfo,
+    _destination: &RuntimeAccountInfo,
+    _amount: u64,
+) -> Result<(), TascError> {
+    let result = unsafe {
+        sol_invoke_signed_c(
+            instruction as *const SolInstruction as *const u8,
+            cpi_infos.as_ptr() as *const u8,
+            cpi_infos.len() as u64,
+            signer_seeds.as_ptr() as *const u8,
+            signer_seeds.len() as u64,
+        )
+    };
+    if result == 0 {
+        Ok(())
+    } else {
+        Err(TascError::CpiFailed)
+    }
+}
+
+#[cfg(not(target_os = "solana"))]
+fn invoke_signed_transfer_checked(
+    _instruction: &SolInstruction,
+    _cpi_infos: &[SolAccountInfo],
+    _signer_seeds: &[SolSignerSeeds],
+    vault: &RuntimeAccountInfo,
+    destination: &RuntimeAccountInfo,
+    amount: u64,
+) -> Result<(), TascError> {
+    unsafe {
+        let vault_data = slice::from_raw_parts_mut(vault.data, vault.data_len);
+        let destination_data = slice::from_raw_parts_mut(destination.data, destination.data_len);
+        let vault_amount = read_u64(vault_data, SPL_TOKEN_AMOUNT_OFFSET);
+        let destination_amount = read_u64(destination_data, SPL_TOKEN_AMOUNT_OFFSET);
+        if vault_amount < amount {
+            return Err(TascError::InvalidAccount);
+        }
+        let updated_destination = destination_amount
+            .checked_add(amount)
+            .ok_or(TascError::InvalidAccount)?;
+        write_u64(vault_data, SPL_TOKEN_AMOUNT_OFFSET, vault_amount - amount);
+        write_u64(
+            destination_data,
+            SPL_TOKEN_AMOUNT_OFFSET,
+            updated_destination,
+        );
+    }
+    Ok(())
+}
+
+#[derive(Clone, Copy)]
+struct SplTokenAccount {
+    mint: PubkeyBytes,
+    owner: PubkeyBytes,
+    amount: u64,
+    state: u8,
+}
+
+fn decode_spl_token_account(account: &RuntimeAccountInfo) -> Result<SplTokenAccount, TascError> {
+    let data = runtime_account_data(account)?;
+    if data.len() != SPL_TOKEN_ACCOUNT_SIZE {
+        return Err(TascError::InvalidLength);
+    }
+    Ok(SplTokenAccount {
+        mint: read_32(data, 0),
+        owner: read_32(data, 32),
+        amount: read_u64(data, SPL_TOKEN_AMOUNT_OFFSET),
+        state: data[SPL_TOKEN_STATE_OFFSET],
+    })
+}
+
+fn decode_spl_mint_decimals(account: &RuntimeAccountInfo) -> Result<u8, TascError> {
+    let data = runtime_account_data(account)?;
+    if data.len() != SPL_MINT_ACCOUNT_SIZE {
+        return Err(TascError::InvalidLength);
+    }
+    if data[SPL_MINT_INITIALIZED_OFFSET] != SPL_ACCOUNT_STATE_INITIALIZED {
+        return Err(TascError::InvalidAccount);
+    }
+    Ok(data[SPL_MINT_DECIMALS_OFFSET])
+}
+
+fn runtime_account_data(account: &RuntimeAccountInfo) -> Result<&[u8], TascError> {
+    if account.data.is_null() {
+        return Err(TascError::InvalidAccount);
+    }
+    Ok(unsafe { slice::from_raw_parts(account.data, account.data_len) })
 }
 
 fn decode_unit_instruction(data: &[u8], tag: u8) -> Result<(), TascError> {
@@ -357,9 +821,15 @@ unsafe fn read_runtime_u8(input: *mut u8, offset: &mut usize) -> u8 {
 }
 
 unsafe fn read_runtime_u64(input: *mut u8, offset: &mut usize) -> u64 {
-    let value = *(input.add(*offset) as *const u64);
+    let value = read_runtime_u64_at(input, *offset);
     *offset += size_of::<u64>();
     value
+}
+
+unsafe fn read_runtime_u64_at(input: *mut u8, offset: usize) -> u64 {
+    let mut raw = [0u8; 8];
+    core::ptr::copy_nonoverlapping(input.add(offset), raw.as_mut_ptr(), raw.len());
+    u64::from_le_bytes(raw)
 }
 
 unsafe fn read_runtime_pubkey(input: *mut u8, offset: &mut usize) -> PubkeyBytes {
@@ -751,6 +1221,87 @@ mod tests {
         data
     }
 
+    fn spl_mint_account_data(decimals: u8) -> Vec<u8> {
+        let mut data = vec![0u8; SPL_MINT_ACCOUNT_SIZE];
+        data[SPL_MINT_DECIMALS_OFFSET] = decimals;
+        data[SPL_MINT_INITIALIZED_OFFSET] = SPL_ACCOUNT_STATE_INITIALIZED;
+        data
+    }
+
+    fn spl_token_account_data(mint: PubkeyBytes, owner: PubkeyBytes, amount: u64) -> Vec<u8> {
+        let mut data = vec![0u8; SPL_TOKEN_ACCOUNT_SIZE];
+        data[0..32].copy_from_slice(&mint);
+        data[32..64].copy_from_slice(&owner);
+        data[SPL_TOKEN_AMOUNT_OFFSET..SPL_TOKEN_AMOUNT_OFFSET + 8]
+            .copy_from_slice(&amount.to_le_bytes());
+        data[SPL_TOKEN_STATE_OFFSET] = SPL_ACCOUNT_STATE_INITIALIZED;
+        data
+    }
+
+    fn settlement_accounts(
+        signer: PubkeyBytes,
+        task: PubkeyBytes,
+        task_data: Vec<u8>,
+        program_id: PubkeyBytes,
+        vault: PubkeyBytes,
+        mint: PubkeyBytes,
+        destination: PubkeyBytes,
+        destination_owner: PubkeyBytes,
+        vault_authority: PubkeyBytes,
+    ) -> [TestAccount; RUNTIME_SETTLEMENT_ACCOUNTS] {
+        [
+            TestAccount {
+                key: signer,
+                owner: key(0),
+                is_signer: true,
+                is_writable: true,
+                data: Vec::new(),
+            },
+            TestAccount {
+                key: task,
+                owner: program_id,
+                is_signer: false,
+                is_writable: true,
+                data: task_data,
+            },
+            TestAccount {
+                key: vault,
+                owner: SPL_TOKEN_PROGRAM_ID,
+                is_signer: false,
+                is_writable: true,
+                data: spl_token_account_data(mint, vault_authority, 10_000_000),
+            },
+            TestAccount {
+                key: mint,
+                owner: SPL_TOKEN_PROGRAM_ID,
+                is_signer: false,
+                is_writable: false,
+                data: spl_mint_account_data(6),
+            },
+            TestAccount {
+                key: destination,
+                owner: SPL_TOKEN_PROGRAM_ID,
+                is_signer: false,
+                is_writable: true,
+                data: spl_token_account_data(mint, destination_owner, 0),
+            },
+            TestAccount {
+                key: vault_authority,
+                owner: key(0),
+                is_signer: false,
+                is_writable: false,
+                data: Vec::new(),
+            },
+            TestAccount {
+                key: SPL_TOKEN_PROGRAM_ID,
+                owner: key(0),
+                is_signer: false,
+                is_writable: false,
+                data: Vec::new(),
+            },
+        ]
+    }
+
     fn push_u64(out: &mut Vec<u8>, value: u64) {
         out.extend_from_slice(&value.to_le_bytes());
     }
@@ -759,7 +1310,7 @@ mod tests {
         out.push(NON_DUP_MARKER);
         out.push(u8::from(account.is_signer));
         out.push(u8::from(account.is_writable));
-        out.push(0);
+        out.push(u8::from(account.key == SPL_TOKEN_PROGRAM_ID));
         out.extend_from_slice(&0u32.to_le_bytes());
         out.extend_from_slice(&account.key);
         out.extend_from_slice(&account.owner);
@@ -1065,22 +1616,21 @@ mod tests {
         let worker = key(6);
         let verifier = key(3);
         let task = key(8);
-        let accounts = [
-            TestAccount {
-                key: worker,
-                owner: key(0),
-                is_signer: true,
-                is_writable: true,
-                data: Vec::new(),
-            },
-            TestAccount {
-                key: task,
-                owner: program_id,
-                is_signer: false,
-                is_writable: true,
-                data: passed_account_data(buyer, worker, key(5), key(2), verifier, key(7)),
-            },
-        ];
+        let vault = key(5);
+        let mint = key(2);
+        let destination = key(12);
+        let vault_authority = key(11);
+        let accounts = settlement_accounts(
+            worker,
+            task,
+            passed_account_data(buyer, worker, vault, mint, verifier, key(7)),
+            program_id,
+            vault,
+            mint,
+            destination,
+            worker,
+            vault_authority,
+        );
         let mut input = serialized_runtime_input(&accounts, &[TAG_RELEASE], program_id);
 
         let status = unsafe { entrypoint(input.as_mut_ptr()) };
@@ -1091,6 +1641,23 @@ mod tests {
             decode_task_account(&input[task_data_offset..task_data_offset + TASK_ACCOUNT_SIZE])
                 .unwrap();
         assert_eq!(decoded.status, STATUS_RELEASED);
+
+        let vault_offset = data_offset_for_account(&input, 2);
+        let destination_offset = data_offset_for_account(&input, 4);
+        assert_eq!(
+            read_u64(
+                &input[vault_offset..vault_offset + SPL_TOKEN_ACCOUNT_SIZE],
+                SPL_TOKEN_AMOUNT_OFFSET
+            ),
+            0
+        );
+        assert_eq!(
+            read_u64(
+                &input[destination_offset..destination_offset + SPL_TOKEN_ACCOUNT_SIZE],
+                SPL_TOKEN_AMOUNT_OFFSET
+            ),
+            10_000_000
+        );
     }
 
     #[test]
@@ -1100,22 +1667,21 @@ mod tests {
         let worker = key(6);
         let verifier = key(3);
         let task = key(8);
-        let accounts = [
-            TestAccount {
-                key: buyer,
-                owner: key(0),
-                is_signer: true,
-                is_writable: true,
-                data: Vec::new(),
-            },
-            TestAccount {
-                key: task,
-                owner: program_id,
-                is_signer: false,
-                is_writable: true,
-                data: failed_account_data(buyer, worker, key(5), key(2), verifier, key(7)),
-            },
-        ];
+        let vault = key(5);
+        let mint = key(2);
+        let destination = key(13);
+        let vault_authority = key(11);
+        let accounts = settlement_accounts(
+            buyer,
+            task,
+            failed_account_data(buyer, worker, vault, mint, verifier, key(7)),
+            program_id,
+            vault,
+            mint,
+            destination,
+            buyer,
+            vault_authority,
+        );
         let mut input = serialized_runtime_input(&accounts, &[TAG_REFUND], program_id);
 
         let status = unsafe { entrypoint(input.as_mut_ptr()) };
@@ -1126,5 +1692,22 @@ mod tests {
             decode_task_account(&input[task_data_offset..task_data_offset + TASK_ACCOUNT_SIZE])
                 .unwrap();
         assert_eq!(decoded.status, STATUS_REFUNDED);
+
+        let vault_offset = data_offset_for_account(&input, 2);
+        let destination_offset = data_offset_for_account(&input, 4);
+        assert_eq!(
+            read_u64(
+                &input[vault_offset..vault_offset + SPL_TOKEN_ACCOUNT_SIZE],
+                SPL_TOKEN_AMOUNT_OFFSET
+            ),
+            0
+        );
+        assert_eq!(
+            read_u64(
+                &input[destination_offset..destination_offset + SPL_TOKEN_ACCOUNT_SIZE],
+                SPL_TOKEN_AMOUNT_OFFSET
+            ),
+            10_000_000
+        );
     }
 }
