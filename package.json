@@ -57,6 +57,8 @@
     "solana:lifecycle-release-send": "node bin/run-solana-lifecycle.js send-release",
     "solana:lifecycle-refund-plan": "node bin/run-solana-lifecycle.js plan-refund",
     "solana:lifecycle-refund-send": "node bin/run-solana-lifecycle.js send-refund",
+    "solana:lifecycle-scan-plan": "node bin/scan-solana-lifecycle-live.js plan",
+    "solana:lifecycle-scan-live": "node bin/scan-solana-lifecycle-live.js scan",
     "solana:spl-setup-plan": "node bin/run-solana-spl-setup.js plan examples/solana-devnet/summarize_url.signature.json",
     "solana:spl-setup-send": "node bin/run-solana-spl-setup.js send examples/solana-devnet/summarize_url.signature.json",
     "solana:spl-scan-plan": "node bin/scan-solana-spl-live.js plan examples/solana-devnet/spl-setup.live.json",

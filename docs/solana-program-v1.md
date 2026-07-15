@@ -2,7 +2,7 @@
 
 This document defines the minimal Solana program/scanner boundary for Global Tasc.
 
-The fund processor has been deployed on Solana devnet, and the lifecycle-enabled upgrade is built locally. This document describes the executable ABI and minimal account-mutating processor indexers use to decode live task accounts into `tasc.funding.solana` evidence.
+The fund processor and lifecycle-enabled upgrade have been deployed on Solana devnet. This document describes the executable ABI and minimal account-mutating processor indexers use to decode live task accounts into `tasc.funding.solana` and lifecycle evidence.
 
 ## Why This Exists
 
@@ -157,7 +157,7 @@ The live scanner reads that deterministic task account with `getAccountInfo`, de
 
 ## Next Step
 
-The guarded deploy/fund/scan sequence has been executed on devnet. The next implementation step is to redeploy the lifecycle-enabled program, send guarded live `claim` and `attest` transactions against the funded SPL task, then add real SPL token escrow movement for `release` and `refund`.
+The guarded deploy/fund/scan/claim/attest sequence has been executed on devnet. The next implementation step is real SPL token escrow movement for `release` and `refund`.
 
 Run:
 
@@ -165,6 +165,7 @@ Run:
 npm run validate:solana-source
 npm run validate:solana-fund-tx
 npm run validate:solana-lifecycle-tx
+npm run solana:lifecycle-scan-live -- examples/solana-devnet/summarize_url_spl.signature.json
 npm run validate:solana-live-scan
 ```
 

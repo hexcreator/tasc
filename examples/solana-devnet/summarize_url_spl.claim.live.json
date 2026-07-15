@@ -1,0 +1,15 @@
+{
+  "ok": true,
+  "mode": "send-claim",
+  "rpc_host": "solana-devnet.g.alchemy.com",
+  "cluster": "devnet",
+  "program_id": "FAqKhKke5pZr4TK6kXq9aKR98hWFy19SMQG9eGfXQrRM",
+  "task_account": "37hA4KUeR6eLPP1g1mBoTMYHKCPq7LECpLryQc61TmRi",
+  "signer_role": "worker",
+  "signer": "BfRmLmH7ksPRCRxNBi7c8SspN7zKoyuAPKrJMDL5uQCJ",
+  "instruction_data_hex": "0x01",
+  "signature": "3eQLPK2SsMFJySopM6W27YapKLAoxdFANy9qjf4JjoXe3suSt8yZLZrruFCTzBfqAkF4MvXPNieFQFasSoY4rBG6",
+  "confirmation_status": "confirmed",
+  "token_movement": "none",
+  "key_material_printed": false
+}

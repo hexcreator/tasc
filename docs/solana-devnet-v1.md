@@ -293,6 +293,20 @@ funding evidence:     examples/solana-devnet/summarize_url_spl.funding.live.json
 index output:         examples/index/solana.spl.live.index.json
 ```
 
+Current live lifecycle proof:
+
+```text
+lifecycle deploy tx:  3sg2FKp3GBxHt4Du1MCKfWaKvTUk9PGR4yTMo34Z4uZsLmyFpTVCAtkDwUNChXcNJs4T3pwhgUKtQreU9geGXpyu
+claim tx:             3eQLPK2SsMFJySopM6W27YapKLAoxdFANy9qjf4JjoXe3suSt8yZLZrruFCTzBfqAkF4MvXPNieFQFasSoY4rBG6
+attest tx:            4ttsWrawCvg3v981Yyrsy8SYpr9ayzYmfLeVK72bvQmUBEHaaGyEiVCE9MLY3hYiTtR1ZZrS3NmMSsBnYA9sMUw1
+task account:         37hA4KUeR6eLPP1g1mBoTMYHKCPq7LECpLryQc61TmRi
+current status:       Passed
+worker:               BfRmLmH7ksPRCRxNBi7c8SspN7zKoyuAPKrJMDL5uQCJ
+result hash:          0x0bdfacb7e0ec2c3241da82c7b812b1a0fa28945b47c7f8a6b113b4de3779776f
+lifecycle deploy out: examples/solana-devnet/summarize_url_spl.lifecycle-deploy.live.json
+lifecycle scan output: examples/solana-devnet/summarize_url_spl.lifecycle-account.live.json
+```
+
 ## Scanner Shape
 
 The EVM scanner reads `Funded` logs. The Solana scanner reads task account state:
@@ -307,9 +321,9 @@ The EVM scanner reads `Funded` logs. The Solana scanner reads task account state
 
 Solana devnet now works well enough to continue on the faster-chain path. The next real implementation step is:
 
-1. Redeploy the lifecycle-enabled program, then send guarded `claim` and `attest` transactions against the live funded SPL task.
-2. Add program-signed SPL Token CPI for `release` and `refund`.
-3. Scan lifecycle state after claim/attest/release, not only funding state.
+1. Add program-signed SPL Token CPI for `release` and `refund`.
+2. Scan lifecycle state after release/refund, not only funding and attestation state.
+3. Add wallet-backed browser claim/attest controls once the static proof should become interactive.
 4. Keep the browser/static index path chain-neutral by admitting Solana and EVM evidence through the same indexer boundary.
 5. Add production-style finality/reorg handling and duplicate-task suppression before treating devnet behavior as production-ready.
 

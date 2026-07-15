@@ -1,0 +1,13 @@
+{
+  "ok": true,
+  "mode": "deploy",
+  "program_artifact": "build/solana/global_tasc_solana_program.so",
+  "program_id": "FAqKhKke5pZr4TK6kXq9aKR98hWFy19SMQG9eGfXQrRM",
+  "payer_address": "6Apg3YonZ8yCnhSnEVPx3EoUZYnhH9297EuCf5A1beTR",
+  "rpc_value_printed": false,
+  "solana_output": {
+    "programId": "FAqKhKke5pZr4TK6kXq9aKR98hWFy19SMQG9eGfXQrRM",
+    "signature": "3sg2FKp3GBxHt4Du1MCKfWaKvTUk9PGR4yTMo34Z4uZsLmyFpTVCAtkDwUNChXcNJs4T3pwhgUKtQreU9geGXpyu"
+  },
+  "key_material_printed": false
+}

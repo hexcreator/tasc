@@ -1,0 +1,80 @@
+{
+  "kind": "tasc.solana.lifecycle_account.live",
+  "version": "0.1",
+  "signed_intent": "examples/solana-devnet/summarize_url_spl.signature.json",
+  "cluster": "devnet",
+  "pubkey": "37hA4KUeR6eLPP1g1mBoTMYHKCPq7LECpLryQc61TmRi",
+  "owner": "FAqKhKke5pZr4TK6kXq9aKR98hWFy19SMQG9eGfXQrRM",
+  "executable": false,
+  "lamports": "2811840",
+  "rent_epoch": "18446744073709552000",
+  "data_base64": "/lqbGiDwjwMBAwAAEDMXrWA1aYBRM7Ud3TRHRhpf+ZjovKJkJyggX399tl5MzpDujxv2lH4hvDM8N12p8JWVz/k/fts30eritGAHIJ5s8PnhtE6vyaTkKYLDR57PoBqMnaS/MtexTokmruALJE5OfCWf/Pzdv87HRmKX/e1efWthYq/LTEXFmLo7Jo9vmNVSVJdv7if4AcPZCrdEGWBfrNONl64rTguBkPnw963bHgiO++ab3xvQbpPmSLhZqSdBXY/LqheavpMjaE13gJaYAAAAAAA80klrAAAAAAEAAAAAAAAAC9+st+DsLDJB2oLHuBKxoPoolFtHx/imsRO03jd5d28AAAAAAAAAAAAAAAAAAAAA",
+  "context": {
+    "slot": "476496400",
+    "api_version": "4.1.0-rc.1"
+  },
+  "decoded": {
+    "kind": "tasc.solana.task_account",
+    "version": "0.1",
+    "program_id": "FAqKhKke5pZr4TK6kXq9aKR98hWFy19SMQG9eGfXQrRM",
+    "task_pda": "37hA4KUeR6eLPP1g1mBoTMYHKCPq7LECpLryQc61TmRi",
+    "status": "Passed",
+    "status_code": 3,
+    "bump": 0,
+    "flags": 0,
+    "task_hash": "0x103317ad603569805133b51ddd3447461a5ff998e8bca2642728205f7f7db65e",
+    "buyer": "6Apg3YonZ8yCnhSnEVPx3EoUZYnhH9297EuCf5A1beTR",
+    "worker": "BfRmLmH7ksPRCRxNBi7c8SspN7zKoyuAPKrJMDL5uQCJ",
+    "verifier": "3Siw3mYu8yQVaZ8qvXH5z4quyhhk6vBySn5d3KhNW9Tt",
+    "token_mint": "8WdRRCNVr8Du5Q1C1EeiMvqCRpSTBwWnHRjnx3FZ7KbC",
+    "vault": "ChfKa5tEUjeSdaEhmjiDCWQE1Q6YT1oVaZt62HHR43b4",
+    "amount": "10000000",
+    "deadline_unix": "1800000060",
+    "nonce": "1",
+    "result_hash": "0x0bdfacb7e0ec2c3241da82c7b812b1a0fa28945b47c7f8a6b113b4de3779776f",
+    "created_slot": "0",
+    "updated_slot": "0"
+  },
+  "intent_match_checks": [
+    {
+      "name": "program_id",
+      "pass": true
+    },
+    {
+      "name": "task_pda",
+      "pass": true
+    },
+    {
+      "name": "task_hash",
+      "pass": true
+    },
+    {
+      "name": "buyer",
+      "pass": true
+    },
+    {
+      "name": "token_mint",
+      "pass": true
+    },
+    {
+      "name": "vault",
+      "pass": true
+    },
+    {
+      "name": "amount",
+      "pass": true
+    },
+    {
+      "name": "deadline_unix",
+      "pass": true
+    },
+    {
+      "name": "verifier",
+      "pass": true
+    },
+    {
+      "name": "nonce",
+      "pass": true
+    }
+  ]
+}

@@ -71,7 +71,6 @@ Open issues for:
 
 - `good first issue`: create another `.tasc` task fixture
 - `good first issue`: add README walkthrough screenshots
-- `protocol`: redeploy and send live Solana claim/attest against the funded SPL task
 - `protocol`: implement program-signed SPL token release/refund CPI
 - `indexer`: discover funded task accounts from program-owned accounts
 - `indexer`: scan post-funding lifecycle state
@@ -97,12 +96,10 @@ Ask for specific feedback:
 
 ## Next Engineering Steps
 
-1. Redeploy the lifecycle-enabled Solana program.
-2. Send live worker claim and verifier attestation transactions.
-3. Implement program-signed SPL token release/refund CPI.
-4. Extend scanner/indexer from "funded" to lifecycle state.
-5. Add wallet-backed browser claim controls after live claim is proven.
-6. Add one-command local demo.
+1. Implement program-signed SPL token release/refund CPI.
+2. Extend scanner/indexer from "funded" and "attested" to completed payout/refund state.
+3. Add wallet-backed browser claim controls after release/refund semantics are safe.
+4. Add one-command local demo.
 
 ## Success Criteria For Early Use
 
