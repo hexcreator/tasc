@@ -22,10 +22,10 @@ Done:
 - secret ignore rules exist
 - devnet SPL custody proof exists
 - validators exist
+- Apache-2.0 license exists
 
 Next:
 
-- choose a license
 - add a short demo video or GIF
 - add GitHub topics: `solana`, `microtasks`, `escrow`, `usdc`, `task-language`, `devnet`
 - create labeled issues for the first contribution tracks

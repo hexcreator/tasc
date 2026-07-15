@@ -68,7 +68,7 @@ Required additions before this mode:
 
 Do not publish this mode until:
 
-- a license is selected
+- Apache-2.0 licensing is preserved across source and artifacts
 - security disclosure process exists
 - key management policy is documented
 - contract/program review has happened

@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "commonjs",
+  "license": "Apache-2.0",
   "description": "Seed prototype for a decentralized instant micro-work task protocol.",
   "scripts": {
     "demo": "npm run compile:example && npm run verify:example && npm run demo:market && npm run validate:indexer && npm run validate:solana-spl-escrow",

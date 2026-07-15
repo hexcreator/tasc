@@ -4,9 +4,7 @@ Tasc is an early protocol prototype. Contributions are welcome, but the project 
 
 ## Current Contribution Status
 
-The repository is public, but a project license has not been selected yet. Until a `LICENSE` file is added, avoid submitting substantial original code. Issues, design feedback, docs improvements, typo fixes, and small reproducibility fixes are fine.
-
-Recommended next legal step: choose `MIT`, `Apache-2.0`, or a dual-license strategy before inviting broad code contributions.
+The project is licensed under Apache-2.0. By submitting a contribution, you agree that it will be licensed under the same license unless explicitly agreed otherwise before submission.
 
 ## Good First Areas
 

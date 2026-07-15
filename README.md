@@ -7,7 +7,7 @@
   <img alt="Status" src="https://img.shields.io/badge/status-devnet%20prototype-45E0B8?style=flat-square">
   <img alt="Runtime deps" src="https://img.shields.io/badge/runtime%20deps-zero-7DD3FC?style=flat-square">
   <img alt="Settlement" src="https://img.shields.io/badge/settlement-Solana%20%2B%20EVM-F8C35B?style=flat-square">
-  <img alt="License" src="https://img.shields.io/badge/license-TBD-8A8F98?style=flat-square">
+  <img alt="License" src="https://img.shields.io/badge/license-Apache--2.0-8A8F98?style=flat-square">
 </p>
 
 # Tasc
@@ -202,4 +202,4 @@ Start with [CONTRIBUTING.md](CONTRIBUTING.md), then pick one of the tracks in [d
 - Live transaction commands are guarded by explicit environment flags.
 - Current npm production dependency audit reports zero vulnerabilities.
 - Runtime code avoids framework dependencies where practical.
-- A project license has not been selected yet; choose one before accepting substantial third-party code.
+- Licensed under Apache-2.0.
