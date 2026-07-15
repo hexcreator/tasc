@@ -3,11 +3,13 @@
 const fs = require("fs");
 const path = require("path");
 const core = require("../web/tasc-web-core");
+const demoIndex = require("../web/demo-index");
 
 const WEB_DIR = "web";
 const LOG = "examples/events/summarize_url.funded-log.json";
 const FUNDING = "examples/funding/summarize_url.from-log.json";
 const HANDOFF = "examples/testnet/base-sepolia.handoff.example.json";
+const SOLANA_INDEX = "examples/index/solana.spl.live.index.json";
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -25,13 +27,29 @@ function assertNoExternalRuntimeDependencies() {
   const html = read(path.join(WEB_DIR, "index.html"));
   assert(!/(?:src|href)=["']https?:\/\//.test(html), "web/index.html should not load external runtime URLs");
   assert(html.includes("./tasc-web-core.js"), "index should load dependencyless core");
+  assert(html.includes("./demo-index.js"), "index should load bundled demo index");
   assert(html.includes("./app.js"), "index should load app script");
 
-  for (const file of ["app.js", "tasc-web-core.js"]) {
+  for (const file of ["app.js", "demo-index.js", "tasc-web-core.js"]) {
     const source = read(path.join(WEB_DIR, file));
     assert(!/from\s+["']/.test(source), `${file} should not use module imports`);
     assert(!/require\s*\(/.test(source), `${file} should not require packages in browser runtime`);
   }
+}
+
+function assertBundledSolanaIndexMatchesFixture() {
+  const expected = loadJson(SOLANA_INDEX);
+  assert(demoIndex.kind === expected.kind, "bundled Solana index kind mismatch");
+  assert(Array.isArray(demoIndex.entries), "bundled Solana index entries must be an array");
+  assert(demoIndex.entries.length === expected.entries.length, "bundled Solana index entry count mismatch");
+  const actualEntry = demoIndex.entries[0];
+  const expectedEntry = expected.entries[0];
+  for (const field of ["status", "intent_hash", "task_hash", "buyer", "token_mint", "amount", "deadline_unix", "verifier"]) {
+    assert(actualEntry[field] === expectedEntry[field], `bundled Solana ${field} mismatch`);
+  }
+  assert(actualEntry.settlement.vault === expectedEntry.settlement.vault, "bundled Solana vault mismatch");
+  assert(actualEntry.funding.signature === expectedEntry.funding.signature, "bundled Solana funding signature mismatch");
+  assert(actualEntry.funding.custody.amount === expectedEntry.funding.custody.amount, "bundled Solana custody amount mismatch");
 }
 
 function assertDecodeMatchesFundingFixture() {
@@ -85,12 +103,14 @@ function main() {
   assertNoExternalRuntimeDependencies();
   assertDecodeMatchesFundingFixture();
   assertFilterAndHandoff();
+  assertBundledSolanaIndexMatchesFixture();
 
   process.stdout.write(`${JSON.stringify({
     ok: true,
     web: WEB_DIR,
     decoded_fixture: LOG,
     handoff_fixture: HANDOFF,
+    bundled_solana_index: SOLANA_INDEX,
     external_runtime_dependencies: 0,
     next: "Open web/index.html or deploy web/ as static files.",
   }, null, 2)}\n`);

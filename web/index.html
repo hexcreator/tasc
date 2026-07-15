@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Global Tasc Feed</title>
+    <title>Tasc Claimable Feed</title>
     <link rel="stylesheet" href="./styles.css">
   </head>
   <body>
@@ -12,13 +12,13 @@
           <div class="brand">
             <div class="mark">GT</div>
             <div>
-              <h1>Global Tasc Feed</h1>
+              <h1>Tasc Claimable Feed</h1>
             </div>
           </div>
         <div class="stats">
           <div class="stat">
             <strong id="task-count">0</strong>
-            <span>funded tasks</span>
+            <span>claimable tasks</span>
           </div>
         </div>
       </header>
@@ -26,7 +26,15 @@
       <main class="layout">
         <aside class="panel controls">
           <section class="section">
-            <h2>Connection</h2>
+            <h2>Public Demo</h2>
+            <p class="helper">Load the bundled Solana devnet SPL custody proof. This does not connect a wallet or send a transaction.</p>
+            <div class="actions">
+              <button id="load-demo" class="primary" type="button">Load Devnet Proof</button>
+            </div>
+          </section>
+
+          <section class="section">
+            <h2>EVM Scanner</h2>
             <label>
               RPC URL
               <input id="rpc-url" type="url" autocomplete="off" placeholder="https://sepolia.base.org">
@@ -76,9 +84,10 @@
 
         <section class="panel feed">
           <div class="feed-header">
-            <h2>Task Feed</h2>
+            <h2>Claimable Inventory</h2>
             <div id="cursor" class="cursor">No cursor</div>
           </div>
+          <div id="claimable-list" class="claimable-list"></div>
           <div class="table-wrap">
             <table>
               <thead>
@@ -101,6 +110,7 @@
     </div>
 
     <script src="./tasc-web-core.js"></script>
+    <script src="./demo-index.js"></script>
     <script src="./app.js"></script>
   </body>
 </html>

@@ -1,0 +1,63 @@
+(function initTascDemoIndex(root) {
+  "use strict";
+
+  const index = {
+    kind: "tasc.index",
+    version: "0.1",
+    entries: [
+      {
+        kind: "tasc.index.entry",
+        version: "0.1",
+        status: "claimable",
+        admitted_at: "1970-01-01T00:00:00.000Z",
+        intent_hash: "sha256:cf0bba00c96f417f3a74bb7d7005b3d8f69ef196b793dde7b659188761ff3bc5",
+        task_hash: "0x103317ad603569805133b51ddd3447461a5ff998e8bca2642728205f7f7db65e",
+        settlement: {
+          chain: "solana",
+          cluster: "devnet",
+          program_id: "FAqKhKke5pZr4TK6kXq9aKR98hWFy19SMQG9eGfXQrRM",
+          task_pda: "37hA4KUeR6eLPP1g1mBoTMYHKCPq7LECpLryQc61TmRi",
+          vault: "ChfKa5tEUjeSdaEhmjiDCWQE1Q6YT1oVaZt62HHR43b4",
+        },
+        buyer: "6Apg3YonZ8yCnhSnEVPx3EoUZYnhH9297EuCf5A1beTR",
+        token_mint: "8WdRRCNVr8Du5Q1C1EeiMvqCRpSTBwWnHRjnx3FZ7KbC",
+        amount: "10000000",
+        deadline_unix: "1800000060",
+        verifier: "3Siw3mYu8yQVaZ8qvXH5z4quyhhk6vBySn5d3KhNW9Tt",
+        nonce: "1",
+        funding: {
+          kind: "tasc.funding.solana",
+          signature: "zhrqMMYfXQAK37hLVkuvmqNwb2VzkdM4ZyHZMhpBhci97j3L38A7dswKhA9PsjimMPEFczf9NoWu5pR4jnudsm1",
+          slot: "476483582",
+          instruction_index: "4",
+          status: "Funded",
+          confirmation_status: "confirmed",
+          custody: {
+            kind: "tasc.custody.solana.spl_token",
+            token_program_id: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+            vault_token_account: "ChfKa5tEUjeSdaEhmjiDCWQE1Q6YT1oVaZt62HHR43b4",
+            vault_authority: "8ysLbdWSpBQCPV5De2GWonQWM5cCjNw93d44ihh2Hv9F",
+            token_mint: "8WdRRCNVr8Du5Q1C1EeiMvqCRpSTBwWnHRjnx3FZ7KbC",
+            amount: "10000000",
+            required_amount: "10000000",
+            decimals: 6,
+            transfer_signature: "zhrqMMYfXQAK37hLVkuvmqNwb2VzkdM4ZyHZMhpBhci97j3L38A7dswKhA9PsjimMPEFczf9NoWu5pR4jnudsm1",
+            slot: "476483582",
+            instruction_index: "3",
+            confirmation_status: "confirmed",
+          },
+        },
+        signature: {
+          signer: "6Apg3YonZ8yCnhSnEVPx3EoUZYnhH9297EuCf5A1beTR",
+          valid: true,
+        },
+      },
+    ],
+  };
+
+  if (typeof module !== "undefined" && module.exports) {
+    module.exports = index;
+  }
+
+  root.TascDemoIndex = index;
+})(typeof globalThis !== "undefined" ? globalThis : window);

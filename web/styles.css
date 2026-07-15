@@ -8,6 +8,7 @@
   --muted: #5f6e7d;
   --accent: #0f766e;
   --accent-dark: #0b5f59;
+  --accent-soft: #e6fffa;
   --danger: #b42318;
   --success: #067647;
   --shadow: 0 12px 28px rgba(23, 33, 43, 0.08);
@@ -138,6 +139,13 @@ label span,
   gap: 12px;
 }
 
+.helper {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
 .grid-two {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -256,6 +264,108 @@ button:disabled {
   border-bottom: 1px solid var(--border);
 }
 
+.claimable-list {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+}
+
+.claimable-list:empty {
+  display: none;
+}
+
+.claimable-card {
+  display: grid;
+  gap: 16px;
+  border: 1px solid #b6e5d9;
+  border-radius: 8px;
+  padding: 16px;
+  background: linear-gradient(180deg, #f7fffc 0%, #ffffff 100%);
+}
+
+.claimable-card-header,
+.claimable-card-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.claimable-card-header {
+  align-items: flex-start;
+}
+
+.claimable-card-footer {
+  align-items: center;
+  border-top: 1px solid var(--border);
+  padding-top: 14px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.claimable-card h3,
+.claimable-card p {
+  margin: 0;
+}
+
+.claimable-card h3 {
+  margin-top: 4px;
+  font-size: 20px;
+}
+
+.claimable-card p {
+  margin-top: 6px;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.eyebrow {
+  color: var(--accent-dark);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.reward {
+  flex: 0 0 auto;
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: var(--accent-soft);
+  color: var(--accent-dark);
+  font-size: 20px;
+  font-weight: 800;
+}
+
+.claimable-meta {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.meta-item {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px;
+  background: #fff;
+}
+
+.meta-item span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 750;
+  text-transform: uppercase;
+}
+
+.meta-item strong,
+.meta-item a {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .cursor {
   color: var(--muted);
   font-size: 13px;
@@ -323,6 +433,16 @@ a:hover {
   }
 
   .grid-two {
+    grid-template-columns: 1fr;
+  }
+
+  .claimable-card-header,
+  .claimable-card-footer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .claimable-meta {
     grid-template-columns: 1fr;
   }
 

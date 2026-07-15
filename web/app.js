@@ -2,9 +2,11 @@
   "use strict";
 
   const core = window.TascWebCore;
+  const demoIndex = window.TascDemoIndex;
   const storageKey = "global-tasc.web.feed.v1";
 
   const el = {
+    loadDemo: document.querySelector("#load-demo"),
     rpcUrl: document.querySelector("#rpc-url"),
     escrow: document.querySelector("#escrow"),
     chainId: document.querySelector("#chain-id"),
@@ -18,6 +20,7 @@
     status: document.querySelector("#status"),
     taskCount: document.querySelector("#task-count"),
     cursor: document.querySelector("#cursor"),
+    claimableList: document.querySelector("#claimable-list"),
     tableBody: document.querySelector("#task-table-body"),
     empty: document.querySelector("#empty-state"),
   };
@@ -134,6 +137,12 @@
     return `${value.slice(0, 10)}...${value.slice(-6)}`;
   }
 
+  function shortMiddle(value) {
+    if (!value) return "";
+    if (String(value).length <= 18) return String(value);
+    return `${String(value).slice(0, 8)}...${String(value).slice(-6)}`;
+  }
+
   function explorerTxUrl(chainId, txHash) {
     if (chainId === 84532) return `https://sepolia.basescan.org/tx/${txHash}`;
     if (chainId === 8453) return `https://basescan.org/tx/${txHash}`;
@@ -146,15 +155,93 @@
     return new Date(millis).toLocaleString();
   }
 
+  function solanaExplorerUrl(path, cluster) {
+    return `https://explorer.solana.com/${path}?cluster=${encodeURIComponent(cluster || "devnet")}`;
+  }
+
   function render() {
     const state = readState();
     const entries = state.entries || [];
-    el.taskCount.textContent = String(entries.length);
+    const claimableEntries = state.claimableEntries || [];
+    el.taskCount.textContent = String(entries.length + claimableEntries.length);
     el.cursor.textContent = state.cursor
       ? `Next block ${state.cursor.nextFromBlock}; head ${state.cursor.headBlock}`
-      : "No cursor";
-    el.empty.hidden = entries.length > 0;
+      : claimableEntries.length > 0
+        ? "Bundled devnet proof loaded"
+        : "No cursor";
+    el.claimableList.replaceChildren(...claimableEntries.map(renderClaimableCard));
+    el.empty.hidden = entries.length > 0 || claimableEntries.length > 0;
     el.tableBody.replaceChildren(...entries.map(renderRow));
+  }
+
+  function metaItem(label, value, href) {
+    const item = document.createElement("div");
+    item.className = "meta-item";
+    const labelNode = document.createElement("span");
+    labelNode.textContent = label;
+    const valueNode = href
+      ? Object.assign(document.createElement("a"), {
+        href,
+        target: "_blank",
+        rel: "noreferrer",
+        textContent: value,
+      })
+      : Object.assign(document.createElement("strong"), { textContent: value });
+    item.append(labelNode, valueNode);
+    return item;
+  }
+
+  function renderClaimableCard(entry) {
+    const card = document.createElement("article");
+    card.className = "claimable-card";
+    const settlement = entry.settlement || {};
+    const funding = entry.funding || {};
+    const custody = funding.custody || {};
+    const cluster = settlement.cluster || "devnet";
+    const reward = `${core.formatTokenAmount(entry.amount, custody.decimals ?? 6)} USDC`;
+
+    const header = document.createElement("div");
+    header.className = "claimable-card-header";
+    const titleWrap = document.createElement("div");
+    const eyebrow = document.createElement("div");
+    eyebrow.className = "eyebrow";
+    eyebrow.textContent = `${settlement.chain || "chain"} / ${cluster}`;
+    const title = document.createElement("h3");
+    title.textContent = "summarize_url_spl";
+    const subtitle = document.createElement("p");
+    subtitle.textContent = "Live devnet task admitted from signed intent plus SPL vault custody.";
+    titleWrap.append(eyebrow, title, subtitle);
+
+    const rewardNode = document.createElement("div");
+    rewardNode.className = "reward";
+    rewardNode.textContent = reward;
+    header.append(titleWrap, rewardNode);
+
+    const meta = document.createElement("div");
+    meta.className = "claimable-meta";
+    meta.append(
+      metaItem("Status", entry.status),
+      metaItem("Task", shortHash(entry.task_hash)),
+      metaItem("Program", shortMiddle(settlement.program_id), solanaExplorerUrl(`address/${settlement.program_id}`, cluster)),
+      metaItem("Task account", shortMiddle(settlement.task_pda), solanaExplorerUrl(`address/${settlement.task_pda}`, cluster)),
+      metaItem("Vault", shortMiddle(settlement.vault), solanaExplorerUrl(`address/${settlement.vault}`, cluster)),
+      metaItem("Custody", `${core.formatTokenAmount(custody.amount || "0", custody.decimals ?? 6)} USDC`),
+      metaItem("Funding tx", shortMiddle(funding.signature), solanaExplorerUrl(`tx/${funding.signature}`, cluster)),
+      metaItem("Verifier", shortMiddle(entry.verifier), solanaExplorerUrl(`address/${entry.verifier}`, cluster)),
+    );
+
+    const footer = document.createElement("div");
+    footer.className = "claimable-card-footer";
+    const note = document.createElement("span");
+    note.textContent = "Claim is disabled until the live Solana claim instruction is implemented.";
+    const claim = document.createElement("button");
+    claim.type = "button";
+    claim.disabled = true;
+    claim.textContent = "Claim pending";
+    footer.append(note, claim);
+
+    card.append(header, meta, footer);
+    return card;
   }
 
   function renderRow(entry) {
@@ -192,6 +279,14 @@
     const state = readState();
     state.config = config;
     writeState(state);
+  }
+
+  function onLoadDemo() {
+    const state = readState();
+    state.claimableEntries = demoIndex && Array.isArray(demoIndex.entries) ? demoIndex.entries : [];
+    writeState(state);
+    render();
+    setStatus(`Loaded ${state.claimableEntries.length} bundled devnet proof task(s)`, "success");
   }
 
   async function onScan() {
@@ -254,6 +349,7 @@
     const state = readState();
     setFormFromState(state);
     render();
+    el.loadDemo.addEventListener("click", onLoadDemo);
     el.scan.addEventListener("click", onScan);
     el.importHandoff.addEventListener("click", onImportHandoff);
     el.clear.addEventListener("click", onClear);
