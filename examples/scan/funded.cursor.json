@@ -1,0 +1,12 @@
+{
+  "kind": "tasc.scan.state",
+  "version": "0.1",
+  "chain_id": 84532,
+  "escrow": "0x2222222222222222222222222222222222222222",
+  "confirmations": 6,
+  "next_from_block": 123457,
+  "last_scanned_block": 123456,
+  "last_head_block": 123461,
+  "updated_at": "1970-01-01T00:00:00.000Z",
+  "scanned": true
+}

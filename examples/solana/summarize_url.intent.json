@@ -1,0 +1,32 @@
+{
+  "kind": "tasc.intent.solana",
+  "version": "0.1",
+  "task_file": "examples/summarize_url.tasc",
+  "task_name": "summarize_url",
+  "display_reward": {
+    "amount": "10",
+    "currency": "USDC"
+  },
+  "chain_reward": {
+    "amount": "10000000",
+    "decimals": 6,
+    "token_mint": "2yUhqDXZGKzNswLYVqfnJErRHMfkUJTrfruJNnLncSic"
+  },
+  "relative_deadline": {
+    "raw": "60s",
+    "seconds": 60
+  },
+  "generated_at_unix": 1800000000,
+  "message": {
+    "cluster": "devnet",
+    "program_id": "Eyh4Q93EG7nSR4zBW6VbGkknKNJM59W3UKAx6Yo7iJRk",
+    "buyer": "ByfGMg9jszQEgMLinwBukAEBM3SiAZyTVt3Kquu8xAyp",
+    "task_hash": "0x28443f131686bc717c485b52cdb05c70fd4b959ee784357537bc1ef92fccbb45",
+    "token_mint": "2yUhqDXZGKzNswLYVqfnJErRHMfkUJTrfruJNnLncSic",
+    "amount": "10000000",
+    "deadline_unix": "1800000060",
+    "verifier": "BkdSvHTynUnxa6sEShTjBZagwNpXvQ6VAyyQtgmtiR83",
+    "nonce": "1"
+  },
+  "intent_hash": "sha256:7b1ec5e6291c4e5b2e9d713375bc27fb4281c4d42f98b3c32a3bd3898c48ff5c"
+}

@@ -1,0 +1,193 @@
+{
+  "kind": "tasc.solana.program.spec",
+  "version": "0.1",
+  "note": "Dependencyless live-program ABI scaffold. A real Solana program should use this account layout and instruction shape so scanners can emit tasc.funding.solana.",
+  "task_account": {
+    "discriminator_hex": "fe5a9b1a20f08f03",
+    "size": 276,
+    "layout": [
+      {
+        "name": "discriminator",
+        "offset": 0,
+        "size": 8,
+        "type": "bytes"
+      },
+      {
+        "name": "version",
+        "offset": 8,
+        "size": 1,
+        "type": "u8"
+      },
+      {
+        "name": "status",
+        "offset": 9,
+        "size": 1,
+        "type": "u8 enum"
+      },
+      {
+        "name": "bump",
+        "offset": 10,
+        "size": 1,
+        "type": "u8"
+      },
+      {
+        "name": "flags",
+        "offset": 11,
+        "size": 1,
+        "type": "u8"
+      },
+      {
+        "name": "task_hash",
+        "offset": 12,
+        "size": 32,
+        "type": "bytes32"
+      },
+      {
+        "name": "buyer",
+        "offset": 44,
+        "size": 32,
+        "type": "pubkey"
+      },
+      {
+        "name": "worker",
+        "offset": 76,
+        "size": 32,
+        "type": "pubkey"
+      },
+      {
+        "name": "verifier",
+        "offset": 108,
+        "size": 32,
+        "type": "pubkey"
+      },
+      {
+        "name": "token_mint",
+        "offset": 140,
+        "size": 32,
+        "type": "pubkey"
+      },
+      {
+        "name": "vault",
+        "offset": 172,
+        "size": 32,
+        "type": "pubkey"
+      },
+      {
+        "name": "amount",
+        "offset": 204,
+        "size": 8,
+        "type": "u64 le"
+      },
+      {
+        "name": "deadline_unix",
+        "offset": 212,
+        "size": 8,
+        "type": "u64 le"
+      },
+      {
+        "name": "nonce",
+        "offset": 220,
+        "size": 8,
+        "type": "u64 le"
+      },
+      {
+        "name": "result_hash",
+        "offset": 228,
+        "size": 32,
+        "type": "bytes32"
+      },
+      {
+        "name": "created_slot",
+        "offset": 260,
+        "size": 8,
+        "type": "u64 le"
+      },
+      {
+        "name": "updated_slot",
+        "offset": 268,
+        "size": 8,
+        "type": "u64 le"
+      }
+    ],
+    "statuses": {
+      "Empty": 0,
+      "Funded": 1,
+      "Claimed": 2,
+      "Passed": 3,
+      "Failed": 4,
+      "Released": 5,
+      "Refunded": 6,
+      "Disputed": 7
+    }
+  },
+  "instructions": {
+    "tags": {
+      "fund": 0,
+      "claim": 1,
+      "attest": 2,
+      "release": 3,
+      "refund": 4,
+      "open_dispute": 5
+    },
+    "fund_data": [
+      {
+        "name": "tag",
+        "offset": 0,
+        "size": 1,
+        "type": "u8",
+        "value": 0
+      },
+      {
+        "name": "task_hash",
+        "offset": 1,
+        "size": 32,
+        "type": "bytes32"
+      },
+      {
+        "name": "amount",
+        "offset": 33,
+        "size": 8,
+        "type": "u64 le"
+      },
+      {
+        "name": "deadline_unix",
+        "offset": 41,
+        "size": 8,
+        "type": "u64 le"
+      },
+      {
+        "name": "nonce",
+        "offset": 49,
+        "size": 8,
+        "type": "u64 le"
+      },
+      {
+        "name": "token_mint",
+        "offset": 57,
+        "size": 32,
+        "type": "pubkey"
+      },
+      {
+        "name": "verifier",
+        "offset": 89,
+        "size": 32,
+        "type": "pubkey"
+      }
+    ]
+  },
+  "scanner_contract": {
+    "input": "Solana task account owned by the Global Tasc program plus the matching signed buyer intent",
+    "output": "tasc.funding.solana",
+    "required_status": "Funded",
+    "matching_fields": [
+      "program_id",
+      "task_hash",
+      "buyer",
+      "token_mint",
+      "amount",
+      "deadline_unix",
+      "verifier",
+      "nonce"
+    ]
+  }
+}

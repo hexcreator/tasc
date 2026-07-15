@@ -1,0 +1,45 @@
+{
+  "kind": "tasc.testnet.handoff",
+  "version": "0.1",
+  "network": "Base Sepolia",
+  "chain_id": 84532,
+  "rpc_env": "BASE_SEPOLIA_RPC_URL",
+  "contracts": {
+    "token": "0x3333333333333333333333333333333333333333",
+    "escrow": "0x2222222222222222222222222222222222222222"
+  },
+  "actors": {
+    "buyer": "0x7E5F4552091A69125d5DfCb7b8C2659029395Bdf",
+    "worker": "0x2B5AD5c4795c026514f8317c7a215E218DcCD6cF",
+    "verifier": "0x6813Eb9362372EEF6200f3b1dbC3f819671cBA69"
+  },
+  "task_hash": "0x28443f131686bc717c485b52cdb05c70fd4b959ee784357537bc1ef92fccbb45",
+  "result_hash": "0x0bdfacb7e0ec2c3241da82c7b812b1a0fa28945b47c7f8a6b113b4de3779776f",
+  "amount": "10000000",
+  "deadline": 1800000060,
+  "funding_event": {
+    "tx_hash": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "block_number": 123456,
+    "log_index": 0,
+    "confirmations_required": 6
+  },
+  "scanner": {
+    "command": "npm run scan:funded",
+    "env": {
+      "TASC_SCAN_RPC_URL": "$BASE_SEPOLIA_RPC_URL",
+      "TASC_SCAN_ESCROW": "0x2222222222222222222222222222222222222222",
+      "TASC_SCAN_CHAIN_ID": "84532",
+      "TASC_SCAN_START_BLOCK": "123456",
+      "TASC_SCAN_CONFIRMATIONS": "6"
+    }
+  },
+  "lifecycle_txs": {
+    "mint": "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "approve": "0xcccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "fund": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "claim": "0xdddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "attest": "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "release": "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+  },
+  "note": "Public testnet metadata only. No private keys or RPC secrets are stored here."
+}

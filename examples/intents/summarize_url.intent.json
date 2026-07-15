@@ -1,0 +1,94 @@
+{
+  "kind": "tasc.intent.eip712",
+  "version": "0.1",
+  "task_file": "examples/summarize_url.tasc",
+  "task_name": "summarize_url",
+  "display_reward": {
+    "amount": "10",
+    "currency": "USDC"
+  },
+  "chain_reward": {
+    "amount": "10000000",
+    "decimals": 6,
+    "token": "0x3333333333333333333333333333333333333333"
+  },
+  "relative_deadline": {
+    "raw": "60s",
+    "seconds": 60
+  },
+  "generated_at_unix": 1800000000,
+  "typed_data": {
+    "types": {
+      "EIP712Domain": [
+        {
+          "name": "name",
+          "type": "string"
+        },
+        {
+          "name": "version",
+          "type": "string"
+        },
+        {
+          "name": "chainId",
+          "type": "uint256"
+        },
+        {
+          "name": "verifyingContract",
+          "type": "address"
+        }
+      ],
+      "TaskIntent": [
+        {
+          "name": "buyer",
+          "type": "address"
+        },
+        {
+          "name": "taskHash",
+          "type": "bytes32"
+        },
+        {
+          "name": "escrow",
+          "type": "address"
+        },
+        {
+          "name": "token",
+          "type": "address"
+        },
+        {
+          "name": "amount",
+          "type": "uint256"
+        },
+        {
+          "name": "deadline",
+          "type": "uint64"
+        },
+        {
+          "name": "verifier",
+          "type": "address"
+        },
+        {
+          "name": "nonce",
+          "type": "uint256"
+        }
+      ]
+    },
+    "primaryType": "TaskIntent",
+    "domain": {
+      "name": "Global Tasc",
+      "version": "0.1",
+      "chainId": 84532,
+      "verifyingContract": "0x2222222222222222222222222222222222222222"
+    },
+    "message": {
+      "buyer": "0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266",
+      "taskHash": "0x28443f131686bc717c485b52cdb05c70fd4b959ee784357537bc1ef92fccbb45",
+      "escrow": "0x2222222222222222222222222222222222222222",
+      "token": "0x3333333333333333333333333333333333333333",
+      "amount": "10000000",
+      "deadline": "1800000060",
+      "verifier": "0x4444444444444444444444444444444444444444",
+      "nonce": "1"
+    }
+  },
+  "intent_hash": "sha256:4ccb1f9069e875a065958b5618c23000b0477abbb3abb010c06bb0925e7515ed"
+}

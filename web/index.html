@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Global Tasc Feed</title>
+    <link rel="stylesheet" href="./styles.css">
+  </head>
+  <body>
+    <div class="shell">
+      <header class="topbar">
+          <div class="brand">
+            <div class="mark">GT</div>
+            <div>
+              <h1>Global Tasc Feed</h1>
+            </div>
+          </div>
+        <div class="stats">
+          <div class="stat">
+            <strong id="task-count">0</strong>
+            <span>funded tasks</span>
+          </div>
+        </div>
+      </header>
+
+      <main class="layout">
+        <aside class="panel controls">
+          <section class="section">
+            <h2>Connection</h2>
+            <label>
+              RPC URL
+              <input id="rpc-url" type="url" autocomplete="off" placeholder="https://sepolia.base.org">
+            </label>
+            <label>
+              Escrow
+              <input id="escrow" autocomplete="off" placeholder="0x...">
+            </label>
+            <div class="grid-two">
+              <label>
+                Chain ID
+                <input id="chain-id" inputmode="numeric" autocomplete="off" value="84532">
+              </label>
+              <label>
+                Confirmations
+                <input id="confirmations" inputmode="numeric" autocomplete="off" value="6">
+              </label>
+            </div>
+            <div class="grid-two">
+              <label>
+                Start Block
+                <input id="start-block" inputmode="numeric" autocomplete="off" placeholder="123456">
+              </label>
+              <label>
+                Chunk Size
+                <input id="chunk-size" inputmode="numeric" autocomplete="off" value="2000">
+              </label>
+            </div>
+          </section>
+
+          <section class="section">
+            <h2>Handoff</h2>
+            <textarea id="handoff" spellcheck="false" placeholder="Paste tasc.testnet.handoff JSON"></textarea>
+            <div class="actions">
+              <button id="import-handoff" type="button">Import Handoff</button>
+            </div>
+          </section>
+
+          <section class="section">
+            <div class="actions">
+              <button id="scan" class="primary" type="button">Scan Funded Tasks</button>
+              <button id="clear-cache" type="button">Clear Cache</button>
+            </div>
+            <div id="status" class="status" data-variant="neutral">Idle</div>
+          </section>
+        </aside>
+
+        <section class="panel feed">
+          <div class="feed-header">
+            <h2>Task Feed</h2>
+            <div id="cursor" class="cursor">No cursor</div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Reward</th>
+                  <th>Task</th>
+                  <th>Buyer</th>
+                  <th>Token</th>
+                  <th>Deadline</th>
+                  <th>Block / Conf.</th>
+                  <th>Tx</th>
+                </tr>
+              </thead>
+              <tbody id="task-table-body"></tbody>
+            </table>
+          </div>
+          <div id="empty-state" class="empty">No funded task events cached yet.</div>
+        </section>
+      </main>
+    </div>
+
+    <script src="./tasc-web-core.js"></script>
+    <script src="./app.js"></script>
+  </body>
+</html>

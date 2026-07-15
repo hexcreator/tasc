@@ -1,0 +1,303 @@
+# Solana Devnet V1
+
+This spike checks whether Solana devnet removes the faucet friction that blocked the Base Sepolia proof, then adds a local Solana settlement adapter that preserves the Global Tasc lifecycle.
+
+It does not replace the EVM escrow yet. It proves the first Solana substrate pieces:
+
+- dependencyless Solana key generation
+- devnet account funding through raw JSON-RPC
+- balance reads through raw JSON-RPC
+- a concrete local settlement adapter
+- a fixed Solana task-account ABI and scanner evidence boundary
+- a live devnet program/fund/scan/index proof
+
+## Why Solana
+
+Solana is attractive for Global Tasc because:
+
+- transactions are fast
+- fees are tiny
+- devnet supports RPC airdrops
+- the user-facing mental model is closer to instant micro-work
+
+The tradeoff is that Solana escrow is a different implementation. The current repo has a working Solidity escrow and EVM log indexer; Solana needs a program, account model, and scanner adapter.
+
+## Commands
+
+Show local Solana devnet setup:
+
+```sh
+npm run solana:plan
+```
+
+Create fresh devnet-only keypairs:
+
+```sh
+npm run solana:create-wallets
+```
+
+This writes:
+
+```text
+.env.solana-devnet.local
+```
+
+The file is chmod `0600` and ignored by git. It stores Solana CLI-compatible 64-byte keypair arrays. Do not use these keys for real funds.
+
+Request devnet SOL:
+
+```sh
+npm run solana:airdrop:buyer
+```
+
+Or fund all three test roles:
+
+```sh
+npm run solana:airdrop:all
+```
+
+If only one faucet drip succeeds, fund the remaining local roles from the buyer:
+
+```sh
+npm run solana:fund-roles
+```
+
+This signs plain Solana System Program transfers locally with the buyer devnet key and sends them through JSON-RPC. No Solana SDK is required.
+
+Check balances:
+
+```sh
+npm run solana:balances
+```
+
+Validate offline behavior:
+
+```sh
+npm run validate:solana-devnet
+```
+
+Generate a local Solana settlement fixture:
+
+```sh
+npm run solana:demo-settlement
+```
+
+This writes:
+
+```text
+examples/solana/summarize_url.intent.json
+examples/solana/summarize_url.signature.json
+examples/solana/summarize_url.funding.json
+examples/solana/summarize_url.settlement.json
+examples/solana/funded.batch.json
+```
+
+Admit the Solana funding evidence through the shared indexer boundary:
+
+```sh
+npm run index:admit-solana
+npm run index:admit-solana-batch
+```
+
+Validate the full local adapter:
+
+```sh
+npm run validate:solana-settlement
+```
+
+Generate the Solana program-account ABI fixture:
+
+```sh
+npm run solana:program-plan
+npm run solana:program-fixture
+```
+
+Scan the task-account fixture into funding evidence and admit it:
+
+```sh
+npm run solana:scan-program-fixture
+npm run index:admit-solana-program
+```
+
+Validate the program-account scanner boundary:
+
+```sh
+npm run validate:solana-program
+```
+
+Validate the Rust source core and deploy readiness:
+
+```sh
+npm run validate:solana-source
+npm run solana:deploy-readiness
+npm run solana:build-sbf
+npm run solana:live-intent
+npm run solana:fund-plan:live
+npm run validate:solana-spl-escrow
+npm run solana:spl-setup-plan
+npm run solana:spl-scan-plan
+npm run solana:scan-live-plan
+```
+
+Run the guarded live sequence only when spending devnet SOL is intended:
+
+```sh
+GLOBAL_TASC_ALLOW_SOLANA_DEPLOY=1 npm run solana:deploy
+GLOBAL_TASC_ALLOW_SOLANA_FUND=1 npm run solana:fund-send:live
+npm run solana:scan-live
+npm run index:admit-solana-live
+```
+
+Run the guarded SPL test-token setup only when spending devnet SOL is intended:
+
+```sh
+GLOBAL_TASC_ALLOW_SOLANA_SPL_SETUP=1 npm run solana:spl-setup-send
+npm run solana:spl-scan-live
+```
+
+Create and plan a fresh token-backed task using the live SPL mint:
+
+```sh
+node bin/create-solana-live-intent.js examples/summarize_url_spl.tasc --token-mint 8WdRRCNVr8Du5Q1C1EeiMvqCRpSTBwWnHRjnx3FZ7KbC
+npm run solana:fund-spl-plan:live
+```
+
+Run the guarded token-backed funding transaction only when spending devnet SOL and moving the test tokens is intended:
+
+```sh
+GLOBAL_TASC_ALLOW_SOLANA_SPL_FUND=1 npm run solana:fund-spl-send:live
+```
+
+Then scan the fresh task account and vault token account with the returned transaction signature:
+
+```sh
+node bin/scan-solana-live.js scan examples/solana-devnet/summarize_url_spl.signature.json \
+  --account-out examples/solana-devnet/summarize_url_spl.task-account.live.json \
+  --out examples/solana-devnet/summarize_url_spl.funding.live.json \
+  --signature zhrqMMYfXQAK37hLVkuvmqNwb2VzkdM4ZyHZMhpBhci97j3L38A7dswKhA9PsjimMPEFczf9NoWu5pR4jnudsm1 \
+  --instruction-index 4 \
+  --confirmation-status confirmed \
+  --custody-account ChfKa5tEUjeSdaEhmjiDCWQE1Q6YT1oVaZt62HHR43b4 \
+  --custody-instruction-index 3 \
+  --custody-decimals 6
+npm run index:admit-solana-spl-live
+```
+
+## Current Feasibility Result
+
+Public `https://api.devnet.solana.com` balance reads work, but public `requestAirdrop` can rate-limit. An Alchemy Solana Devnet RPC app works for reads and successfully funded the buyer wallet with devnet SOL. If repeated faucet calls fail, one successful buyer airdrop is enough because the harness can transfer devnet SOL from buyer to worker and verifier.
+
+Current funded devnet roles:
+
+```text
+buyer:    6Apg3YonZ8yCnhSnEVPx3EoUZYnhH9297EuCf5A1beTR
+worker:   BfRmLmH7ksPRCRxNBi7c8SspN7zKoyuAPKrJMDL5uQCJ
+verifier: 3Siw3mYu8yQVaZ8qvXH5z4quyhhk6vBySn5d3KhNW9Tt
+```
+
+Observed balances before the live SPL funding transaction:
+
+```text
+buyer:    0.024071 SOL
+worker:   0.01 SOL
+verifier: 0.01 SOL
+```
+
+## Settlement Adapter Shape
+
+The minimal Solana path preserves the existing Global Tasc lifecycle:
+
+```text
+funded -> claimed -> passed/failed -> released/refunded/disputed
+```
+
+The local adapter currently models:
+
+- a Solana buyer intent: `tasc.intent.solana`
+- a Solana Ed25519 buyer signature: `tasc.intent.signature.solana`
+- a task PDA derived from `program_id` and `task_hash`
+- a vault address derived from `program_id`, `task_hash`, and `token_mint`
+- a funding proof object: `tasc.funding.solana`
+- buyer, worker, verifier, amount, deadline, and status fields
+- local `fund`, `claim`, `attest`, and `release` state transitions
+
+The TascLang source should stay chain-agnostic. It should compile to the same canonical task hash and then generate Solana-specific settlement bindings separately.
+
+The adapter is intentionally dependencyless. It uses Node built-ins for Ed25519 signing/verification and reuses the local base58 implementation from the devnet harness instead of adding `@solana/web3.js`.
+
+The original local adapter is now backed by a deployed devnet fund-account processor. The placeholder fund proof created account state only; the SPL path now also moves live test tokens into a fresh task vault with `TransferChecked`, scans that vault token account, and admits only custody-backed funding evidence.
+
+## Program Account ABI
+
+The program processor in [docs/solana-program-v1.md](/Users/chriscabral/Garage/global-tasc/docs/solana-program-v1.md) defines the fixed task-account layout and fund instruction bytes.
+
+Current fixture facts:
+
+```text
+task account size: 276 bytes
+fund instruction size: 121 bytes
+funded status code: 1
+scanner output: tasc.funding.solana
+```
+
+This moved the Solana path from "local settlement simulation" to a scanner-ready live account contract.
+
+The Rust source core now exists under `programs/solana-tasc/` and validates the same account and instruction bytes without external Cargo dependencies. The Solana CLI and SBF toolchain are installed on this machine, and the current artifact has been deployed to devnet.
+
+Current live account-state proof:
+
+```text
+program id:   FAqKhKke5pZr4TK6kXq9aKR98hWFy19SMQG9eGfXQrRM
+deploy tx:    4veC8ijRVhzgCcUU6DKXmB7RoF7YRZmtRxz5Esxfm9kzdAzuAPr3cHATe6gNjp1YyVD7JaVqmhSF1GPps5fvBqMg
+fund tx:      BH2QJ4iWHFp9W6Tk4a27v5osyySBdhdcuswePAWjqTqXes26rVY1QeszcXhbnV6uyL4aH8fg12kfozGby2Swfqp
+task account: 55mDcsddNiSvUKfrrRBbmP7mPeuT9UDf4kRL8EygvDEa
+index output: examples/index/solana.live.index.json
+```
+
+Current live SPL setup proof:
+
+```text
+setup tx:             2p6vSHtZDa6FM48jwA1Ck4EQb1hTaE2b7eNf1YDB159HdkMoE9ZN59kXeLCboxvazaqW1Wh2Z5KVjS6UrVXr8DE3
+mint:                 8WdRRCNVr8Du5Q1C1EeiMvqCRpSTBwWnHRjnx3FZ7KbC
+buyer token account:  532DEeJ1PHjgd56Tzk86G5zFavXVwj4NBVHRrQaoUf6E
+vault token account:  5pzDYJ55KMtFC5aH6uQSmRpBBBTyuENLCLsb2Ng9fexc
+vault authority PDA:  Hb7UnP6kkDHUpRZARHQGdnat1vHmsEEyrGF2XjBmg8EQ
+scan output:          examples/solana-devnet/spl-accounts.live.json
+```
+
+After the live token-backed funding transaction, the setup scan is no longer an initial distribution proof: the buyer token account is `0`, the original setup vault remains `0`, and `initial_balances_match_setup` is `false`. The funded task vault is the fresh vault token account in the next block.
+
+Current live SPL token-backed funding proof:
+
+```text
+fund tx:              zhrqMMYfXQAK37hLVkuvmqNwb2VzkdM4ZyHZMhpBhci97j3L38A7dswKhA9PsjimMPEFczf9NoWu5pR4jnudsm1
+task account:         37hA4KUeR6eLPP1g1mBoTMYHKCPq7LECpLryQc61TmRi
+vault token account:  ChfKa5tEUjeSdaEhmjiDCWQE1Q6YT1oVaZt62HHR43b4
+vault authority PDA:  8ysLbdWSpBQCPV5De2GWonQWM5cCjNw93d44ihh2Hv9F
+token mint:           8WdRRCNVr8Du5Q1C1EeiMvqCRpSTBwWnHRjnx3FZ7KbC
+amount:               10000000 base units
+task scan output:     examples/solana-devnet/summarize_url_spl.task-account.live.json
+funding evidence:     examples/solana-devnet/summarize_url_spl.funding.live.json
+index output:         examples/index/solana.spl.live.index.json
+```
+
+## Scanner Shape
+
+The EVM scanner reads `Funded` logs. The Solana scanner reads task account state:
+
+- discover initialized task accounts
+- verify task state matches signed intent fields
+- optionally decode the SPL vault token account and prove its balance covers the signed amount
+- emit a chain-neutral `tasc.funding.solana` evidence object
+- admit that evidence through the same indexer boundary
+
+## Near-Term Decision
+
+Solana devnet now works well enough to continue on the faster-chain path. The next real implementation step is:
+
+1. Add live `claim`, `attest`, `release`, and `refund` instructions.
+2. Scan lifecycle state after claim/attest/release, not only funding state.
+3. Keep the browser/static index path chain-neutral by admitting Solana and EVM evidence through the same indexer boundary.
+4. Add production-style finality/reorg handling and duplicate-task suppression before treating devnet behavior as production-ready.
+
+That gives Global Tasc a credible faster-chain path without throwing away the EVM work.

@@ -1,0 +1,32 @@
+{
+  "kind": "tasc.index",
+  "version": "0.1",
+  "entries": [
+    {
+      "kind": "tasc.index.entry",
+      "version": "0.1",
+      "status": "claimable",
+      "admitted_at": "1970-01-01T00:00:00.000Z",
+      "intent_hash": "sha256:4ccb1f9069e875a065958b5618c23000b0477abbb3abb010c06bb0925e7515ed",
+      "task_hash": "0x28443f131686bc717c485b52cdb05c70fd4b959ee784357537bc1ef92fccbb45",
+      "chain_id": 84532,
+      "escrow": "0x2222222222222222222222222222222222222222",
+      "buyer": "0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266",
+      "token": "0x3333333333333333333333333333333333333333",
+      "amount": "10000000",
+      "deadline": "1800000060",
+      "verifier": "0x4444444444444444444444444444444444444444",
+      "nonce": "1",
+      "funding": {
+        "tx_hash": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "block_number": 123456,
+        "log_index": 0,
+        "status": "Funded"
+      },
+      "signature": {
+        "recovered": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+        "valid": true
+      }
+    }
+  ]
+}

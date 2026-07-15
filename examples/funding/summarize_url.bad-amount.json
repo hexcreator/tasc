@@ -1,0 +1,15 @@
+{
+  "kind": "tasc.funding.evm",
+  "version": "0.1",
+  "chain_id": 84532,
+  "task_hash": "0x28443f131686bc717c485b52cdb05c70fd4b959ee784357537bc1ef92fccbb45",
+  "escrow": "0x2222222222222222222222222222222222222222",
+  "buyer": "0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266",
+  "token": "0x3333333333333333333333333333333333333333",
+  "amount": "9000000",
+  "deadline": "1800000060",
+  "status": "Funded",
+  "tx_hash": "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "block_number": 123457,
+  "log_index": 0
+}

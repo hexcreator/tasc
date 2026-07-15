@@ -1,0 +1,52 @@
+{
+  "kind": "tasc.solana.settlement",
+  "version": "0.1",
+  "cluster": "devnet",
+  "program_id": "Eyh4Q93EG7nSR4zBW6VbGkknKNJM59W3UKAx6Yo7iJRk",
+  "task_pda": "4L1Pn1TuK613cqsnxMC27EXQXdMNgAd3xNkAL8qQ4xDu",
+  "vault": "67W2cEJKxwhsrqhHogqmAkrVJ4AbQYrhLbUR7nZ8Z1bF",
+  "task_hash": "0x28443f131686bc717c485b52cdb05c70fd4b959ee784357537bc1ef92fccbb45",
+  "buyer": "ByfGMg9jszQEgMLinwBukAEBM3SiAZyTVt3Kquu8xAyp",
+  "worker": "2MKsLqVKNGyAsZSAVZ4FN7iFVfdEHWYViH5r2MY4Juze",
+  "verifier": "BkdSvHTynUnxa6sEShTjBZagwNpXvQ6VAyyQtgmtiR83",
+  "token_mint": "2yUhqDXZGKzNswLYVqfnJErRHMfkUJTrfruJNnLncSic",
+  "amount": "10000000",
+  "deadline_unix": "1800000060",
+  "result_hash": "0x0bdfacb7e0ec2c3241da82c7b812b1a0fa28945b47c7f8a6b113b4de3779776f",
+  "status": "Released",
+  "token_accounts": {
+    "buyer": "0",
+    "vault": "0",
+    "worker": "10000000"
+  },
+  "events": [
+    {
+      "type": "funded",
+      "signature": "32n8BGa3K467mR6dHCZDTVEyeQH8wvARa6bV8w2hVX4LtU6W5h2Vgz4qGLWwenwV11dwwGgsTv5jtZAUQhftjmHi",
+      "slot": 1,
+      "buyer": "ByfGMg9jszQEgMLinwBukAEBM3SiAZyTVt3Kquu8xAyp",
+      "amount": "10000000"
+    },
+    {
+      "type": "claimed",
+      "signature": "Gy3rzETDRA1Ze7yk9Br5wtQMqWrEkk1geyvuqBdwxNRx54Lodgtg47CBzVtpYR51hCJaX48dY4mVG9GHuJiwbHM",
+      "slot": 2,
+      "worker": "2MKsLqVKNGyAsZSAVZ4FN7iFVfdEHWYViH5r2MY4Juze"
+    },
+    {
+      "type": "attested",
+      "signature": "56wUK8bkjzuYVwwuatLDP3uiZFjchq4Df2DsM1Bm63fSydoWmQ7wBkNhTNFF61fwWRVn82C6NNaC4mGTNkaS214i",
+      "slot": 3,
+      "verifier": "BkdSvHTynUnxa6sEShTjBZagwNpXvQ6VAyyQtgmtiR83",
+      "result_hash": "0x0bdfacb7e0ec2c3241da82c7b812b1a0fa28945b47c7f8a6b113b4de3779776f",
+      "verdict": "pass"
+    },
+    {
+      "type": "released",
+      "signature": "5zZ5iff2Z9pJcHGLMi5yr8CF7q3cZgth2Mibx1VoQxyXeN8XZzaBBNmUnkrMogbm2my1BCucEAkioRn5UqgU5grS",
+      "slot": 4,
+      "worker": "2MKsLqVKNGyAsZSAVZ4FN7iFVfdEHWYViH5r2MY4Juze",
+      "amount": "10000000"
+    }
+  ]
+}

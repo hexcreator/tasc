@@ -1,0 +1,25 @@
+{
+  "kind": "tasc.funding.batch.solana",
+  "version": "0.1",
+  "entries": [
+    {
+      "kind": "tasc.funding.solana",
+      "version": "0.1",
+      "cluster": "devnet",
+      "program_id": "Eyh4Q93EG7nSR4zBW6VbGkknKNJM59W3UKAx6Yo7iJRk",
+      "task_hash": "0x28443f131686bc717c485b52cdb05c70fd4b959ee784357537bc1ef92fccbb45",
+      "task_pda": "4L1Pn1TuK613cqsnxMC27EXQXdMNgAd3xNkAL8qQ4xDu",
+      "vault": "67W2cEJKxwhsrqhHogqmAkrVJ4AbQYrhLbUR7nZ8Z1bF",
+      "buyer": "ByfGMg9jszQEgMLinwBukAEBM3SiAZyTVt3Kquu8xAyp",
+      "token_mint": "2yUhqDXZGKzNswLYVqfnJErRHMfkUJTrfruJNnLncSic",
+      "amount": "10000000",
+      "deadline_unix": "1800000060",
+      "verifier": "BkdSvHTynUnxa6sEShTjBZagwNpXvQ6VAyyQtgmtiR83",
+      "status": "Funded",
+      "signature": "32n8BGa3K467mR6dHCZDTVEyeQH8wvARa6bV8w2hVX4LtU6W5h2Vgz4qGLWwenwV11dwwGgsTv5jtZAUQhftjmHi",
+      "slot": 1,
+      "instruction_index": 0,
+      "confirmation_status": "confirmed"
+    }
+  ]
+}

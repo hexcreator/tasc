@@ -1,0 +1,32 @@
+{
+  "kind": "tasc.solana.program.account.fixture",
+  "version": "0.1",
+  "pubkey": "4L1Pn1TuK613cqsnxMC27EXQXdMNgAd3xNkAL8qQ4xDu",
+  "owner": "Eyh4Q93EG7nSR4zBW6VbGkknKNJM59W3UKAx6Yo7iJRk",
+  "executable": false,
+  "lamports": "2039280",
+  "rent_epoch": "0",
+  "data_base64": "/lqbGiDwjwMBAQAAKEQ/ExaGvHF8SFtSzbBccP1LlZ7nhDV1N7we+S/Mu0WjGKkiaRTrXbVyc18eoN7W5zVQcusXnLUjLyUK2goQqwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAn8IN/o6KfWhiW3QOhaUx75wXeVT8PRazVFY4GWReWVAdU4mIJvvY/b5rcdWSeStPNqgUXkJseePHLuK0/Tx+2Uv0vcELOPUqmzuCT8oeav+1L+l3OmfF0c2d+NF4PIpygJaYAAAAAAA80klrAAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAqAAAAAAAAACoAAAAAAAAA",
+  "decoded": {
+    "kind": "tasc.solana.task_account",
+    "version": "0.1",
+    "program_id": "Eyh4Q93EG7nSR4zBW6VbGkknKNJM59W3UKAx6Yo7iJRk",
+    "task_pda": "4L1Pn1TuK613cqsnxMC27EXQXdMNgAd3xNkAL8qQ4xDu",
+    "status": "Funded",
+    "status_code": 1,
+    "bump": 0,
+    "flags": 0,
+    "task_hash": "0x28443f131686bc717c485b52cdb05c70fd4b959ee784357537bc1ef92fccbb45",
+    "buyer": "ByfGMg9jszQEgMLinwBukAEBM3SiAZyTVt3Kquu8xAyp",
+    "worker": "11111111111111111111111111111111",
+    "verifier": "BkdSvHTynUnxa6sEShTjBZagwNpXvQ6VAyyQtgmtiR83",
+    "token_mint": "2yUhqDXZGKzNswLYVqfnJErRHMfkUJTrfruJNnLncSic",
+    "vault": "67W2cEJKxwhsrqhHogqmAkrVJ4AbQYrhLbUR7nZ8Z1bF",
+    "amount": "10000000",
+    "deadline_unix": "1800000060",
+    "nonce": "1",
+    "result_hash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+    "created_slot": "42",
+    "updated_slot": "42"
+  }
+}

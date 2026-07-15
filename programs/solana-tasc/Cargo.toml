@@ -1,0 +1,19 @@
+[package]
+name = "global-tasc-solana-program"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[lib]
+name = "global_tasc_solana_program"
+path = "src/lib.rs"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+
+[profile.release]
+overflow-checks = true
+codegen-units = 1
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(target_os, values("solana"))'] }

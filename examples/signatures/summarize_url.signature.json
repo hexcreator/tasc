@@ -1,0 +1,85 @@
+{
+  "kind": "tasc.intent.signature.eip712",
+  "version": "0.1",
+  "intent_hash": "sha256:4ccb1f9069e875a065958b5618c23000b0477abbb3abb010c06bb0925e7515ed",
+  "signer": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+  "buyer": "0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266",
+  "recovered": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+  "valid": true,
+  "signature": "0xbcf62ca2fa9784d96738bded7b4b7a9a88d17e102b01f12908707efcf2ed9b022b1ba45169a8fed348c81a70bd2d42050a161934a9001c163a4adfe79e9a71891c",
+  "key_source": "test:hardhat0",
+  "note": "Public Hardhat/Anvil test key. Never use on mainnet or with real funds.",
+  "typed_data": {
+    "types": {
+      "EIP712Domain": [
+        {
+          "name": "name",
+          "type": "string"
+        },
+        {
+          "name": "version",
+          "type": "string"
+        },
+        {
+          "name": "chainId",
+          "type": "uint256"
+        },
+        {
+          "name": "verifyingContract",
+          "type": "address"
+        }
+      ],
+      "TaskIntent": [
+        {
+          "name": "buyer",
+          "type": "address"
+        },
+        {
+          "name": "taskHash",
+          "type": "bytes32"
+        },
+        {
+          "name": "escrow",
+          "type": "address"
+        },
+        {
+          "name": "token",
+          "type": "address"
+        },
+        {
+          "name": "amount",
+          "type": "uint256"
+        },
+        {
+          "name": "deadline",
+          "type": "uint64"
+        },
+        {
+          "name": "verifier",
+          "type": "address"
+        },
+        {
+          "name": "nonce",
+          "type": "uint256"
+        }
+      ]
+    },
+    "primaryType": "TaskIntent",
+    "domain": {
+      "name": "Global Tasc",
+      "version": "0.1",
+      "chainId": 84532,
+      "verifyingContract": "0x2222222222222222222222222222222222222222"
+    },
+    "message": {
+      "buyer": "0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266",
+      "taskHash": "0x28443f131686bc717c485b52cdb05c70fd4b959ee784357537bc1ef92fccbb45",
+      "escrow": "0x2222222222222222222222222222222222222222",
+      "token": "0x3333333333333333333333333333333333333333",
+      "amount": "10000000",
+      "deadline": "1800000060",
+      "verifier": "0x4444444444444444444444444444444444444444",
+      "nonce": "1"
+    }
+  }
+}

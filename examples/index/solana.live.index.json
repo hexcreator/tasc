@@ -1,0 +1,39 @@
+{
+  "kind": "tasc.index",
+  "version": "0.1",
+  "entries": [
+    {
+      "kind": "tasc.index.entry",
+      "version": "0.1",
+      "status": "claimable",
+      "admitted_at": "1970-01-01T00:00:00.000Z",
+      "intent_hash": "sha256:4c5deaac042280ebba9f1da16d4bb210adc95da9ae1b92569723c64fd7343aa5",
+      "task_hash": "0x28443f131686bc717c485b52cdb05c70fd4b959ee784357537bc1ef92fccbb45",
+      "settlement": {
+        "chain": "solana",
+        "cluster": "devnet",
+        "program_id": "FAqKhKke5pZr4TK6kXq9aKR98hWFy19SMQG9eGfXQrRM",
+        "task_pda": "55mDcsddNiSvUKfrrRBbmP7mPeuT9UDf4kRL8EygvDEa",
+        "vault": "CcsiF2rAKUt4evkNaFj7nJpfXtxqqZaxUu11mC1KxRb"
+      },
+      "buyer": "6Apg3YonZ8yCnhSnEVPx3EoUZYnhH9297EuCf5A1beTR",
+      "token_mint": "11111111111111111111111111111111",
+      "amount": "10000000",
+      "deadline_unix": "1800000060",
+      "verifier": "3Siw3mYu8yQVaZ8qvXH5z4quyhhk6vBySn5d3KhNW9Tt",
+      "nonce": "1",
+      "funding": {
+        "kind": "tasc.funding.solana",
+        "signature": "BH2QJ4iWHFp9W6Tk4a27v5osyySBdhdcuswePAWjqTqXes26rVY1QeszcXhbnV6uyL4aH8fg12kfozGby2Swfqp",
+        "slot": "476344051",
+        "instruction_index": "0",
+        "status": "Funded",
+        "confirmation_status": "confirmed"
+      },
+      "signature": {
+        "signer": "6Apg3YonZ8yCnhSnEVPx3EoUZYnhH9297EuCf5A1beTR",
+        "valid": true
+      }
+    }
+  ]
+}

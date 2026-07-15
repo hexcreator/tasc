@@ -1,0 +1,37 @@
+{
+  "ok": true,
+  "manifest": "programs/solana-tasc/Cargo.toml",
+  "out_dir": "build/solana",
+  "artifact": {
+    "path": "build/solana/global_tasc_solana_program.so",
+    "bytes": 6360,
+    "sha256": "ec6793c4353360ca243caea97a3a15263808afff344e31eafaa39ca05e53c9bf",
+    "entrypoint_symbol": {
+      "checked": true,
+      "ok": true
+    }
+  },
+  "builder": {
+    "command": "cargo-build-sbf",
+    "version": "cargo-build-sbf 4.1.0",
+    "used_platform_tools": true,
+    "platform_tools_version": "v1.54",
+    "no_rustup_override": true,
+    "skipped_tool_install": true
+  },
+  "toolchain": {
+    "solana": "solana-cli 4.1.1 (src:6a8c724a; feat:c763ae0a, client:Agave)",
+    "cargo": "cargo 1.92.0 (Homebrew)",
+    "rustc": "rustc 1.92.0 (ded5c06cf 2025-12-08) (Homebrew)"
+  },
+  "dependency_posture": {
+    "cargo_dependencies": [],
+    "npm_dependencies_added": false,
+    "note": "Uses only Node built-ins and the installed Solana platform toolchain."
+  },
+  "secret_posture": {
+    "generated_keypairs_secured_count": 1,
+    "generated_keypairs_printed": false,
+    "generated_keypairs_gitignored": true
+  }
+}

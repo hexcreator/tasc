@@ -1,0 +1,49 @@
+{
+  "kind": "tasc.solana.program.instruction",
+  "version": "0.1",
+  "name": "fund",
+  "program_id": "Eyh4Q93EG7nSR4zBW6VbGkknKNJM59W3UKAx6Yo7iJRk",
+  "accounts": [
+    {
+      "name": "buyer",
+      "pubkey": "ByfGMg9jszQEgMLinwBukAEBM3SiAZyTVt3Kquu8xAyp",
+      "signer": true,
+      "writable": true
+    },
+    {
+      "name": "task",
+      "pubkey": "4L1Pn1TuK613cqsnxMC27EXQXdMNgAd3xNkAL8qQ4xDu",
+      "signer": false,
+      "writable": true
+    },
+    {
+      "name": "vault",
+      "pubkey": "67W2cEJKxwhsrqhHogqmAkrVJ4AbQYrhLbUR7nZ8Z1bF",
+      "signer": false,
+      "writable": true
+    },
+    {
+      "name": "token_mint",
+      "pubkey": "2yUhqDXZGKzNswLYVqfnJErRHMfkUJTrfruJNnLncSic",
+      "signer": false,
+      "writable": false
+    },
+    {
+      "name": "verifier",
+      "pubkey": "BkdSvHTynUnxa6sEShTjBZagwNpXvQ6VAyyQtgmtiR83",
+      "signer": false,
+      "writable": false
+    }
+  ],
+  "data_hex": "0x0028443f131686bc717c485b52cdb05c70fd4b959ee784357537bc1ef92fccbb4580969800000000003cd2496b0000000001000000000000001d53898826fbd8fdbe6b71d592792b4f36a8145e426c79e3c72ee2b4fd3c7ed99fc20dfe8e8a7d68625b740e85a531ef9c177954fc3d16b354563819645e5950",
+  "decoded": {
+    "name": "fund",
+    "tag": 0,
+    "task_hash": "0x28443f131686bc717c485b52cdb05c70fd4b959ee784357537bc1ef92fccbb45",
+    "amount": "10000000",
+    "deadline_unix": "1800000060",
+    "nonce": "1",
+    "token_mint": "2yUhqDXZGKzNswLYVqfnJErRHMfkUJTrfruJNnLncSic",
+    "verifier": "BkdSvHTynUnxa6sEShTjBZagwNpXvQ6VAyyQtgmtiR83"
+  }
+}
