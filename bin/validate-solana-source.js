@@ -65,6 +65,9 @@ function main() {
   const taskSize = parseNumber(extractConst(source, "TASK_ACCOUNT_SIZE"));
   const fundInstructionSize = parseNumber(extractConst(source, "FUND_INSTRUCTION_SIZE"));
   const attestInstructionSize = parseNumber(extractConst(source, "ATTEST_INSTRUCTION_SIZE"));
+  const claimAccountCount = parseNumber(extractConst(source, "RUNTIME_CLAIM_ACCOUNTS"));
+  const settlementAccountCount = parseNumber(extractConst(source, "RUNTIME_SETTLEMENT_ACCOUNTS"));
+  const timeoutRefundAccountCount = parseNumber(extractConst(source, "RUNTIME_TIMEOUT_REFUND_ACCOUNTS"));
   const tagFund = parseNumber(extractConst(source, "TAG_FUND"));
   const tagClaim = parseNumber(extractConst(source, "TAG_CLAIM"));
   const tagAttest = parseNumber(extractConst(source, "TAG_ATTEST"));
@@ -80,10 +83,15 @@ function main() {
   const updatedSlotOffset = parseNumber(extractConst(source, "UPDATED_SLOT_OFFSET"));
 
   const discriminatorMatch = source.includes("0xfe, 0x5a, 0x9b, 0x1a, 0x20, 0xf0, 0x8f, 0x03");
+  const clockSysvarMatch = source.includes("6, 167, 213, 23, 24, 199, 116, 201");
   assert(discriminatorMatch, "Rust discriminator does not match JS ABI");
+  assert(clockSysvarMatch, "Rust Clock sysvar does not match JS ABI");
   assert(taskSize === abi.task_account.size, "Rust task account size does not match JS ABI");
   assert(fundInstructionSize === 121, "Rust fund instruction size mismatch");
   assert(attestInstructionSize === 34, "Rust attest instruction size mismatch");
+  assert(claimAccountCount === 3, "Rust claim account count mismatch");
+  assert(settlementAccountCount === 7, "Rust settlement account count mismatch");
+  assert(timeoutRefundAccountCount === 8, "Rust timeout refund account count mismatch");
   assert(tagFund === abi.instructions.tags.fund, "Rust fund tag does not match JS ABI");
   assert(tagClaim === abi.instructions.tags.claim, "Rust claim tag does not match JS ABI");
   assert(tagAttest === abi.instructions.tags.attest, "Rust attest tag does not match JS ABI");
@@ -109,7 +117,11 @@ function main() {
       task_account_size: taskSize,
       fund_instruction_size: fundInstructionSize,
       attest_instruction_size: attestInstructionSize,
+      claim_account_count: claimAccountCount,
+      settlement_account_count: settlementAccountCount,
+      timeout_refund_account_count: timeoutRefundAccountCount,
       discriminator: abi.task_account.discriminator_hex,
+      clock_sysvar: abi.sysvars.clock,
       status_funded: statusFunded,
       lifecycle_statuses: {
         funded: statusFunded,

@@ -21,6 +21,7 @@ const TASK_ACCOUNT_SIZE = 276;
 const ZERO_BYTES32 = `0x${"00".repeat(32)}`;
 const ZERO_PUBKEY = base58Encode(Buffer.alloc(32));
 const MAX_U64 = (1n << 64n) - 1n;
+const CLOCK_SYSVAR_ID = "SysvarC1ock11111111111111111111111111111111";
 
 const STATUS_NAMES = [
   "Empty",
@@ -202,6 +203,44 @@ function spec() {
       refund_data: [
         { name: "tag", offset: 0, size: 1, type: "u8", value: INSTRUCTION_TAGS.refund },
       ],
+      account_requirements: {
+        claim: [
+          "worker signer",
+          "writable task account",
+          "Clock sysvar account",
+        ],
+        release: [
+          "worker signer",
+          "writable task account",
+          "SPL vault token account",
+          "mint",
+          "worker destination token account",
+          "vault authority PDA",
+          "SPL Token Program",
+        ],
+        refund: [
+          "buyer signer",
+          "writable task account",
+          "SPL vault token account",
+          "mint",
+          "buyer destination token account",
+          "vault authority PDA",
+          "SPL Token Program",
+        ],
+        timeout_refund: [
+          "buyer signer",
+          "writable task account",
+          "SPL vault token account",
+          "mint",
+          "buyer destination token account",
+          "vault authority PDA",
+          "SPL Token Program",
+          "Clock sysvar account",
+        ],
+      },
+    },
+    sysvars: {
+      clock: CLOCK_SYSVAR_ID,
     },
     scanner_contract: {
       input: "Solana task account owned by the Global Tasc program plus the matching signed buyer intent",

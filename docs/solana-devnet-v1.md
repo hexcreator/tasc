@@ -220,18 +220,19 @@ The local adapter currently models:
 - a vault address derived from `program_id`, `task_hash`, and `token_mint`
 - a funding proof object: `tasc.funding.solana`
 - buyer, worker, verifier, amount, deadline, and status fields
-- local `fund`, `claim`, `attest`, and `release` state transitions
+- local `fund`, `claim`, `attest`, `release`, failure refund, and timeout refund state transitions
 
 The live program processor now accepts the same lifecycle instruction tags for task-account status transitions:
 
 ```text
-claim:   worker signer + writable task account -> Claimed
+claim:   worker signer + writable task account + Clock sysvar -> Claimed before deadline
 attest:  verifier signer + writable task account -> Passed/Failed
 release: worker signer + writable task account + SPL settlement accounts -> TransferChecked + Released after Passed
 refund:  buyer signer + writable task account + SPL settlement accounts -> TransferChecked + Refunded after Failed
+refund:  buyer signer + writable task account + SPL settlement accounts + Clock sysvar -> Refunded after timeout while Funded/Claimed
 ```
 
-The guarded CLI builder for those transactions is `bin/run-solana-lifecycle.js`. `release` and `refund` pass the vault token account, mint, destination token account, vault authority PDA, and SPL Token Program account so the on-chain program can sign an SPL Token `TransferChecked` CPI from the vault authority PDA.
+The guarded CLI builder for those transactions is `bin/run-solana-lifecycle.js`. `release`, failure `refund`, and `timeout-refund` pass the vault token account, mint, destination token account, vault authority PDA, and SPL Token Program account so the on-chain program can sign an SPL Token `TransferChecked` CPI from the vault authority PDA. `claim` and `timeout-refund` pass the Clock sysvar for deadline enforcement.
 
 The SPL settlement prep CLI is `bin/run-solana-spl-settlement.js`:
 
@@ -239,10 +240,11 @@ The SPL settlement prep CLI is `bin/run-solana-spl-settlement.js`:
 npm run solana:spl-worker-token-plan
 GLOBAL_TASC_ALLOW_SOLANA_WORKER_TOKEN_SETUP=1 npm run solana:spl-worker-token-send
 npm run solana:spl-release-plan
+npm run solana:spl-timeout-refund-plan -- examples/solana-devnet/<overdue>.signature.json --task-account examples/solana-devnet/<overdue>.task-account.live.json --funding examples/solana-devnet/<overdue>.funding.live.json
 npm run validate:solana-spl-settlement
 ```
 
-`plan-release` is read-only. It validates the signed intent, live task account, funding evidence, vault authority PDA, and worker token account before emitting the exact `spl_token.transfer_checked` CPI account shape. `plan-refund` uses the same shape for failed tasks.
+`plan-release` is read-only. It validates the signed intent, live task account, funding evidence, vault authority PDA, and worker token account before emitting the exact `spl_token.transfer_checked` CPI account shape. `plan-refund` uses the same shape for failed tasks. `plan-timeout-refund` accepts `Funded` or `Claimed` tasks only when `now >= deadline_unix`, and the guarded sender is `GLOBAL_TASC_ALLOW_SOLANA_TIMEOUT_REFUND=1 npm run solana:lifecycle-timeout-refund-send`.
 
 The TascLang source should stay chain-agnostic. It should compile to the same canonical task hash and then generate Solana-specific settlement bindings separately.
 
@@ -386,10 +388,10 @@ Solana devnet now works well enough to continue on the faster-chain path. The co
 
 The next real implementation step is:
 
-1. Add timeout policy around refund eligibility.
+1. Deploy the timeout-aware SBF artifact and run a fresh live overdue-task timeout refund proof.
 2. Add wallet-backed browser claim/attest controls once the static proof should become interactive.
 3. Keep the browser/static index path chain-neutral by admitting Solana and EVM evidence through the same indexer boundary.
 4. Add production-style finality/reorg handling and duplicate-task suppression before treating devnet behavior as production-ready.
-5. Start dispute-path design once pass/fail/timeout settlement is mechanically covered.
+5. Start dispute-path design once pass/fail/timeout settlement is live-proven.
 
 That gives Global Tasc a credible faster-chain path without throwing away the EVM work.

@@ -32,11 +32,13 @@ const DEFAULT_SUBMISSION = "examples/submissions/summarize_url.pass.md";
 const DEFAULT_LEDGER = "examples/ledger.json";
 const DEFAULT_INPUT = "url=https://docs.cdp.coinbase.com/x402/welcome";
 const PLACEHOLDER_SIGNER = "11111111111111111111111111111111";
+const CLOCK_SYSVAR_ID = "SysvarC1ock11111111111111111111111111111111";
 const ALLOW = {
   claim: "GLOBAL_TASC_ALLOW_SOLANA_CLAIM",
   attest: "GLOBAL_TASC_ALLOW_SOLANA_ATTEST",
   release: "GLOBAL_TASC_ALLOW_SOLANA_RELEASE",
   refund: "GLOBAL_TASC_ALLOW_SOLANA_REFUND",
+  "timeout-refund": "GLOBAL_TASC_ALLOW_SOLANA_TIMEOUT_REFUND",
 };
 
 function usage() {
@@ -50,6 +52,8 @@ function usage() {
     "  node bin/run-solana-lifecycle.js send-release [signed-solana-intent.json] [--env file] [--task-account address] [--destination-token-account address] [--out file]",
     "  node bin/run-solana-lifecycle.js plan-refund [signed-solana-intent.json] [--env file] [--task-account address] [--signer address] [--destination-token-account address]",
     "  node bin/run-solana-lifecycle.js send-refund [signed-solana-intent.json] [--env file] [--task-account address] [--destination-token-account address] [--out file]",
+    "  node bin/run-solana-lifecycle.js plan-timeout-refund [signed-solana-intent.json] [--env file] [--task-account address] [--signer address] [--destination-token-account address] [--clock-sysvar address]",
+    "  node bin/run-solana-lifecycle.js send-timeout-refund [signed-solana-intent.json] [--env file] [--task-account address] [--destination-token-account address] [--clock-sysvar address] [--out file]",
     "",
     "send-* commands are guarded by GLOBAL_TASC_ALLOW_SOLANA_<ACTION>=1.",
   ].join("\n"));
@@ -82,6 +86,7 @@ function parseOptions(rest) {
     submission: DEFAULT_SUBMISSION,
     ledger: DEFAULT_LEDGER,
     inputs: {},
+    clockSysvar: CLOCK_SYSVAR_ID,
   };
   const args = [...rest];
   if (args[0] && !args[0].startsWith("--")) options.signedFile = args.shift();
@@ -99,6 +104,7 @@ function parseOptions(rest) {
     else if (arg === "--verdict") options.verdict = args[++i];
     else if (arg === "--result-hash") options.resultHash = args[++i];
     else if (arg === "--destination-token-account") options.destinationTokenAccount = args[++i];
+    else if (arg === "--clock-sysvar") options.clockSysvar = args[++i];
     else if (arg === "--submission") options.submission = args[++i];
     else if (arg === "--ledger") options.ledger = args[++i];
     else if (arg === "--input") {
@@ -138,19 +144,24 @@ function assertBytes32(value, label) {
 function signerRoleForAction(action) {
   if (action === "claim") return "worker";
   if (action === "attest") return "verifier";
-  if (action === "refund") return "buyer";
+  if (action === "refund" || action === "timeout-refund") return "buyer";
   return "worker";
 }
 
 function expectedSignerForPlan(action, signed) {
   if (action === "attest") return signed.intent.message.verifier;
-  if (action === "refund") return signed.intent.message.buyer;
+  if (action === "refund" || action === "timeout-refund") return signed.intent.message.buyer;
   return null;
+}
+
+function programInstructionForAction(action) {
+  return action === "timeout-refund" ? "refund" : action;
 }
 
 function instructionForAction(action, signed, options = {}) {
   const message = signed.intent.message;
   const taskAccount = assertBase58Address(options.taskAccount || fundAddresses(message).task_account, "task_account");
+  const programInstruction = programInstructionForAction(action);
   if (action === "attest") {
     const verdict = String(options.verdict || "pass").toLowerCase();
     assert(verdict === "pass" || verdict === "fail", "verdict must be pass or fail");
@@ -165,9 +176,9 @@ function instructionForAction(action, signed, options = {}) {
     };
   }
   return {
-    name: action,
+    name: programInstruction,
     task_account: taskAccount,
-    data: encodeInstruction(action),
+    data: encodeInstruction(programInstruction),
   };
 }
 
@@ -176,7 +187,7 @@ function accountMeta(pubkey, signer, writable) {
 }
 
 function isSettlementAction(action) {
-  return action === "release" || action === "refund";
+  return action === "release" || action === "refund" || action === "timeout-refund";
 }
 
 function settlementAccountsForAction(action, message, signerAddress, options = {}) {
@@ -219,6 +230,13 @@ function settlementAccountsForAction(action, message, signerAddress, options = {
   };
 }
 
+function clockAccountsForAction(action, options = {}) {
+  if (action !== "claim" && action !== "timeout-refund") return [];
+  return [
+    accountMeta(assertBase58Address(options.clockSysvar || CLOCK_SYSVAR_ID, "clock_sysvar"), false, false),
+  ];
+}
+
 function buildLifecycleInstruction(action, signed, signerAddress, options = {}) {
   const message = signed.intent.message;
   const instruction = instructionForAction(action, signed, options);
@@ -233,10 +251,13 @@ function buildLifecycleInstruction(action, signed, signerAddress, options = {}) 
       accountMeta(signerAddress, true, true),
       accountMeta(instruction.task_account, false, true),
       ...(settlement ? settlement.outer_accounts : []),
+      ...clockAccountsForAction(action, options),
     ],
     data: instruction.data,
     data_hex: `0x${instruction.data.toString("hex")}`,
     verdict: instruction.verdict || null,
+    program_instruction: instruction.name,
+    clock_sysvar: clockAccountsForAction(action, options)[0]?.pubkey || null,
     settlement,
   };
 }
@@ -278,9 +299,11 @@ function planAction(action, options = {}) {
     signer_placeholder_used: signerSource === "placeholder",
     instruction: {
       name: instruction.action,
+      program_instruction: instruction.program_instruction,
       data_hex: instruction.data_hex,
       accounts: instruction.accounts.map(({ pubkey, signer, writable }) => ({ pubkey, signer, writable })),
       verdict: instruction.verdict,
+      clock_sysvar: instruction.clock_sysvar,
       settlement: instruction.settlement ? {
         destination_role: instruction.settlement.destination_role,
         vault_token_account: instruction.settlement.vault_token_account,
@@ -336,7 +359,9 @@ async function sendAction(action, options = {}) {
     task_account: lifecycle.task_account,
     signer_role: signerRoleForAction(action),
     signer: signer.address,
+    program_instruction: lifecycle.program_instruction,
     instruction_data_hex: lifecycle.data_hex,
+    clock_sysvar: lifecycle.clock_sysvar,
     signature: txSignature,
     confirmation_status: status ? status.confirmationStatus : "pending",
     token_movement: isSettlementAction(action) ? "program_cpi_transfer_checked" : "none",
@@ -357,7 +382,7 @@ async function sendAction(action, options = {}) {
 async function main() {
   const [command, ...rest] = process.argv.slice(2);
   const options = parseOptions(rest);
-  const match = /^(plan|send)-(claim|attest|release|refund)$/.exec(command || "");
+  const match = /^(plan|send)-(claim|attest|release|refund|timeout-refund)$/.exec(command || "");
   if (!match) usage();
   const [, mode, action] = match;
   if (mode === "plan") {
@@ -376,6 +401,7 @@ if (require.main === module) {
 
 module.exports = {
   ALLOW,
+  CLOCK_SYSVAR_ID,
   buildLifecycleInstruction,
   instructionForAction,
   planAction,

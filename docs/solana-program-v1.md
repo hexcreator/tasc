@@ -141,13 +141,14 @@ That emits `build/solana/global_tasc_solana_program.so` plus `build/solana-tasc.
 The entrypoint now also routes lifecycle instruction tags:
 
 ```text
-0x01 claim   worker signer + task account, Funded -> Claimed
+0x01 claim   worker signer + task account + Clock sysvar, Funded -> Claimed before deadline
 0x02 attest  verifier signer + task account, Claimed -> Passed/Failed
 0x03 release worker signer + task account + SPL settlement accounts, Passed -> TransferChecked -> Released
 0x04 refund  buyer signer + task account + SPL settlement accounts, Failed -> TransferChecked -> Refunded
+0x04 refund  buyer signer + task account + SPL settlement accounts + Clock sysvar, Funded/Claimed after deadline -> TransferChecked -> Refunded
 ```
 
-For `release` and `refund`, accounts must be ordered as signer, task account, vault token account, mint, destination token account, vault authority PDA, and SPL Token Program. The vault authority PDA is unsigned in the outer transaction; the program signs it internally for SPL Token `TransferChecked` with seeds `["global-tasc-vault", task_hash, token_mint]`.
+For `claim`, account 3 must be the Clock sysvar. For `release` and failure `refund`, accounts must be ordered as signer, task account, vault token account, mint, destination token account, vault authority PDA, and SPL Token Program. Timeout refund uses the same refund instruction tag and adds Clock sysvar as account 8. The vault authority PDA is unsigned in the outer transaction; the program signs it internally for SPL Token `TransferChecked` with seeds `["global-tasc-vault", task_hash, token_mint]`.
 
 The current processor expects a pre-created task account owned by the program and pre-created SPL token accounts. It does not create accounts by CPI.
 
@@ -157,7 +158,7 @@ The live scanner reads that deterministic task account with `getAccountInfo`, de
 
 ## Next Step
 
-The guarded deploy/fund/scan/claim/attest/release sequence has been executed on devnet, and release evidence now admits as a completed index entry. A separate fresh failed-task run has also executed `claim -> fail attest -> refund`, drained the PDA-owned vault, restored `10000000` token base units to the buyer token account, and admitted refund evidence as a completed index entry. The next implementation step is timeout policy around refund eligibility.
+The guarded deploy/fund/scan/claim/attest/release sequence has been executed on devnet, and release evidence now admits as a completed index entry. A separate fresh failed-task run has also executed `claim -> fail attest -> refund`, drained the PDA-owned vault, restored `10000000` token base units to the buyer token account, and admitted refund evidence as a completed index entry. Timeout refund mechanics are implemented in source, validators, CLI builders, and the latest SBF artifact. The next live step is deploying that artifact and running a fresh overdue-task timeout refund proof.
 
 Run:
 
@@ -165,6 +166,7 @@ Run:
 npm run validate:solana-source
 npm run validate:solana-fund-tx
 npm run validate:solana-lifecycle-tx
+npm run validate:solana-spl-settlement
 npm run solana:lifecycle-scan-live -- examples/solana-devnet/summarize_url_spl.signature.json
 npm run validate:solana-live-scan
 ```

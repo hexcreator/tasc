@@ -109,6 +109,31 @@ function main() {
   assert(refundPlan.transfer_checked.accounts[0].pubkey === refundPlan.vault_token_account, "refund source account mismatch");
   assert(refundPlan.transfer_checked.accounts[3].pubkey === refundPlan.vault_authority, "refund authority mismatch");
 
+  const claimedTask = {
+    ...failedTask,
+    status: "Claimed",
+    result_hash: "0x0000000000000000000000000000000000000000000000000000000000000000",
+  };
+  let earlyTimeoutRejected = false;
+  try {
+    buildSettlementPlan("timeout-refund", {
+      task: claimedTask,
+      buyerTokenAccount: splBuyerTokenAddress(claimedTask.buyer, claimedTask.token_mint),
+      nowUnix: "1800000059",
+    });
+  } catch (error) {
+    earlyTimeoutRejected = /requires now >= deadline_unix/.test(error.message);
+  }
+  assert(earlyTimeoutRejected, "timeout refund should reject before deadline");
+  const timeoutRefundPlan = buildSettlementPlan("timeout-refund", {
+    task: claimedTask,
+    buyerTokenAccount: splBuyerTokenAddress(claimedTask.buyer, claimedTask.token_mint),
+    nowUnix: "1800000060",
+  });
+  assert(timeoutRefundPlan.task_status === "Claimed", "timeout refund should accept Claimed task state");
+  assert(timeoutRefundPlan.destination_role === "buyer", "timeout refund destination role mismatch");
+  assert(timeoutRefundPlan.destination_token_account === refundPlan.destination_token_account, "timeout refund destination mismatch");
+
   process.stdout.write(`${JSON.stringify({
     ok: true,
     checks: [
@@ -116,10 +141,13 @@ function main() {
       "release plan encodes SPL Token TransferChecked from vault to worker token account",
       "refund rejects non-Failed live task state",
       "synthetic failed task encodes refund to the buyer token account",
+      "timeout refund rejects before deadline",
+      "synthetic claimed task encodes timeout refund to the buyer token account after deadline",
       "no new dependencies",
     ],
     release_destination: releasePlan.destination_token_account,
     refund_destination: refundPlan.destination_token_account,
+    timeout_refund_destination: timeoutRefundPlan.destination_token_account,
   }, null, 2)}\n`);
 }
 

@@ -14,9 +14,11 @@ pub const FUND_INSTRUCTION_SIZE: usize = 121;
 pub const ATTEST_INSTRUCTION_SIZE: usize = 34;
 pub const VERSION: u8 = 1;
 pub const RUNTIME_MIN_ACCOUNTS: usize = 2;
+pub const RUNTIME_CLAIM_ACCOUNTS: usize = 3;
 pub const RUNTIME_FUND_ACCOUNTS: usize = 5;
 pub const RUNTIME_SETTLEMENT_ACCOUNTS: usize = 7;
-pub const RUNTIME_MAX_TRACKED_ACCOUNTS: usize = RUNTIME_SETTLEMENT_ACCOUNTS;
+pub const RUNTIME_TIMEOUT_REFUND_ACCOUNTS: usize = 8;
+pub const RUNTIME_MAX_TRACKED_ACCOUNTS: usize = RUNTIME_TIMEOUT_REFUND_ACCOUNTS;
 pub const NON_DUP_MARKER: u8 = u8::MAX;
 pub const BPF_ALIGN_OF_U128: usize = 8;
 pub const MAX_PERMITTED_DATA_INCREASE: usize = 1_024 * 10;
@@ -28,7 +30,13 @@ pub const SPL_MINT_DECIMALS_OFFSET: usize = 44;
 pub const SPL_MINT_INITIALIZED_OFFSET: usize = 45;
 pub const SPL_ACCOUNT_STATE_INITIALIZED: u8 = 1;
 pub const SPL_TRANSFER_CHECKED_TAG: u8 = 12;
+pub const CLOCK_SYSVAR_SIZE: usize = 40;
+pub const CLOCK_UNIX_TIMESTAMP_OFFSET: usize = 32;
 pub const VAULT_AUTHORITY_SEED: &[u8; 17] = b"global-tasc-vault";
+pub const CLOCK_SYSVAR_ID: PubkeyBytes = [
+    6, 167, 213, 23, 24, 199, 116, 201, 40, 86, 99, 152, 105, 29, 94, 182, 139, 94, 184, 163,
+    155, 75, 109, 92, 115, 85, 91, 33, 0, 0, 0, 0,
+];
 pub const SPL_TOKEN_PROGRAM_ID: PubkeyBytes = [
     6, 221, 246, 225, 215, 101, 161, 147, 217, 203, 225, 70, 206, 235, 121, 172, 28, 180, 133, 237,
     95, 91, 55, 145, 58, 140, 245, 133, 126, 255, 0, 169,
@@ -271,7 +279,7 @@ unsafe fn process_serialized_runtime_input(input: *mut u8) -> Result<(), TascErr
         let duplicate_marker = read_runtime_u8(input, &mut offset);
         if duplicate_marker != NON_DUP_MARKER {
             offset += 7;
-            if index < RUNTIME_SETTLEMENT_ACCOUNTS {
+            if index < RUNTIME_MAX_TRACKED_ACCOUNTS {
                 return Err(TascError::DuplicateAccount);
             }
             continue;
@@ -417,10 +425,14 @@ fn process_claim_runtime(
     instruction_data: &[u8],
 ) -> Result<(), TascError> {
     decode_unit_instruction(instruction_data, TAG_CLAIM)?;
-    validate_lifecycle_accounts(program_id, accounts, account_count)?;
+    validate_claim_accounts(program_id, accounts, account_count)?;
     let task_data =
         unsafe { slice::from_raw_parts_mut(accounts.task_data, accounts.task_data_len) };
     let mut account = decode_task_account(task_data)?;
+    let now = clock_unix_timestamp(accounts, 2)?;
+    if now >= account.deadline_unix {
+        return Err(TascError::InvalidStatus);
+    }
     apply_claim(&mut account, accounts.signer_key, 0)?;
     encode_task_account(&account, task_data)
 }
@@ -479,11 +491,17 @@ fn process_refund_runtime(
     if account.buyer != accounts.signer_key {
         return Err(TascError::InvalidSigner);
     }
-    if account.status != STATUS_FAILED {
-        return Err(TascError::InvalidStatus);
+    if account.status == STATUS_FAILED {
+        invoke_spl_transfer_checked(program_id, accounts, &account, account.buyer)?;
+        apply_refund(&mut account, 0)?;
+    } else {
+        let now = clock_unix_timestamp(accounts, 7)?;
+        if !timeout_refund_allowed(&account, now) {
+            return Err(TascError::InvalidStatus);
+        }
+        invoke_spl_transfer_checked(program_id, accounts, &account, account.buyer)?;
+        apply_timeout_refund(&mut account, now, 0)?;
     }
-    invoke_spl_transfer_checked(program_id, accounts, &account, account.buyer)?;
-    apply_refund(&mut account, 0)?;
     encode_task_account(&account, task_data)
 }
 
@@ -794,6 +812,19 @@ fn validate_lifecycle_accounts(
     validate_task_metadata(program_id, accounts)
 }
 
+fn validate_claim_accounts(
+    program_id: &PubkeyBytes,
+    accounts: &RuntimeAccounts,
+    account_count: usize,
+) -> Result<(), TascError> {
+    if account_count < RUNTIME_CLAIM_ACCOUNTS {
+        return Err(TascError::MissingAccount);
+    }
+    validate_lifecycle_accounts(program_id, accounts, account_count)?;
+    validate_clock_account(runtime_account(accounts, 2)?)?;
+    Ok(())
+}
+
 fn validate_task_metadata(
     program_id: &PubkeyBytes,
     accounts: &RuntimeAccounts,
@@ -808,6 +839,26 @@ fn validate_task_metadata(
         return Err(TascError::InvalidLength);
     }
     Ok(())
+}
+
+fn validate_clock_account(account: &RuntimeAccountInfo) -> Result<&[u8], TascError> {
+    if account.key != CLOCK_SYSVAR_ID {
+        return Err(TascError::InvalidAccount);
+    }
+    let data = runtime_account_data(account)?;
+    if data.len() < CLOCK_SYSVAR_SIZE {
+        return Err(TascError::InvalidLength);
+    }
+    Ok(data)
+}
+
+fn clock_unix_timestamp(accounts: &RuntimeAccounts, index: usize) -> Result<u64, TascError> {
+    let data = validate_clock_account(runtime_account(accounts, index)?)?;
+    let timestamp = read_i64(data, CLOCK_UNIX_TIMESTAMP_OFFSET);
+    if timestamp < 0 {
+        return Err(TascError::InvalidAccount);
+    }
+    Ok(timestamp as u64)
 }
 
 fn is_zeroed(data: &[u8]) -> bool {
@@ -1043,6 +1094,24 @@ pub fn apply_refund(account: &mut TaskAccount, slot: u64) -> Result<(), TascErro
     Ok(())
 }
 
+pub fn timeout_refund_allowed(account: &TaskAccount, now_unix: u64) -> bool {
+    now_unix >= account.deadline_unix
+        && (account.status == STATUS_FUNDED || account.status == STATUS_CLAIMED)
+}
+
+pub fn apply_timeout_refund(
+    account: &mut TaskAccount,
+    now_unix: u64,
+    slot: u64,
+) -> Result<(), TascError> {
+    if !timeout_refund_allowed(account, now_unix) {
+        return Err(TascError::InvalidStatus);
+    }
+    account.status = STATUS_REFUNDED;
+    account.updated_slot = slot;
+    Ok(())
+}
+
 fn validate_status(status: u8) -> Result<(), TascError> {
     if status <= STATUS_DISPUTED {
         Ok(())
@@ -1067,6 +1136,12 @@ fn read_u64(data: &[u8], offset: usize) -> u64 {
     u64::from_le_bytes(raw)
 }
 
+fn read_i64(data: &[u8], offset: usize) -> i64 {
+    let mut raw = [0u8; 8];
+    raw.copy_from_slice(&data[offset..offset + 8]);
+    i64::from_le_bytes(raw)
+}
+
 fn write_u64(out: &mut [u8], offset: usize, value: u64) {
     out[offset..offset + 8].copy_from_slice(&value.to_le_bytes());
 }
@@ -1082,6 +1157,7 @@ mod tests {
         [byte; 32]
     }
 
+    #[derive(Clone)]
     struct TestAccount {
         key: PubkeyBytes,
         owner: PubkeyBytes,
@@ -1238,6 +1314,23 @@ mod tests {
         data
     }
 
+    fn clock_sysvar_data(unix_timestamp: i64) -> Vec<u8> {
+        let mut data = vec![0u8; CLOCK_SYSVAR_SIZE];
+        data[CLOCK_UNIX_TIMESTAMP_OFFSET..CLOCK_UNIX_TIMESTAMP_OFFSET + 8]
+            .copy_from_slice(&unix_timestamp.to_le_bytes());
+        data
+    }
+
+    fn clock_sysvar_account(unix_timestamp: i64) -> TestAccount {
+        TestAccount {
+            key: CLOCK_SYSVAR_ID,
+            owner: key(0),
+            is_signer: false,
+            is_writable: false,
+            data: clock_sysvar_data(unix_timestamp),
+        }
+    }
+
     fn settlement_accounts(
         signer: PubkeyBytes,
         task: PubkeyBytes,
@@ -1299,6 +1392,41 @@ mod tests {
                 is_writable: false,
                 data: Vec::new(),
             },
+        ]
+    }
+
+    fn timeout_refund_accounts(
+        signer: PubkeyBytes,
+        task: PubkeyBytes,
+        task_data: Vec<u8>,
+        program_id: PubkeyBytes,
+        vault: PubkeyBytes,
+        mint: PubkeyBytes,
+        destination: PubkeyBytes,
+        destination_owner: PubkeyBytes,
+        vault_authority: PubkeyBytes,
+        unix_timestamp: i64,
+    ) -> [TestAccount; RUNTIME_TIMEOUT_REFUND_ACCOUNTS] {
+        let settlement = settlement_accounts(
+            signer,
+            task,
+            task_data,
+            program_id,
+            vault,
+            mint,
+            destination,
+            destination_owner,
+            vault_authority,
+        );
+        [
+            settlement[0].clone(),
+            settlement[1].clone(),
+            settlement[2].clone(),
+            settlement[3].clone(),
+            settlement[4].clone(),
+            settlement[5].clone(),
+            settlement[6].clone(),
+            clock_sysvar_account(unix_timestamp),
         ]
     }
 
@@ -1464,6 +1592,44 @@ mod tests {
     }
 
     #[test]
+    fn timeout_refund_requires_deadline_and_funded_or_claimed_status() {
+        let ix = FundInstruction {
+            task_hash: key(1),
+            amount: 10_000_000,
+            deadline_unix: 1_800_000_060,
+            nonce: 1,
+            token_mint: key(2),
+            verifier: key(3),
+        };
+        let mut funded = build_funded_task_account(&ix, key(4), key(5), 42);
+        assert!(!timeout_refund_allowed(&funded, 1_800_000_059));
+        assert!(timeout_refund_allowed(&funded, 1_800_000_060));
+        apply_timeout_refund(&mut funded, 1_800_000_060, 43).unwrap();
+        assert_eq!(funded.status, STATUS_REFUNDED);
+
+        let mut claimed = build_funded_task_account(&ix, key(4), key(5), 42);
+        apply_claim(&mut claimed, key(6), 43).unwrap();
+        apply_timeout_refund(&mut claimed, 1_800_000_061, 44).unwrap();
+        assert_eq!(claimed.status, STATUS_REFUNDED);
+
+        let mut failed = build_funded_task_account(&ix, key(4), key(5), 42);
+        apply_claim(&mut failed, key(6), 43).unwrap();
+        apply_attest(
+            &mut failed,
+            &AttestInstruction {
+                passed: false,
+                result_hash: key(7),
+            },
+            44,
+        )
+        .unwrap();
+        assert_eq!(
+            apply_timeout_refund(&mut failed, 1_800_000_061, 45),
+            Err(TascError::InvalidStatus)
+        );
+    }
+
+    #[test]
     fn entrypoint_fund_instruction_writes_task_account() {
         let program_id = key(9);
         let buyer = key(4);
@@ -1555,6 +1721,7 @@ mod tests {
                 data: Vec::new(),
             },
             TestAccount::new(task, program_id, false, true, TASK_ACCOUNT_SIZE),
+            clock_sysvar_account(1_800_000_000),
         ];
         let mut accounts = accounts;
         accounts[1].data = funded_account_data(buyer, key(5), key(2), verifier);
@@ -1570,6 +1737,36 @@ mod tests {
         assert_eq!(decoded.status, STATUS_CLAIMED);
         assert_eq!(decoded.worker, worker);
         assert_eq!(decoded.updated_slot, 0);
+    }
+
+    #[test]
+    fn entrypoint_claim_instruction_rejects_after_deadline() {
+        let program_id = key(9);
+        let buyer = key(4);
+        let worker = key(6);
+        let task = key(8);
+        let verifier = key(3);
+        let accounts = [
+            TestAccount {
+                key: worker,
+                owner: key(0),
+                is_signer: true,
+                is_writable: true,
+                data: Vec::new(),
+            },
+            TestAccount {
+                key: task,
+                owner: program_id,
+                is_signer: false,
+                is_writable: true,
+                data: funded_account_data(buyer, key(5), key(2), verifier),
+            },
+            clock_sysvar_account(1_800_000_060),
+        ];
+        let mut input = serialized_runtime_input(&accounts, &[TAG_CLAIM], program_id);
+
+        let status = unsafe { entrypoint(input.as_mut_ptr()) };
+        assert_eq!(status, TascError::InvalidStatus as u64);
     }
 
     #[test]
@@ -1709,5 +1906,86 @@ mod tests {
             ),
             10_000_000
         );
+    }
+
+    #[test]
+    fn entrypoint_refund_instruction_allows_timeout_after_deadline() {
+        let program_id = key(9);
+        let buyer = key(4);
+        let worker = key(6);
+        let verifier = key(3);
+        let task = key(8);
+        let vault = key(5);
+        let mint = key(2);
+        let destination = key(13);
+        let vault_authority = key(11);
+        let accounts = timeout_refund_accounts(
+            buyer,
+            task,
+            claimed_account_data(buyer, worker, vault, mint, verifier),
+            program_id,
+            vault,
+            mint,
+            destination,
+            buyer,
+            vault_authority,
+            1_800_000_060,
+        );
+        let mut input = serialized_runtime_input(&accounts, &[TAG_REFUND], program_id);
+
+        let status = unsafe { entrypoint(input.as_mut_ptr()) };
+        assert_eq!(status, 0);
+
+        let task_data_offset = data_offset_for_account(&input, 1);
+        let decoded =
+            decode_task_account(&input[task_data_offset..task_data_offset + TASK_ACCOUNT_SIZE])
+                .unwrap();
+        assert_eq!(decoded.status, STATUS_REFUNDED);
+
+        let vault_offset = data_offset_for_account(&input, 2);
+        let destination_offset = data_offset_for_account(&input, 4);
+        assert_eq!(
+            read_u64(
+                &input[vault_offset..vault_offset + SPL_TOKEN_ACCOUNT_SIZE],
+                SPL_TOKEN_AMOUNT_OFFSET
+            ),
+            0
+        );
+        assert_eq!(
+            read_u64(
+                &input[destination_offset..destination_offset + SPL_TOKEN_ACCOUNT_SIZE],
+                SPL_TOKEN_AMOUNT_OFFSET
+            ),
+            10_000_000
+        );
+    }
+
+    #[test]
+    fn entrypoint_refund_instruction_rejects_timeout_before_deadline() {
+        let program_id = key(9);
+        let buyer = key(4);
+        let worker = key(6);
+        let verifier = key(3);
+        let task = key(8);
+        let vault = key(5);
+        let mint = key(2);
+        let destination = key(13);
+        let vault_authority = key(11);
+        let accounts = timeout_refund_accounts(
+            buyer,
+            task,
+            claimed_account_data(buyer, worker, vault, mint, verifier),
+            program_id,
+            vault,
+            mint,
+            destination,
+            buyer,
+            vault_authority,
+            1_800_000_059,
+        );
+        let mut input = serialized_runtime_input(&accounts, &[TAG_REFUND], program_id);
+
+        let status = unsafe { entrypoint(input.as_mut_ptr()) };
+        assert_eq!(status, TascError::InvalidStatus as u64);
     }
 }

@@ -43,6 +43,7 @@ const DEFAULT_FUNDING = "examples/solana-devnet/summarize_url_spl.funding.live.j
 const DEFAULT_WORKER_TOKEN = "examples/solana-devnet/summarize_url_spl.worker-token.live.json";
 const DEFAULT_RELEASE_PLAN = "examples/solana-devnet/summarize_url_spl.release-plan.live.json";
 const DEFAULT_REFUND_PLAN = "examples/solana-devnet/summarize_url_spl.refund-plan.live.json";
+const DEFAULT_TIMEOUT_REFUND_PLAN = "examples/solana-devnet/summarize_url_spl.timeout-refund-plan.live.json";
 const ALLOW_WORKER_TOKEN_ENV = "GLOBAL_TASC_ALLOW_SOLANA_WORKER_TOKEN_SETUP";
 const ZERO_PUBKEY = "11111111111111111111111111111111";
 
@@ -53,6 +54,7 @@ function usage() {
     "  node bin/run-solana-spl-settlement.js send-worker-token [signed-solana-intent.json] [--env file] [--task-account file] [--out file]",
     "  node bin/run-solana-spl-settlement.js plan-release [signed-solana-intent.json] [--task-account file] [--funding file] [--worker-token file] [--out file]",
     "  node bin/run-solana-spl-settlement.js plan-refund [signed-solana-intent.json] [--task-account file] [--funding file] [--buyer-token-account address] [--out file]",
+    "  node bin/run-solana-spl-settlement.js plan-timeout-refund [signed-solana-intent.json] [--task-account file] [--funding file] [--buyer-token-account address] [--now unix] [--out file]",
     "",
     `send-worker-token is guarded by ${ALLOW_WORKER_TOKEN_ENV}=1.`,
     "release/refund plans do not send transactions; they define the program-signed SPL Token CPI shape used by lifecycle send commands.",
@@ -83,6 +85,7 @@ function parseOptions(rest) {
     out: null,
     buyerTokenAccount: null,
     workerTokenAccount: null,
+    nowUnix: null,
   };
   const args = [...rest];
   if (args[0] && !args[0].startsWith("--")) options.signedFile = args.shift();
@@ -94,6 +97,7 @@ function parseOptions(rest) {
     else if (arg === "--worker-token") options.workerTokenFile = args[++i];
     else if (arg === "--worker-token-account") options.workerTokenAccount = args[++i];
     else if (arg === "--buyer-token-account") options.buyerTokenAccount = args[++i];
+    else if (arg === "--now") options.nowUnix = String(args[++i]);
     else if (arg === "--out") options.out = args[++i];
     else usage();
   }
@@ -329,12 +333,19 @@ function destinationForAction(action, signed, task, options = {}) {
 }
 
 function buildSettlementPlan(action, options = {}) {
-  assert(action === "release" || action === "refund", "settlement action must be release or refund");
+  assert(action === "release" || action === "refund" || action === "timeout-refund", "settlement action must be release, refund, or timeout-refund");
   const signed = options.signed || loadSignedIntent(options.signedFile || DEFAULT_SIGNED_INTENT);
   const task = options.task || loadTaskAccount(options.taskAccountFile || DEFAULT_TASK_ACCOUNT);
   const funding = options.funding || loadFunding(options.fundingFile || DEFAULT_FUNDING);
-  const requiredStatus = action === "release" ? "Passed" : "Failed";
-  assert(task.status === requiredStatus, `${action} requires task status ${requiredStatus}; found ${task.status}`);
+  if (action === "release") {
+    assert(task.status === "Passed", "release requires task status Passed");
+  } else if (action === "refund") {
+    assert(task.status === "Failed", `refund requires task status Failed; found ${task.status}`);
+  } else {
+    const nowUnix = options.nowUnix ? BigInt(options.nowUnix) : BigInt(Math.floor(Date.now() / 1000));
+    assert(task.status === "Funded" || task.status === "Claimed", `timeout-refund requires task status Funded or Claimed; found ${task.status}`);
+    assert(nowUnix >= BigInt(task.deadline_unix), `timeout-refund requires now >= deadline_unix; now ${nowUnix.toString()} deadline ${task.deadline_unix}`);
+  }
   const { custody, expectedVaultAuthority } = validateTaskAndFunding(signed, task, funding);
   const destination = destinationForAction(action, signed, task, options);
   const decimals = Number(custody.decimals ?? signed.intent.chain_reward?.decimals ?? 6);
@@ -363,6 +374,8 @@ function buildSettlementPlan(action, options = {}) {
     token_program_id: TOKEN_PROGRAM_ID,
     task_account: task.task_pda,
     task_status: task.status,
+    now_unix: action === "timeout-refund" ? String(options.nowUnix || Math.floor(Date.now() / 1000)) : null,
+    deadline_unix: task.deadline_unix,
     vault_token_account: task.vault,
     vault_authority: expectedVaultAuthority.address,
     vault_authority_bump: expectedVaultAuthority.bump,
@@ -387,7 +400,9 @@ function buildSettlementPlan(action, options = {}) {
       decoded_data: decodeTransferCheckedData(transfer.data),
     },
     lifecycle_send_requirements: [
-      "run the guarded lifecycle release/refund sender with the same settlement accounts",
+      action === "timeout-refund"
+        ? "run the guarded lifecycle timeout-refund sender with the same settlement accounts plus Clock sysvar"
+        : "run the guarded lifecycle release/refund sender with the same settlement accounts",
       "program signs the CPI as the vault_authority PDA with the documented seeds",
       "task account transitions to Released or Refunded only after the CPI succeeds",
     ],
@@ -511,6 +526,13 @@ async function main() {
   if (command === "plan-refund") {
     if (!options.out) options.out = DEFAULT_REFUND_PLAN;
     const result = buildSettlementPlan("refund", options);
+    if (options.out) writeJson(options.out, result);
+    process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
+    return;
+  }
+  if (command === "plan-timeout-refund") {
+    if (!options.out) options.out = DEFAULT_TIMEOUT_REFUND_PLAN;
+    const result = buildSettlementPlan("timeout-refund", options);
     if (options.out) writeJson(options.out, result);
     process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
     return;
