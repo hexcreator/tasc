@@ -176,6 +176,22 @@ Useful docs:
 - [Adoption Plan](docs/adoption-plan.md)
 - [Contributing](CONTRIBUTING.md)
 
+## Reproduce The Devnet Proof
+
+The live Solana mechanics can now be packaged as a fresh proof bundle. The safe plan mode does not send transactions:
+
+```bash
+npm run prove:solana-devnet:plan
+```
+
+The live runner creates fresh task hashes, sets up a devnet SPL test mint, proves release, failure refund, and timeout refund, scans the resulting accounts, and writes completed index evidence under the ignored `examples/solana-devnet/proofs/` directory:
+
+```bash
+GLOBAL_TASC_ALLOW_SOLANA_DEVNET_PROOF=1 npm run prove:solana-devnet
+```
+
+Do this only with devnet keys and funded devnet SOL balances.
+
 ## Why Tasc Might Work
 
 Most micro-work systems fail on trust and timing. Workers do not want to wait for payment, and buyers do not want to pay before proof. Tasc narrows the problem:
@@ -196,6 +212,7 @@ The best first contributions are narrow and verifiable:
 - add dispute handling around release/refund eligibility
 - harden duplicate-task, finality, and concurrency handling around the live Solana proofs
 - turn the static task feed into a public demo
+- connect the reproducible devnet proof runner to wallet-backed buyer/worker flows
 - add more TascLang task examples with deterministic verifier rules
 - build an indexer process that watches live Solana task accounts
 - package the CLI so people can create and sign tasks without reading the internals

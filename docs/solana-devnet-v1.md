@@ -413,12 +413,21 @@ The EVM scanner reads `Funded` logs. The Solana scanner reads task account state
 
 Solana devnet now works well enough to continue on the faster-chain path. The completed-settlement scanner is `bin/scan-solana-settlement-live.js`; it emits `tasc.settlement.solana.spl_token`, which `bin/tascindex.js` admits as a `completed` index entry rather than claimable inventory.
 
-The next real implementation step is:
+The complete mechanics loop can now be planned or rerun as a fresh proof bundle:
+
+```bash
+npm run prove:solana-devnet:plan
+GLOBAL_TASC_ALLOW_SOLANA_DEVNET_PROOF=1 npm run prove:solana-devnet
+```
+
+The live runner creates fresh task names and hashes, writes artifacts under ignored `examples/solana-devnet/proofs/`, runs SPL setup once, then proves three branches: pass release, verifier-failed refund, and timeout refund.
+
+The next real implementation steps are:
 
 1. Add wallet-backed browser claim/attest controls once the static proof should become interactive.
 2. Keep the browser/static index path chain-neutral by admitting Solana and EVM evidence through the same indexer boundary.
 3. Add production-style finality/reorg handling and duplicate-task suppression before treating devnet behavior as production-ready.
 4. Start dispute-path design now that pass/fail/timeout settlement is live-proven.
-5. Package a reproducible devnet proof script that runs the whole mechanics loop end to end.
+5. Turn proof bundles into a private-beta task feed that a buyer, worker, and verifier can operate from wallets.
 
 That gives Global Tasc a credible faster-chain path without throwing away the EVM work.

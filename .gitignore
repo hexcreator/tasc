@@ -5,3 +5,4 @@ npm-debug.log*
 target/
 programs/*/target/
 build/solana/*-keypair.json
+examples/solana-devnet/proofs/
