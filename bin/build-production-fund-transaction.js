@@ -365,7 +365,7 @@ async function buildArtifact(options = {}, rpcCall = defaultRpcCall) {
       capture_signature_as: "fund-signature",
       after_send: [
         "confirm the fund transaction on mainnet",
-        "record fund signature, task_account, and vault_token_account with real:capture:record after wallet submission",
+        "record the returned signature with real:capture:record --transaction .tascverifier/production-fund-transaction.json --signature <fund-sig>",
       ],
     },
     source: {

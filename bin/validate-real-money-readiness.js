@@ -567,7 +567,7 @@ async function plan(options = {}) {
       devnet_timed_proof: "GLOBAL_TASC_ALLOW_SOLANA_DEVNET_PROOF=1 npm run earn:devnet",
       validate_timed_proof: "npm run validate:timed-payout -- examples/solana-devnet/proofs/<run-id>/proof-summary.json",
       init_production_capture: "npm run real:capture:init -- --signed-intent .tascverifier/production-intent/production-intent.signature.json --program-id <program-id> --token-mint <mainnet-usdc-mint> --worker <worker-wallet> --destination-token-account <worker-token-account>",
-      record_production_evidence: "npm run real:capture:record -- --fund-signature <fund-sig> --task-account <task-account> --vault-token-account <vault-token-account>",
+      record_production_evidence: "npm run real:capture:record -- --transaction .tascverifier/production-fund-transaction.json --signature <fund-sig>",
       build_production_payout: "npm run real:capture:payout -- --production-rpc-url <mainnet-rpc-url>",
       validate_readiness: "npm run real:readiness -- --timed-proof examples/solana-devnet/proofs/<run-id>/proof-summary.json --production-payout .tascverifier/production-payout-evidence.json --production-rpc-url <mainnet-rpc-url> --expected-genesis-hash <mainnet-genesis-hash>",
     },

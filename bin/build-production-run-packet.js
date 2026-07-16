@@ -410,9 +410,8 @@ function buildCaptureFundCommand(config) {
   return [
     "npm run real:capture:record --",
     ` --capture ${config.production_capture_file}`,
-    " --fund-signature <fund-sig>",
-    ` --task-account ${commandValue(config.task_account, "<task-account>")}`,
-    ` --vault-token-account ${commandValue(config.vault_token_account, "<vault-token-account>")}`,
+    " --transaction .tascverifier/production-fund-transaction.json",
+    " --signature <fund-sig>",
   ].join("");
 }
 
@@ -420,7 +419,8 @@ function buildCaptureClaimCommand(config) {
   return [
     "npm run real:capture:record --",
     ` --capture ${config.production_capture_file}`,
-    " --claim-signature <claim-sig>",
+    " --transaction .tascverifier/production-lifecycle-claim.json",
+    " --signature <claim-sig>",
     " --claim-started-at <iso-claim-started>",
   ].join("");
 }
@@ -429,8 +429,8 @@ function buildCaptureAttestCommand(config) {
   return [
     "npm run real:capture:record --",
     ` --capture ${config.production_capture_file}`,
-    " --attest-signature <attest-sig>",
-    " --result-hash <0x-result-hash>",
+    " --transaction .tascverifier/production-lifecycle-attest.json",
+    " --signature <attest-sig>",
   ].join("");
 }
 
@@ -438,7 +438,8 @@ function buildCaptureReleaseCommand(config) {
   return [
     "npm run real:capture:record --",
     ` --capture ${config.production_capture_file}`,
-    " --release-signature <release-sig>",
+    " --transaction .tascverifier/production-lifecycle-release.json",
+    " --signature <release-sig>",
     " --release-confirmed-at <iso-release-confirmed>",
     " --completed-indexed-at <iso-completed-indexed>",
   ].join("");
@@ -824,6 +825,7 @@ function validatePacket(packet) {
   assert(packetText.includes("npm run real:preflight"), "packet must include preflight command");
   assert(packetText.includes("npm run real:lifecycle:build"), "packet must include lifecycle transaction command");
   assert(packetText.includes("npm run real:capture:"), "packet must include capture commands");
+  assert(packetText.includes("--transaction .tascverifier/production-"), "packet must include artifact-aware capture commands");
   assert(packetText.includes("npm run real:capture:payout"), "packet must include payout command");
   assert(packetText.includes("npm run real:readiness"), "packet must include readiness command");
   return {

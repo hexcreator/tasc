@@ -382,7 +382,7 @@ function plan(options = {}, processEnv = process.env) {
     next_commands: {
       check: "npm run real:preflight -- --production-rpc-url <mainnet-rpc-url> --expected-genesis-hash <mainnet-genesis-hash> --program-id <program-id> --usdc-mint <mainnet-usdc-mint> --buyer <buyer> --worker <worker> --verifier <verifier> --buyer-usdc-token-account <buyer-usdc-account> --worker-usdc-token-account <worker-usdc-account>",
       init_capture: "npm run real:capture:init -- --signed-intent .tascverifier/production-intent/production-intent.signature.json --program-id <program-id> --token-mint <mainnet-usdc-mint> --worker <worker-wallet> --destination-token-account <worker-usdc-account>",
-      record_evidence: "npm run real:capture:record -- --fund-signature <fund-sig> --task-account <task-account> --vault-token-account <vault-token-account>",
+      record_evidence: "npm run real:capture:record -- --transaction .tascverifier/production-fund-transaction.json --signature <fund-sig>",
       build_payout_evidence: "npm run real:capture:payout -- --production-rpc-url <mainnet-rpc-url>",
     },
   };

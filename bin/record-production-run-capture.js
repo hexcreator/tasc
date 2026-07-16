@@ -2,6 +2,14 @@
 
 const fs = require("fs");
 const path = require("path");
+const {
+  buildArtifact: buildProductionFundTransaction,
+  validateArtifact: validateProductionFundTransaction,
+} = require("./build-production-fund-transaction");
+const {
+  buildArtifact: buildProductionLifecycleTransaction,
+  validateArtifact: validateProductionLifecycleTransaction,
+} = require("./build-production-lifecycle-transaction");
 const { buildEvidence } = require("./build-production-payout-evidence");
 const { validateProductionPayout } = require("./validate-real-money-readiness");
 const { verifySignedSolanaIntent } = require("./tascsolana");
@@ -29,6 +37,8 @@ function usage() {
     "  --capture <file>                          capture file; default .tascverifier/production-run-capture.json",
     "  --out <file>                              payout evidence output for payout command",
     "  --signed-intent <file>                    signed production intent",
+    "  --transaction <file>                      production fund/lifecycle transaction artifact for record",
+    "  --signature <signature>                   wallet signature returned for --transaction",
     "  --program-id <address>                    expected deployed mainnet program id",
     "  --token-mint <address>                    expected mainnet USDC mint",
     "  --worker <address>                        worker wallet",
@@ -66,6 +76,8 @@ function parseArgs(argv) {
     capture: DEFAULT_CAPTURE,
     out: DEFAULT_PAYOUT,
     signedIntent: "",
+    transaction: "",
+    signature: "",
     programId: "",
     tokenMint: "",
     worker: "",
@@ -96,6 +108,8 @@ function parseArgs(argv) {
     if (arg === "--capture") options.capture = requireValue(args, ++i, arg);
     else if (arg === "--out") options.out = requireValue(args, ++i, arg);
     else if (arg === "--signed-intent") options.signedIntent = requireValue(args, ++i, arg);
+    else if (arg === "--transaction") options.transaction = requireValue(args, ++i, arg);
+    else if (arg === "--signature") options.signature = requireValue(args, ++i, arg);
     else if (arg === "--program-id") options.programId = requireValue(args, ++i, arg);
     else if (arg === "--token-mint") options.tokenMint = requireValue(args, ++i, arg);
     else if (arg === "--worker") options.worker = requireValue(args, ++i, arg);
@@ -349,6 +363,125 @@ function applyOptions(capture, options) {
   updateTiming(capture, options);
 }
 
+function assertCaptureIntentMatches(capture, artifact) {
+  assert(capture.signed_intent, "capture must be initialized with signed production intent before recording a transaction artifact");
+  const signed = capture.signed_intent;
+  assert(artifact.cluster === DEFAULT_CLUSTER, "transaction artifact cluster must be solana-mainnet-beta");
+  assert(artifact.network_type === "mainnet", "transaction artifact network_type must be mainnet");
+  assert(artifact.program_id === signed.program_id, "transaction artifact program_id does not match capture");
+  assert(artifact.token && artifact.token.mint === signed.token_mint, "transaction artifact token mint does not match capture");
+  assert(artifact.amount && artifact.amount.base_units === signed.amount_base_units, "transaction artifact amount does not match capture");
+  assert(artifact.buyer === signed.buyer, "transaction artifact buyer does not match capture");
+  assert(artifact.verifier === signed.verifier, "transaction artifact verifier does not match capture");
+  if (artifact.intent_hash && signed.intent_hash) {
+    assert(artifact.intent_hash === signed.intent_hash, "transaction artifact intent_hash does not match capture");
+  }
+}
+
+function signatureForPhase(options, phase) {
+  const specific = {
+    fund: options.fundSignature,
+    claim: options.claimSignature,
+    attest: options.attestSignature,
+    release: options.releaseSignature,
+  }[phase] || "";
+  if (options.signature && specific) {
+    assert(options.signature === specific, `--signature and --${phase}-signature must match`);
+  }
+  return assertSolanaSignature(specific || options.signature, `${phase}_signature`);
+}
+
+function setOrAssert(existing, incoming, label) {
+  const checked = assertString(incoming, label);
+  if (existing) {
+    assert(existing === checked, `${label} mismatch`);
+    return existing;
+  }
+  return checked;
+}
+
+function loadTransactionArtifact(file) {
+  const resolved = path.resolve(assertString(file, "transaction"));
+  const artifact = loadJson(resolved);
+  if (artifact.kind === "tasc.production_fund_transaction") {
+    validateProductionFundTransaction(artifact);
+    return {
+      file: rel(resolved),
+      artifact,
+      phase: "fund",
+      kind: artifact.kind,
+    };
+  }
+  if (artifact.kind === "tasc.production_lifecycle_transaction") {
+    const validation = validateProductionLifecycleTransaction(artifact);
+    return {
+      file: rel(resolved),
+      artifact,
+      phase: validation.action,
+      kind: artifact.kind,
+    };
+  }
+  throw new Error("transaction artifact must be tasc.production_fund_transaction or tasc.production_lifecycle_transaction");
+}
+
+function applyTransactionArtifact(capture, options) {
+  if (!options.transaction) return null;
+  const loaded = loadTransactionArtifact(options.transaction);
+  const artifact = loaded.artifact;
+  assertCaptureIntentMatches(capture, artifact);
+  const signature = signatureForPhase(options, loaded.phase);
+
+  if (loaded.phase === "fund") {
+    capture.settlement_inputs.task_account = setOrAssert(capture.settlement_inputs.task_account, artifact.task_account, "task_account");
+    capture.settlement_inputs.vault_token_account = setOrAssert(
+      capture.settlement_inputs.vault_token_account,
+      artifact.vault_token_account,
+      "vault_token_account",
+    );
+    capture.signatures.fund = setOrAssert(capture.signatures.fund, signature, "fund_signature");
+  } else {
+    capture.settlement_inputs.task_account = setOrAssert(capture.settlement_inputs.task_account, artifact.task_account, "task_account");
+    if (loaded.phase === "claim") {
+      capture.role_accounts.worker = setOrAssert(capture.role_accounts.worker, artifact.signer, "worker");
+      capture.signatures.claim = setOrAssert(capture.signatures.claim, signature, "claim_signature");
+      if (!options.claimStartedAt && !capture.timing.claim_started_at) {
+        capture.timing.claim_started_at = assertIso(options.generatedAt || capture.updated_at, "claim_started_at");
+      }
+    }
+    if (loaded.phase === "attest") {
+      assert(artifact.signer === capture.signed_intent.verifier, "attest transaction signer must match capture verifier");
+      capture.settlement_inputs.result_hash = setOrAssert(
+        capture.settlement_inputs.result_hash,
+        artifact.instruction.result_hash,
+        "result_hash",
+      );
+      capture.signatures.attest = setOrAssert(capture.signatures.attest, signature, "attest_signature");
+    }
+    if (loaded.phase === "release") {
+      assert(artifact.settlement, "release transaction artifact must include settlement");
+      capture.role_accounts.worker = setOrAssert(capture.role_accounts.worker, artifact.signer, "worker");
+      capture.role_accounts.destination_token_account = setOrAssert(
+        capture.role_accounts.destination_token_account,
+        artifact.settlement.destination_token_account,
+        "destination_token_account",
+      );
+      capture.settlement_inputs.vault_token_account = setOrAssert(
+        capture.settlement_inputs.vault_token_account,
+        artifact.settlement.vault_token_account,
+        "vault_token_account",
+      );
+      capture.signatures.release = setOrAssert(capture.signatures.release, signature, "release_signature");
+    }
+  }
+
+  return {
+    file: loaded.file,
+    kind: loaded.kind,
+    phase: loaded.phase,
+    signature,
+  };
+}
+
 function missingForPayout(capture) {
   const missing = [];
   if (!capture.signed_intent) missing.push("signed production intent");
@@ -428,9 +561,13 @@ function plan(options = {}) {
     writes_files: false,
     operator_flow: [
       `npm run real:capture:init -- --signed-intent .tascverifier/production-intent/production-intent.signature.json --program-id <program-id> --token-mint <mainnet-usdc-mint> --worker <worker-wallet> --destination-token-account <worker-usdc-account>`,
+      `npm run real:capture:record -- --transaction .tascverifier/production-fund-transaction.json --signature <fund-sig>`,
       `npm run real:capture:record -- --fund-signature <fund-sig> --task-account <task-account> --vault-token-account <vault-token-account>`,
+      `npm run real:capture:record -- --transaction .tascverifier/production-lifecycle-claim.json --signature <claim-sig> --claim-started-at <iso>`,
       `npm run real:capture:record -- --claim-signature <claim-sig> --claim-started-at <iso>`,
+      `npm run real:capture:record -- --transaction .tascverifier/production-lifecycle-attest.json --signature <attest-sig>`,
       `npm run real:capture:record -- --attest-signature <attest-sig> --result-hash <0x-result-hash>`,
+      `npm run real:capture:record -- --transaction .tascverifier/production-lifecycle-release.json --signature <release-sig> --release-confirmed-at <iso> --completed-indexed-at <iso>`,
       `npm run real:capture:record -- --release-signature <release-sig> --release-confirmed-at <iso> --completed-indexed-at <iso>`,
       `npm run real:capture:payout -- --production-rpc-url <mainnet-rpc-url> --out ${options.out || DEFAULT_PAYOUT}`,
     ],
@@ -466,6 +603,7 @@ function record(options = {}) {
   const capture = loadJson(file);
   validateCapture(capture);
   capture.updated_at = assertIso(options.generatedAt || new Date().toISOString(), "updated_at");
+  const recordedFromTransaction = applyTransactionArtifact(capture, options);
   applyOptions(capture, options);
   validateCapture(capture);
   writeJson(file, capture);
@@ -474,6 +612,7 @@ function record(options = {}) {
     kind: "tasc.production_run.capture.record_result",
     version: "0.1",
     capture_file: rel(file),
+    recorded_from_transaction: recordedFromTransaction,
     complete_for_payout: missingForPayout(capture).length === 0,
     missing: missingForPayout(capture),
     sends_transactions: false,
@@ -598,10 +737,47 @@ async function selfTest() {
   const verifier = sampleAddress(33);
   const worker = sampleAddress(34);
   const destination = sampleAddress(35);
-  const taskAccount = sampleAddress(36);
-  const vault = sampleAddress(37);
   const resultHash = `0x${"38".repeat(32)}`;
   const signed = await sampleSignedIntent(signedIntentFile, { programId, tokenMint, verifier });
+  const recentBlockhash = sampleAddress(36);
+  const fundTransactionFile = path.join(dir, "production-fund-transaction.json");
+  const fundTransaction = await buildProductionFundTransaction({
+    signedIntent: signed.signed_intent_file,
+    buyerUsdcTokenAccount: sampleAddress(37),
+    recentBlockhash,
+    taskRentLamports: "1",
+    vaultTokenRentLamports: "1",
+  });
+  writeJson(fundTransactionFile, fundTransaction);
+  const taskAccount = fundTransaction.task_account;
+  const vault = fundTransaction.vault_token_account;
+  const claimTransactionFile = path.join(dir, "production-lifecycle-claim.json");
+  writeJson(claimTransactionFile, await buildProductionLifecycleTransaction({
+    action: "claim",
+    signedIntent: signed.signed_intent_file,
+    taskAccount,
+    signer: worker,
+    recentBlockhash,
+  }));
+  const attestTransactionFile = path.join(dir, "production-lifecycle-attest.json");
+  writeJson(attestTransactionFile, await buildProductionLifecycleTransaction({
+    action: "attest",
+    signedIntent: signed.signed_intent_file,
+    taskAccount,
+    signer: verifier,
+    resultHash,
+    verdict: "pass",
+    recentBlockhash,
+  }));
+  const releaseTransactionFile = path.join(dir, "production-lifecycle-release.json");
+  writeJson(releaseTransactionFile, await buildProductionLifecycleTransaction({
+    action: "release",
+    signedIntent: signed.signed_intent_file,
+    taskAccount,
+    signer: worker,
+    destinationTokenAccount: destination,
+    recentBlockhash,
+  }));
   const planResult = plan({ capture: captureFile });
   assert(planResult.sends_transactions === false, "plan must not send transactions");
   assert(planResult.writes_files === false, "plan must not write files");
@@ -620,26 +796,27 @@ async function selfTest() {
 
   record({
     capture: captureFile,
-    taskAccount,
-    vaultTokenAccount: vault,
-    fundSignature: sampleSignature(40),
+    transaction: fundTransactionFile,
+    signature: sampleSignature(40),
     generatedAt: "2026-01-01T00:00:01.000Z",
   });
   record({
     capture: captureFile,
-    claimSignature: sampleSignature(41),
+    transaction: claimTransactionFile,
+    signature: sampleSignature(41),
     claimStartedAt: "2026-01-01T00:00:02.000Z",
     generatedAt: "2026-01-01T00:00:02.000Z",
   });
   record({
     capture: captureFile,
-    attestSignature: sampleSignature(42),
-    resultHash,
+    transaction: attestTransactionFile,
+    signature: sampleSignature(42),
     generatedAt: "2026-01-01T00:00:03.000Z",
   });
   const completed = record({
     capture: captureFile,
-    releaseSignature: sampleSignature(43),
+    transaction: releaseTransactionFile,
+    signature: sampleSignature(43),
     releaseConfirmedAt: "2026-01-01T00:00:06.669Z",
     completedIndexedAt: "2026-01-01T00:00:06.751Z",
     vaultBalanceAfter: "0",
@@ -660,7 +837,26 @@ async function selfTest() {
   const evidence = loadJson(payoutFile);
   assert(evidence.settlement.buyer === signed.buyer, "payout evidence should keep signed buyer");
   assert(evidence.settlement.worker === worker, "payout evidence should keep worker");
+  assert(evidence.settlement.task_account === taskAccount, "payout evidence should keep artifact task account");
+  assert(evidence.settlement.vault_token_account === vault, "payout evidence should keep artifact vault account");
   assert(evidence.timing.claim_to_release_ms === 4669, "claim-to-release timing mismatch");
+
+  let rejectedMismatchedArtifact = false;
+  try {
+    const mismatchedFile = path.join(dir, "production-lifecycle-attest-mismatch.json");
+    const mismatched = loadJson(attestTransactionFile);
+    mismatched.task_account = sampleAddress(44);
+    writeJson(mismatchedFile, mismatched);
+    record({
+      capture: captureFile,
+      transaction: mismatchedFile,
+      signature: sampleSignature(45),
+      generatedAt: "2026-01-01T00:00:09.000Z",
+    });
+  } catch {
+    rejectedMismatchedArtifact = true;
+  }
+  assert(rejectedMismatchedArtifact, "mismatched transaction artifact should be rejected");
 
   let rejectedIncomplete = false;
   try {
@@ -677,8 +873,10 @@ async function selfTest() {
     plan_safe: true,
     init_capture: true,
     record_capture: true,
+    record_from_transaction_artifacts: true,
     validate_capture: true,
     payout_from_capture: true,
+    rejected_mismatched_transaction_artifact: true,
     rejected_incomplete_capture: true,
     sends_transactions: false,
     accepts_private_keys: false,
