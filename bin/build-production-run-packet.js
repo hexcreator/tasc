@@ -8,11 +8,15 @@ const { verifySignedSolanaIntent } = require("./tascsolana");
 const { validateHandoff: validateProductionDeployHandoff } = require("./build-production-deploy-handoff");
 const { validateProductionPayout } = require("./validate-real-money-readiness");
 const { assertBase58Address, base58Decode, base58Encode } = require("./run-solana-devnet");
+const {
+  DEFAULT_ENV_FILE,
+  PRODUCTION_ENV,
+  loadEnvFile,
+} = require("./production-env");
 
 const ROOT = path.resolve(__dirname, "..");
 const DEFAULT_OUT = ".tascverifier/production-run-packet.json";
 const DEFAULT_TASK_FILE = "examples/summarize_url.tasc";
-const DEFAULT_ENV_FILE = ".env.solana-mainnet.local";
 const DEFAULT_INTENT_DIR = ".tascverifier/production-intent";
 const DEFAULT_PRODUCTION_DEPLOY = ".tascverifier/production-deploy-handoff.json";
 const DEFAULT_PRODUCTION_PAYOUT = ".tascverifier/production-payout-evidence.json";
@@ -22,17 +26,6 @@ const DEFAULT_AMOUNT_BASE_UNITS = "10000000";
 const DEFAULT_TARGET_MS = 60_000;
 const DEFAULT_INPUT = "url=https://docs.cdp.coinbase.com/x402/welcome";
 const PRODUCTION_SUBMITTER_PAGE = "web/production-run.html";
-const PRODUCTION_ENV = {
-  rpcUrl: "SOLANA_MAINNET_RPC_URL",
-  expectedGenesisHash: "SOLANA_MAINNET_EXPECTED_GENESIS_HASH",
-  programId: "GLOBAL_TASC_SOLANA_MAINNET_PROGRAM_ID",
-  tokenMint: "GLOBAL_TASC_SOLANA_MAINNET_USDC_MINT",
-  buyer: "GLOBAL_TASC_SOLANA_MAINNET_BUYER_ADDRESS",
-  worker: "GLOBAL_TASC_SOLANA_MAINNET_WORKER_ADDRESS",
-  verifier: "GLOBAL_TASC_SOLANA_MAINNET_VERIFIER_ADDRESS",
-  buyerUsdc: "GLOBAL_TASC_SOLANA_MAINNET_BUYER_USDC_TOKEN_ACCOUNT",
-  workerUsdc: "GLOBAL_TASC_SOLANA_MAINNET_WORKER_USDC_TOKEN_ACCOUNT",
-};
 
 function usage() {
   console.error([
@@ -151,19 +144,6 @@ function requireValue(args, index, label) {
 
 function loadJson(file) {
   return JSON.parse(fs.readFileSync(file, "utf8"));
-}
-
-function loadEnvFile(file) {
-  if (!fs.existsSync(file)) return {};
-  const env = {};
-  for (const line of fs.readFileSync(file, "utf8").split(/\r?\n/)) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith("#")) continue;
-    const index = line.indexOf("=");
-    if (index === -1) continue;
-    env[line.slice(0, index).trim()] = line.slice(index + 1).trim();
-  }
-  return env;
 }
 
 function writeJson(file, value) {
@@ -331,16 +311,17 @@ function commandValue(value, placeholder) {
   return value || placeholder;
 }
 
+function envFlag(config) {
+  return ` --env ${config.env_file || DEFAULT_ENV_FILE}`;
+}
+
 function buildIntentCommand(config) {
   const inputs = Object.entries(config.inputs)
     .map(([name, value]) => ` --input ${name}=${value}`)
     .join("");
   return [
     `npm run real:intent:build -- ${config.task_file}`,
-    ` --buyer ${commandValue(config.buyer, "<buyer-wallet>")}`,
-    ` --verifier ${commandValue(config.verifier, "<verifier-wallet>")}`,
-    ` --program-id ${commandValue(config.program_id, "<program-id>")}`,
-    ` --token-mint ${commandValue(config.token_mint, "<mainnet-usdc-mint>")}`,
+    envFlag(config),
     inputs,
   ].join("");
 }
@@ -348,90 +329,72 @@ function buildIntentCommand(config) {
 function buildDeployHandoffCommand(config) {
   return [
     "npm run real:deploy:build --",
-    " --production-rpc-url <mainnet-rpc-url>",
-    ` --expected-genesis-hash ${commandValue(config.expected_genesis_hash, "<mainnet-genesis-hash>")}`,
-    ` --program-id ${commandValue(config.program_id, "<program-id>")}`,
+    envFlag(config),
   ].join("");
 }
 
 function buildPreflightCommand(config) {
   return [
     "npm run real:preflight --",
-    " --production-rpc-url <mainnet-rpc-url>",
-    ` --expected-genesis-hash ${commandValue(config.expected_genesis_hash, "<mainnet-genesis-hash>")}`,
-    ` --program-id ${commandValue(config.program_id, "<program-id>")}`,
-    ` --usdc-mint ${commandValue(config.token_mint, "<mainnet-usdc-mint>")}`,
-    ` --buyer ${commandValue(config.buyer, "<buyer-wallet>")}`,
-    ` --worker ${commandValue(config.worker, "<worker-wallet>")}`,
-    ` --verifier ${commandValue(config.verifier, "<verifier-wallet>")}`,
-    ` --buyer-usdc-token-account ${commandValue(config.buyer_usdc_token_account, "<buyer-usdc-account>")}`,
-    ` --worker-usdc-token-account ${commandValue(config.worker_usdc_token_account, "<worker-usdc-account>")}`,
+    envFlag(config),
   ].join("");
 }
 
 function buildFundCommand(config, artifacts) {
   return [
     "npm run real:fund:build --",
+    envFlag(config),
     ` --signed-intent ${artifacts.intent.signed_intent_file}`,
-    ` --buyer-usdc-token-account ${commandValue(config.buyer_usdc_token_account, "<buyer-usdc-account>")}`,
-    " --production-rpc-url <mainnet-rpc-url>",
   ].join("");
 }
 
 function buildLifecycleClaimCommand(config, artifacts) {
   return [
     "npm run real:lifecycle:build --",
+    envFlag(config),
     " --action claim",
     ` --signed-intent ${artifacts.intent.signed_intent_file}`,
     ` --task-account ${commandValue(config.task_account, "<task-account>")}`,
-    ` --signer ${commandValue(config.worker, "<worker-wallet>")}`,
-    " --production-rpc-url <mainnet-rpc-url>",
   ].join("");
 }
 
 function buildLifecycleAttestCommand(config, artifacts) {
   return [
     "npm run real:lifecycle:build --",
+    envFlag(config),
     " --action attest",
     ` --signed-intent ${artifacts.intent.signed_intent_file}`,
     ` --task-account ${commandValue(config.task_account, "<task-account>")}`,
-    ` --signer ${commandValue(config.verifier, "<verifier-wallet>")}`,
     " --verdict pass",
     " --result-hash <0x-result-hash>",
-    " --production-rpc-url <mainnet-rpc-url>",
   ].join("");
 }
 
 function buildLifecycleReleaseCommand(config, artifacts) {
   return [
     "npm run real:lifecycle:build --",
+    envFlag(config),
     " --action release",
     ` --signed-intent ${artifacts.intent.signed_intent_file}`,
     ` --task-account ${commandValue(config.task_account, "<task-account>")}`,
-    ` --signer ${commandValue(config.worker, "<worker-wallet>")}`,
-    ` --destination-token-account ${commandValue(config.worker_usdc_token_account, "<worker-usdc-account>")}`,
-    " --production-rpc-url <mainnet-rpc-url>",
   ].join("");
 }
 
 function buildPayoutCommand(config) {
   return [
     "npm run real:capture:payout --",
+    envFlag(config),
     ` --capture ${config.production_capture_file}`,
     ` --out ${config.production_payout_file}`,
-    " --production-rpc-url <mainnet-rpc-url>",
   ].join("");
 }
 
 function buildCaptureInitCommand(config) {
   return [
     "npm run real:capture:init --",
+    envFlag(config),
     ` --capture ${config.production_capture_file}`,
     ` --signed-intent ${commandValue(config.signed_intent_file, ".tascverifier/production-intent/production-intent.signature.json")}`,
-    ` --program-id ${commandValue(config.program_id, "<program-id>")}`,
-    ` --token-mint ${commandValue(config.token_mint, "<mainnet-usdc-mint>")}`,
-    ` --worker ${commandValue(config.worker, "<worker-wallet>")}`,
-    ` --destination-token-account ${commandValue(config.worker_usdc_token_account, "<worker-usdc-account>")}`,
   ].join("");
 }
 
@@ -501,10 +464,9 @@ function walletSubmitterHandoff(phase, artifactFile, role, signer, captureComman
 function buildReadinessCommand(config) {
   return [
     "npm run real:readiness --",
+    envFlag(config),
     ` --timed-proof ${commandValue(config.timed_proof_file, "examples/solana-devnet/proofs/<run-id>/proof-summary.json")}`,
     ` --production-payout ${config.production_payout_file}`,
-    " --production-rpc-url <mainnet-rpc-url>",
-    ` --expected-genesis-hash ${commandValue(config.expected_genesis_hash, "<mainnet-genesis-hash>")}`,
   ].join("");
 }
 
@@ -1167,7 +1129,7 @@ function sampleProductionDeploy(file, programId) {
         "mainnet deploy transaction signature",
         "deployed executable program account",
       ],
-      next_preflight_command: `npm run real:preflight -- --production-rpc-url <mainnet-rpc-url> --expected-genesis-hash mainnet-self-test-genesis --program-id ${programId} --usdc-mint <mainnet-usdc-mint> --buyer <buyer-wallet> --worker <worker-wallet> --verifier <verifier-wallet> --buyer-usdc-token-account <buyer-usdc-account> --worker-usdc-token-account <worker-usdc-account>`,
+      next_preflight_command: "npm run real:preflight -- --env .env.solana-mainnet.local",
     },
     source: {
       built_by: "bin/build-production-deploy-handoff.js",
@@ -1264,8 +1226,10 @@ async function selfTest() {
     destinationTokenAccount: workerUsdc,
   });
 
+  const envFile = path.join(dir, ".env.solana-mainnet.local");
   const options = {
     out: path.join(dir, "packet.json"),
+    envFile,
     taskFile: DEFAULT_TASK_FILE,
     timedProof,
     productionDeploy,
@@ -1286,7 +1250,6 @@ async function selfTest() {
     now: "2026-01-01T00:00:00.000Z",
     runId: "production_run_packet_self_test",
   };
-  const envFile = path.join(dir, ".env.solana-mainnet.local");
   fs.writeFileSync(envFile, [
     `${PRODUCTION_ENV.rpcUrl}=https://mainnet.example.com/sensitive/rpc?credential=do-not-store`,
     `${PRODUCTION_ENV.expectedGenesisHash}=mainnet-self-test-genesis`,
@@ -1317,6 +1280,11 @@ async function selfTest() {
   const packet = loadJson(options.out);
   const validation = validatePacket(packet);
   assert(validation.ok === true, "packet validation should pass");
+  const commandText = packet.operator_sequence.map((entry) => entry.command || "").join("\n");
+  assert(commandText.includes(`--env ${path.relative(ROOT, envFile)}`), "packet commands should use env file");
+  assert(!commandText.includes("--production-rpc-url <mainnet-rpc-url>"), "packet commands should not require explicit RPC URL");
+  assert(!commandText.includes("--buyer <buyer-wallet>"), "packet commands should not require explicit env-backed buyer");
+  assert(packet.acceptance_gate.command.includes(`--env ${path.relative(ROOT, envFile)}`), "acceptance gate should use env file");
 
   const envPacket = buildPacket({
     ...options,

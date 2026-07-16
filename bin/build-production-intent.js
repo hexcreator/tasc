@@ -11,6 +11,12 @@ const {
   verifySignedSolanaIntent,
 } = require("./tascsolana");
 const { assertBase58Address, base58Decode, base58Encode } = require("./run-solana-devnet");
+const {
+  DEFAULT_ENV_FILE,
+  PRODUCTION_ENV,
+  envMetadata,
+  withProductionEnv,
+} = require("./production-env");
 
 const ROOT = path.resolve(__dirname, "..");
 const DEFAULT_TASK_FILE = "examples/summarize_url.tasc";
@@ -29,6 +35,7 @@ function usage() {
     "  node bin/build-production-intent.js --self-test",
     "",
     "Build options:",
+    "  --env <file>                production env file; default .env.solana-mainnet.local",
     "  --out-dir <dir>             output directory; default .tascverifier/production-intent",
     "  --buyer <address>           mainnet buyer wallet address",
     "  --verifier <address>        mainnet verifier wallet address",
@@ -51,6 +58,7 @@ function assert(condition, message) {
 function parseArgs(argv) {
   const options = {
     command: "plan",
+    envFile: DEFAULT_ENV_FILE,
     taskFile: DEFAULT_TASK_FILE,
     outDir: DEFAULT_OUT_DIR,
     intentFile: "",
@@ -71,7 +79,8 @@ function parseArgs(argv) {
   if (options.command === "build" && args[0] && !args[0].startsWith("--")) options.taskFile = args.shift();
   for (let i = 0; i < args.length; i += 1) {
     const arg = args[i];
-    if (arg === "--out-dir") options.outDir = requireValue(args, ++i, arg);
+    if (arg === "--env") options.envFile = requireValue(args, ++i, arg);
+    else if (arg === "--out-dir") options.outDir = requireValue(args, ++i, arg);
     else if (arg === "--intent") options.intentFile = requireValue(args, ++i, arg);
     else if (arg === "--signature") options.signature = requireValue(args, ++i, arg);
     else if (arg === "--out") options.out = requireValue(args, ++i, arg);
@@ -97,6 +106,15 @@ function requireValue(args, index, label) {
   const value = args[index] || "";
   if (!value) throw new Error(`${label} requires a value`);
   return value;
+}
+
+function optionsWithEnv(options = {}) {
+  return withProductionEnv(options, {
+    buyer: PRODUCTION_ENV.buyer,
+    verifier: PRODUCTION_ENV.verifier,
+    programId: PRODUCTION_ENV.programId,
+    tokenMint: PRODUCTION_ENV.tokenMint,
+  });
 }
 
 function loadJson(file) {
@@ -150,6 +168,7 @@ function defaultInputs(inputs) {
 }
 
 function buildUnsignedIntent(options = {}) {
+  options = optionsWithEnv(options);
   assert(fs.existsSync(options.taskFile), `task file not found: ${options.taskFile}`);
   const buyer = assertSolanaAddress(options.buyer, "buyer");
   const verifier = assertSolanaAddress(options.verifier, "verifier");
@@ -204,6 +223,7 @@ function artifactPaths(outDir) {
 }
 
 function build(options = {}) {
+  options = optionsWithEnv(options);
   const { intent, signingPayload } = buildUnsignedIntent(options);
   const paths = artifactPaths(options.outDir);
   const payloadBytes = Buffer.from(signingPayload, "utf8");
@@ -226,6 +246,15 @@ function build(options = {}) {
     nonce: intent.message.nonce,
     signing_payload_sha256: intent.signing.payload_sha256,
     signing_payload_bytes: payloadBytes.length,
+    source: {
+      built_by: "bin/build-production-intent.js",
+      ...envMetadata(options.envFile, [
+        PRODUCTION_ENV.buyer,
+        PRODUCTION_ENV.verifier,
+        PRODUCTION_ENV.programId,
+        PRODUCTION_ENV.tokenMint,
+      ]),
+    },
     sends_transactions: false,
     accepts_private_keys: false,
     key_material_printed: false,
@@ -284,6 +313,7 @@ function attachSignature(options = {}) {
 }
 
 function plan(options = {}) {
+  const envFile = options.envFile || DEFAULT_ENV_FILE;
   return {
     ok: true,
     kind: "tasc.production_intent.plan",
@@ -291,6 +321,7 @@ function plan(options = {}) {
     goal: "create a mainnet buyer intent and exact wallet-signing payload without private keys",
     cluster: DEFAULT_CLUSTER,
     network_type: MAINNET_NETWORK_TYPE,
+    default_env_file: envFile,
     default_out_dir: options.outDir || DEFAULT_OUT_DIR,
     sends_transactions: false,
     accepts_private_keys: false,
@@ -307,9 +338,9 @@ function plan(options = {}) {
       "unique nonce",
     ],
     commands: {
-      build_unsigned_intent: "npm run real:intent:build -- examples/summarize_url.tasc --buyer <buyer> --verifier <verifier> --program-id <program-id> --token-mint <mainnet-usdc-mint> --input url=<url>",
+      build_unsigned_intent: `npm run real:intent:build -- examples/summarize_url.tasc --env ${envFile} --input url=<url>`,
       attach_wallet_signature: "npm run real:intent:attach-signature -- --intent .tascverifier/production-intent/production-intent.intent.json --signature <base58-wallet-signature>",
-      next_preflight: "npm run real:preflight -- --production-rpc-url <mainnet-rpc-url> --expected-genesis-hash <mainnet-genesis-hash> --program-id <program-id> --usdc-mint <mainnet-usdc-mint> --buyer <buyer> --worker <worker> --verifier <verifier> --buyer-usdc-token-account <buyer-usdc-account> --worker-usdc-token-account <worker-usdc-account>",
+      next_preflight: `npm run real:preflight -- --env ${envFile}`,
     },
     notes: [
       "Sign the exact UTF-8 bytes in production-intent.signing-payload.json.",
@@ -327,7 +358,9 @@ async function selfTest() {
   fs.mkdirSync(path.join(ROOT, ".tascverifier"), { recursive: true });
   const dir = fs.mkdtempSync(path.join(ROOT, ".tascverifier", "production-intent-"));
   const buyer = fixtureKeypair("buyer");
+  const envFile = path.join(dir, ".env.solana-mainnet.local");
   const options = {
+    envFile,
     taskFile: DEFAULT_TASK_FILE,
     outDir: dir,
     buyer: buyer.address,
@@ -339,6 +372,13 @@ async function selfTest() {
     nonce: "42",
     decimals: DEFAULT_DECIMALS,
   };
+  fs.writeFileSync(envFile, [
+    `${PRODUCTION_ENV.buyer}=${buyer.address}`,
+    `${PRODUCTION_ENV.verifier}=${options.verifier}`,
+    `${PRODUCTION_ENV.programId}=${options.programId}`,
+    `${PRODUCTION_ENV.tokenMint}=${options.tokenMint}`,
+    "",
+  ].join("\n"));
 
   const planResult = plan();
   assert(planResult.sends_transactions === false, "plan must not send transactions");
@@ -354,6 +394,21 @@ async function selfTest() {
   const payloadFromFile = fs.readFileSync(paths.payload, "utf8");
   assert(!payloadFromFile.endsWith("\n"), "signing payload file must not have a trailing newline");
   assert(`sha256:${sha256Hex(payloadFromFile)}` === buildResult.signing_payload_sha256, "signing payload file hash mismatch");
+
+  const envOutDir = path.join(dir, "env");
+  const envBuild = build({
+    ...options,
+    outDir: envOutDir,
+    buyer: "",
+    verifier: "",
+    programId: "",
+    tokenMint: "",
+  });
+  assert(envBuild.buyer === buyer.address, "env build should load buyer");
+  assert(envBuild.verifier === options.verifier, "env build should load verifier");
+  assert(envBuild.program_id === options.programId, "env build should load program id");
+  assert(envBuild.token_mint === options.tokenMint, "env build should load token mint");
+  assert(envBuild.source.env_file_exists === true, "env build should report env file");
 
   const unsignedIntent = loadJson(paths.intent);
   const intentForSigning = { ...unsignedIntent };
@@ -383,6 +438,7 @@ async function selfTest() {
     ok: true,
     self_test: true,
     build_unsigned_intent: true,
+    build_unsigned_intent_from_env: true,
     attach_signature: true,
     rejected_bad_signature: rejectedBadSignature,
     no_private_keys_required: true,
