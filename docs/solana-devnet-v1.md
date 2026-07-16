@@ -472,6 +472,14 @@ npm run real:intent:attach-signature -- \
   --intent .tascverifier/production-intent/production-intent.intent.json \
   --signature <base58-wallet-signature>
 
+npm run real:capture:plan
+npm run real:capture:init -- \
+  --signed-intent .tascverifier/production-intent/production-intent.signature.json \
+  --program-id <program-id> \
+  --token-mint <mainnet-usdc-mint> \
+  --worker <worker-wallet> \
+  --destination-token-account <worker-usdc-account>
+
 npm run real:preflight:plan
 npm run real:preflight -- \
   --production-rpc-url <mainnet-rpc-url> \
@@ -492,6 +500,10 @@ npm run real:fund:build -- \
 
 # Submit .tascverifier/production-fund-transaction.json with the buyer wallet,
 # then keep the returned fund signature plus task/vault accounts.
+npm run real:capture:record -- \
+  --fund-signature <fund-sig> \
+  --task-account <task-account> \
+  --vault-token-account <vault-token-account>
 
 npm run real:lifecycle:plan
 npm run real:lifecycle:build -- \
@@ -503,6 +515,9 @@ npm run real:lifecycle:build -- \
 
 # Submit .tascverifier/production-lifecycle-claim.json with the worker wallet,
 # start the payout timer, then keep the returned claim signature.
+npm run real:capture:record -- \
+  --claim-signature <claim-sig> \
+  --claim-started-at <iso-claim-started>
 
 npm run real:lifecycle:build -- \
   --action attest \
@@ -515,6 +530,9 @@ npm run real:lifecycle:build -- \
 
 # Submit .tascverifier/production-lifecycle-attest.json with the verifier wallet,
 # then keep the returned attest signature.
+npm run real:capture:record -- \
+  --attest-signature <attest-sig> \
+  --result-hash <0x-result-hash>
 
 npm run real:lifecycle:build -- \
   --action release \
@@ -526,23 +544,13 @@ npm run real:lifecycle:build -- \
 
 # Submit .tascverifier/production-lifecycle-release.json with the worker wallet,
 # then keep the returned release signature and confirmation timestamp.
+npm run real:capture:record -- \
+  --release-signature <release-sig> \
+  --release-confirmed-at <iso-release-confirmed> \
+  --completed-indexed-at <iso-completed-indexed>
 
-npm run real:payout:plan
-npm run real:payout:build -- \
-  --signed-intent .tascverifier/production-intent/production-intent.signature.json \
-  --program-id <program-id> \
-  --token-mint <mainnet-usdc-mint> \
-  --worker <worker-wallet> \
-  --result-hash <0x-result-hash> \
-  --task-account <task-account> \
-  --vault-token-account <vault-token-account> \
-  --destination-token-account <worker-token-account> \
-  --fund-signature <sig> \
-  --claim-signature <sig> \
-  --attest-signature <sig> \
-  --release-signature <sig> \
-  --claim-to-release-ms <ms> \
-  --claim-to-completed-index-ms <ms> \
+npm run real:capture:validate
+npm run real:capture:payout -- \
   --production-rpc-url <mainnet-rpc-url>
 
 npm run real:packet:plan
@@ -550,6 +558,7 @@ npm run real:packet:build -- \
   --timed-proof examples/solana-devnet/proofs/<run-id>/proof-summary.json \
   --production-deploy .tascverifier/production-deploy-handoff.json \
   --signed-intent .tascverifier/production-intent/production-intent.signature.json \
+  --production-capture .tascverifier/production-run-capture.json \
   --production-payout .tascverifier/production-payout-evidence.json \
   --production-rpc-url <mainnet-rpc-url> \
   --expected-genesis-hash <mainnet-genesis-hash> \
@@ -570,7 +579,7 @@ npm run real:readiness -- \
   --expected-genesis-hash <mainnet-genesis-hash>
 ```
 
-`real:deploy:build` creates a sanitized mainnet deploy handoff from the SBF artifact and manifest, derives the public program id from the generated program keypair file, keeps the full RPC URL and key material out of JSON, and does not call RPC or send transactions. `real:intent:build` creates the unsigned mainnet buyer intent plus the exact canonical UTF-8 payload a wallet must sign. `real:intent:attach-signature` verifies the base58 Ed25519 wallet signature against the buyer address before writing the signed intent used by funding. `real:preflight` is read-only and checks mainnet RPC identity, deployed program account, role SOL balances, the verified USDC mint, buyer USDC funding capacity, and worker USDC destination readiness before a real run. `real:fund:build` creates the unsigned buyer-wallet transaction that creates the task account, creates and initializes the PDA-owned vault token account, transfers exactly 10 USDC into that vault, and calls `global_tasc.fund`; it can use read-only RPC for blockhash/rent/source-account checks, but never accepts private keys, sends transactions, or writes the full RPC URL. `real:lifecycle:build` creates unsigned role-wallet transactions for claim, verifier attest, and worker release from the signed mainnet intent and funded task account, again without private keys, sends, or full RPC URL persistence. `real:payout:build` creates the ignored local production payout artifact from the signed intent, worker/result hash, mainnet signatures/accounts, and read-only token-account balance checks. `real:packet:build` then assembles a sanitized production run packet with the timed proof, deploy handoff, signed intent, fund and lifecycle transaction handoffs, payout evidence, redacted RPC host, live evidence checklist, and exact remaining commands. It must represent mainnet USDC, not devnet/test-token evidence, and none of these commands accept private keys or send transactions. `real:readiness` should still report `ready_for_goal: false` until that artifact is paired with a timed proof, `--production-rpc-url`, and `--expected-genesis-hash`. The live RPC check verifies the genesis hash, fund/claim/attest/release signature confirmations, decoded released task-account owner/state, vault token-account balance, and worker destination token-account balance.
+`real:deploy:build` creates a sanitized mainnet deploy handoff from the SBF artifact and manifest, derives the public program id from the generated program keypair file, keeps the full RPC URL and key material out of JSON, and does not call RPC or send transactions. `real:intent:build` creates the unsigned mainnet buyer intent plus the exact canonical UTF-8 payload a wallet must sign. `real:intent:attach-signature` verifies the base58 Ed25519 wallet signature against the buyer address before writing the signed intent used by funding. `real:capture:*` records the public production run evidence incrementally in `.tascverifier/production-run-capture.json` without private keys or transaction sends, then builds the ignored payout artifact from that capture. `real:preflight` is read-only and checks mainnet RPC identity, deployed program account, role SOL balances, the verified USDC mint, buyer USDC funding capacity, and worker USDC destination readiness before a real run. `real:fund:build` creates the unsigned buyer-wallet transaction that creates the task account, creates and initializes the PDA-owned vault token account, transfers exactly 10 USDC into that vault, and calls `global_tasc.fund`; it can use read-only RPC for blockhash/rent/source-account checks, but never accepts private keys, sends transactions, or writes the full RPC URL. `real:lifecycle:build` creates unsigned role-wallet transactions for claim, verifier attest, and worker release from the signed mainnet intent and funded task account, again without private keys, sends, or full RPC URL persistence. `real:payout:build` remains the lower-level direct artifact builder. `real:packet:build` then assembles a sanitized production run packet with the timed proof, deploy handoff, signed intent, capture file, fund and lifecycle transaction handoffs, payout evidence, redacted RPC host, live evidence checklist, and exact remaining commands. It must represent mainnet USDC, not devnet/test-token evidence, and none of these commands accept private keys or send transactions. `real:readiness` should still report `ready_for_goal: false` until that artifact is paired with a timed proof, `--production-rpc-url`, and `--expected-genesis-hash`. The live RPC check verifies the genesis hash, fund/claim/attest/release signature confirmations, decoded released task-account owner/state, vault token-account balance, and worker destination token-account balance.
 
 The next real implementation steps are:
 

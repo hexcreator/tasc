@@ -381,7 +381,9 @@ function plan(options = {}, processEnv = process.env) {
     },
     next_commands: {
       check: "npm run real:preflight -- --production-rpc-url <mainnet-rpc-url> --expected-genesis-hash <mainnet-genesis-hash> --program-id <program-id> --usdc-mint <mainnet-usdc-mint> --buyer <buyer> --worker <worker> --verifier <verifier> --buyer-usdc-token-account <buyer-usdc-account> --worker-usdc-token-account <worker-usdc-account>",
-      build_payout_evidence: "npm run real:payout:build -- --signed-intent .tascverifier/production-intent/production-intent.signature.json --program-id <program-id> --token-mint <mainnet-usdc-mint> --worker <worker-wallet> --result-hash <0x-result-hash> --task-account <task-account> --vault-token-account <vault-token-account> --destination-token-account <worker-usdc-account> --fund-signature <sig> --claim-signature <sig> --attest-signature <sig> --release-signature <sig> --claim-to-release-ms <ms> --claim-to-completed-index-ms <ms> --production-rpc-url <mainnet-rpc-url>",
+      init_capture: "npm run real:capture:init -- --signed-intent .tascverifier/production-intent/production-intent.signature.json --program-id <program-id> --token-mint <mainnet-usdc-mint> --worker <worker-wallet> --destination-token-account <worker-usdc-account>",
+      record_evidence: "npm run real:capture:record -- --fund-signature <fund-sig> --task-account <task-account> --vault-token-account <vault-token-account>",
+      build_payout_evidence: "npm run real:capture:payout -- --production-rpc-url <mainnet-rpc-url>",
     },
   };
 }
@@ -502,7 +504,8 @@ async function check(options = {}, rpcCall = defaultRpcCall, processEnv = proces
       "mainnet claim transaction signature",
       "mainnet verifier attest transaction signature",
       "mainnet release transaction signature",
-      "production payout evidence from real:payout:build",
+      "production capture evidence from real:capture:record",
+      "production payout evidence from real:capture:payout",
       "real:readiness result with ready_for_goal true",
     ] : uniqueBlockers,
     no_new_dependencies: true,

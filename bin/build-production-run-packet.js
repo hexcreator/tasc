@@ -15,6 +15,7 @@ const DEFAULT_TASK_FILE = "examples/summarize_url.tasc";
 const DEFAULT_INTENT_DIR = ".tascverifier/production-intent";
 const DEFAULT_PRODUCTION_DEPLOY = ".tascverifier/production-deploy-handoff.json";
 const DEFAULT_PRODUCTION_PAYOUT = ".tascverifier/production-payout-evidence.json";
+const DEFAULT_PRODUCTION_CAPTURE = ".tascverifier/production-run-capture.json";
 const DEFAULT_CLUSTER = "solana-mainnet-beta";
 const DEFAULT_AMOUNT_BASE_UNITS = "10000000";
 const DEFAULT_TARGET_MS = 60_000;
@@ -36,6 +37,7 @@ function usage() {
     "  --production-deploy <file>                production deploy handoff file",
     "  --intent-dir <dir>                        production intent artifact dir",
     "  --signed-intent <file>                    signed production intent file",
+    "  --production-capture <file>               production run capture file",
     "  --production-payout <file>                production payout evidence file",
     "  --production-rpc-url <url>                mainnet RPC URL; host only is persisted",
     "  --expected-genesis-hash <hash>            expected mainnet genesis hash",
@@ -71,6 +73,7 @@ function parseArgs(argv) {
     productionDeploy: DEFAULT_PRODUCTION_DEPLOY,
     intentDir: DEFAULT_INTENT_DIR,
     signedIntent: "",
+    productionCapture: DEFAULT_PRODUCTION_CAPTURE,
     productionPayout: DEFAULT_PRODUCTION_PAYOUT,
     productionRpcUrl: "",
     expectedGenesisHash: "",
@@ -102,6 +105,7 @@ function parseArgs(argv) {
     else if (arg === "--production-deploy") options.productionDeploy = requireValue(args, ++i, arg);
     else if (arg === "--intent-dir") options.intentDir = requireValue(args, ++i, arg);
     else if (arg === "--signed-intent") options.signedIntent = requireValue(args, ++i, arg);
+    else if (arg === "--production-capture") options.productionCapture = requireValue(args, ++i, arg);
     else if (arg === "--production-payout") options.productionPayout = requireValue(args, ++i, arg);
     else if (arg === "--production-rpc-url") options.productionRpcUrl = requireValue(args, ++i, arg);
     else if (arg === "--expected-genesis-hash") options.expectedGenesisHash = requireValue(args, ++i, arg);
@@ -383,22 +387,60 @@ function buildLifecycleReleaseCommand(config, artifacts) {
 
 function buildPayoutCommand(config) {
   return [
-    "npm run real:payout:build --",
+    "npm run real:capture:payout --",
+    ` --capture ${config.production_capture_file}`,
+    ` --out ${config.production_payout_file}`,
+    " --production-rpc-url <mainnet-rpc-url>",
+  ].join("");
+}
+
+function buildCaptureInitCommand(config) {
+  return [
+    "npm run real:capture:init --",
+    ` --capture ${config.production_capture_file}`,
     ` --signed-intent ${commandValue(config.signed_intent_file, ".tascverifier/production-intent/production-intent.signature.json")}`,
     ` --program-id ${commandValue(config.program_id, "<program-id>")}`,
     ` --token-mint ${commandValue(config.token_mint, "<mainnet-usdc-mint>")}`,
     ` --worker ${commandValue(config.worker, "<worker-wallet>")}`,
-    " --result-hash <0x-result-hash>",
+    ` --destination-token-account ${commandValue(config.worker_usdc_token_account, "<worker-usdc-account>")}`,
+  ].join("");
+}
+
+function buildCaptureFundCommand(config) {
+  return [
+    "npm run real:capture:record --",
+    ` --capture ${config.production_capture_file}`,
+    " --fund-signature <fund-sig>",
     ` --task-account ${commandValue(config.task_account, "<task-account>")}`,
     ` --vault-token-account ${commandValue(config.vault_token_account, "<vault-token-account>")}`,
-    ` --destination-token-account ${commandValue(config.worker_usdc_token_account, "<worker-usdc-account>")}`,
-    " --fund-signature <fund-sig>",
+  ].join("");
+}
+
+function buildCaptureClaimCommand(config) {
+  return [
+    "npm run real:capture:record --",
+    ` --capture ${config.production_capture_file}`,
     " --claim-signature <claim-sig>",
+    " --claim-started-at <iso-claim-started>",
+  ].join("");
+}
+
+function buildCaptureAttestCommand(config) {
+  return [
+    "npm run real:capture:record --",
+    ` --capture ${config.production_capture_file}`,
     " --attest-signature <attest-sig>",
+    " --result-hash <0x-result-hash>",
+  ].join("");
+}
+
+function buildCaptureReleaseCommand(config) {
+  return [
+    "npm run real:capture:record --",
+    ` --capture ${config.production_capture_file}`,
     " --release-signature <release-sig>",
-    " --claim-to-release-ms <ms>",
-    " --claim-to-completed-index-ms <ms>",
-    " --production-rpc-url <mainnet-rpc-url>",
+    " --release-confirmed-at <iso-release-confirmed>",
+    " --completed-indexed-at <iso-completed-indexed>",
   ].join("");
 }
 
@@ -464,6 +506,14 @@ function commandSequence(config, artifacts) {
     },
     {
       step: 7,
+      phase: "init-production-run-capture",
+      command: buildCaptureInitCommand(config),
+      output: config.production_capture_file,
+      required_for_goal: true,
+      sends_transactions: false,
+    },
+    {
+      step: 8,
       phase: "mainnet-preflight",
       command: buildPreflightCommand(config),
       required_for_goal: true,
@@ -472,7 +522,7 @@ function commandSequence(config, artifacts) {
       rpc_url_redacted: true,
     },
     {
-      step: 8,
+      step: 9,
       phase: "build-mainnet-fund-transaction",
       command: buildFundCommand(config, artifacts),
       output: ".tascverifier/production-fund-transaction.json",
@@ -482,7 +532,7 @@ function commandSequence(config, artifacts) {
       rpc_url_redacted: true,
     },
     {
-      step: 9,
+      step: 10,
       phase: "wallet-send-mainnet-fund-transaction",
       manual_action: "Submit .tascverifier/production-fund-transaction.json with the buyer wallet; capture the returned fund signature, task account, and vault token account.",
       required_for_goal: true,
@@ -490,7 +540,15 @@ function commandSequence(config, artifacts) {
       network: DEFAULT_CLUSTER,
     },
     {
-      step: 10,
+      step: 11,
+      phase: "record-mainnet-fund-capture",
+      command: buildCaptureFundCommand(config),
+      output: config.production_capture_file,
+      required_for_goal: true,
+      sends_transactions: false,
+    },
+    {
+      step: 12,
       phase: "build-worker-claim-transaction",
       command: buildLifecycleClaimCommand(config, artifacts),
       output: ".tascverifier/production-lifecycle-claim.json",
@@ -500,7 +558,7 @@ function commandSequence(config, artifacts) {
       rpc_url_redacted: true,
     },
     {
-      step: 11,
+      step: 13,
       phase: "wallet-send-worker-claim-transaction",
       manual_action: "Submit .tascverifier/production-lifecycle-claim.json with the worker wallet; start the payout timer at wallet submission and capture the confirmed claim signature.",
       required_for_goal: true,
@@ -508,7 +566,15 @@ function commandSequence(config, artifacts) {
       network: DEFAULT_CLUSTER,
     },
     {
-      step: 12,
+      step: 14,
+      phase: "record-worker-claim-capture",
+      command: buildCaptureClaimCommand(config),
+      output: config.production_capture_file,
+      required_for_goal: true,
+      sends_transactions: false,
+    },
+    {
+      step: 15,
       phase: "build-verifier-attest-transaction",
       command: buildLifecycleAttestCommand(config, artifacts),
       output: ".tascverifier/production-lifecycle-attest.json",
@@ -518,7 +584,7 @@ function commandSequence(config, artifacts) {
       rpc_url_redacted: true,
     },
     {
-      step: 13,
+      step: 16,
       phase: "wallet-send-verifier-attest-transaction",
       manual_action: "Submit .tascverifier/production-lifecycle-attest.json with the verifier wallet after checking the result hash; capture the confirmed attest signature.",
       required_for_goal: true,
@@ -526,7 +592,15 @@ function commandSequence(config, artifacts) {
       network: DEFAULT_CLUSTER,
     },
     {
-      step: 14,
+      step: 17,
+      phase: "record-verifier-attest-capture",
+      command: buildCaptureAttestCommand(config),
+      output: config.production_capture_file,
+      required_for_goal: true,
+      sends_transactions: false,
+    },
+    {
+      step: 18,
       phase: "build-worker-release-transaction",
       command: buildLifecycleReleaseCommand(config, artifacts),
       output: ".tascverifier/production-lifecycle-release.json",
@@ -536,7 +610,7 @@ function commandSequence(config, artifacts) {
       rpc_url_redacted: true,
     },
     {
-      step: 15,
+      step: 19,
       phase: "wallet-send-worker-release-transaction",
       manual_action: "Submit .tascverifier/production-lifecycle-release.json with the worker wallet; capture the release signature and confirmation timestamp.",
       required_for_goal: true,
@@ -544,7 +618,15 @@ function commandSequence(config, artifacts) {
       network: DEFAULT_CLUSTER,
     },
     {
-      step: 16,
+      step: 20,
+      phase: "record-worker-release-capture",
+      command: buildCaptureReleaseCommand(config),
+      output: config.production_capture_file,
+      required_for_goal: true,
+      sends_transactions: false,
+    },
+    {
+      step: 21,
       phase: "build-production-payout-evidence",
       command: buildPayoutCommand(config),
       output: artifacts.production_payout.file,
@@ -554,7 +636,7 @@ function commandSequence(config, artifacts) {
       rpc_url_redacted: true,
     },
     {
-      step: 17,
+      step: 22,
       phase: "validate-real-money-readiness",
       command: buildReadinessCommand(config),
       required_for_goal: true,
@@ -577,6 +659,7 @@ function buildPacket(options = {}) {
     inputs: defaultInputs(options.inputs || {}),
     timed_proof_file: options.timedProof ? rel(options.timedProof) : "",
     production_deploy_file: rel(options.productionDeploy || DEFAULT_PRODUCTION_DEPLOY),
+    production_capture_file: rel(options.productionCapture || DEFAULT_PRODUCTION_CAPTURE),
     production_payout_file: rel(options.productionPayout || DEFAULT_PRODUCTION_PAYOUT),
     signed_intent_file: rel(signedIntentFile),
     expected_genesis_hash: options.expectedGenesisHash || "",
@@ -718,11 +801,16 @@ function validatePacket(packet) {
     "build-mainnet-program-deploy-handoff",
     "deploy-mainnet-program",
     "build-mainnet-buyer-intent",
+    "init-production-run-capture",
     "mainnet-preflight",
     "build-mainnet-fund-transaction",
+    "record-mainnet-fund-capture",
     "build-worker-claim-transaction",
+    "record-worker-claim-capture",
     "build-verifier-attest-transaction",
+    "record-verifier-attest-capture",
     "build-worker-release-transaction",
+    "record-worker-release-capture",
     "build-production-payout-evidence",
     "validate-real-money-readiness",
   ].forEach((phase) => {
@@ -735,7 +823,8 @@ function validatePacket(packet) {
   assert(packetText.includes("npm run real:intent:build"), "packet must include intent command");
   assert(packetText.includes("npm run real:preflight"), "packet must include preflight command");
   assert(packetText.includes("npm run real:lifecycle:build"), "packet must include lifecycle transaction command");
-  assert(packetText.includes("npm run real:payout:build"), "packet must include payout command");
+  assert(packetText.includes("npm run real:capture:"), "packet must include capture commands");
+  assert(packetText.includes("npm run real:capture:payout"), "packet must include payout command");
   assert(packetText.includes("npm run real:readiness"), "packet must include readiness command");
   return {
     ok: true,
