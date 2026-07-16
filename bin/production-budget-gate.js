@@ -215,7 +215,7 @@ function plan(options = {}) {
 function check(options = {}) {
   const envFile = options.envFile || DEFAULT_ENV_FILE;
   const policyFile = path.resolve(options.policy || DEFAULT_POLICY);
-  const pause = pauseCheck({ envFile });
+  const pause = pauseCheck({ ...options, envFile });
   const result = {
     ok: true,
     kind: "tasc.production_budget_gate",
@@ -281,10 +281,28 @@ function writeJson(file, value) {
   fs.writeFileSync(file, `${JSON.stringify(value, null, 2)}\n`);
 }
 
+function selfTestArtifactPaths(dir) {
+  const names = {
+    deployHandoff: "missing-deploy.json",
+    signedIntent: "missing-intent.json",
+    buyerTokenSetup: "missing-buyer-ata.json",
+    workerTokenSetup: "missing-worker-ata.json",
+    fundTransaction: "missing-fund.json",
+    claimTransaction: "missing-claim.json",
+    attestTransaction: "missing-attest.json",
+    releaseTransaction: "missing-release.json",
+    capture: "missing-capture.json",
+    payout: "missing-payout.json",
+    packet: "missing-packet.json",
+  };
+  return Object.fromEntries(Object.entries(names).map(([key, file]) => [key, path.join(dir, file)]));
+}
+
 async function selfTest() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "tasc-production-budget-gate-"));
   const envFile = path.join(dir, ".env.solana-mainnet.local");
   const policy = path.join(dir, "budget-policy.json");
+  const artifactPaths = selfTestArtifactPaths(dir);
   const now = "2026-01-01T00:00:00.000Z";
 
   try {
@@ -293,7 +311,7 @@ async function selfTest() {
     assert(planResult.calls_rpc === false, "plan must not call RPC");
     assert(planResult.writes_files === false, "plan must not write files");
 
-    const missing = check({ envFile, policy, now });
+    const missing = check({ envFile, policy, now, ...artifactPaths });
     assert(missing.spend_resume_budget_approved === false, "missing policy should not approve spend");
     assert(missing.blockers.some((item) => item.includes("budget policy file")), "missing policy blocker expected");
 
@@ -306,7 +324,7 @@ async function selfTest() {
         claim_attest_release_wallet_sends: true,
       },
     });
-    const valid = check({ envFile, policy, now });
+    const valid = check({ envFile, policy, now, ...artifactPaths });
     assert(valid.spend_resume_budget_approved === true, "valid policy should approve budget gate");
     assert(valid.safe_to_resume_spend_work === true, "valid policy should be safe to resume spend work");
 
@@ -315,7 +333,7 @@ async function selfTest() {
       expires_at: "2025-12-31T00:00:00.000Z",
       allow: { fund_10_usdc_task: true },
     });
-    const expired = check({ envFile, policy, now });
+    const expired = check({ envFile, policy, now, ...artifactPaths });
     assert(expired.spend_resume_budget_approved === false, "expired policy should not approve spend");
     assert(expired.blockers.some((item) => item.includes("expired")), "expired blocker expected");
 
@@ -327,7 +345,7 @@ async function selfTest() {
       max_rpc_credits_usd: "0.00",
       allow: { fund_10_usdc_task: true },
     });
-    const underfunded = check({ envFile, policy, now });
+    const underfunded = check({ envFile, policy, now, ...artifactPaths });
     assert(underfunded.spend_resume_budget_approved === false, "under-budget policy should not approve spend");
     assert(underfunded.blockers.some((item) => item.includes("10.00")), "under-budget blocker expected");
 
@@ -336,7 +354,7 @@ async function selfTest() {
       operator_private_key: "do-not-store",
       allow: { fund_10_usdc_task: true },
     });
-    const privatePolicy = check({ envFile, policy, now });
+    const privatePolicy = check({ envFile, policy, now, ...artifactPaths });
     assert(privatePolicy.spend_resume_budget_approved === false, "private-like policy should not approve spend");
     assert(privatePolicy.blockers.some((item) => item.includes("private-key-like")), "private-like blocker expected");
 
@@ -383,6 +401,7 @@ if (require.main === module) {
 module.exports = {
   check,
   plan,
+  policyTemplate,
   selfTest,
   validatePolicy,
 };
