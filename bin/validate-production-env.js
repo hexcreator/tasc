@@ -160,7 +160,8 @@ function requiredStatus(fileEnv, processEnv) {
 
 function commandBlock(envFile) {
   return {
-    copy_template: `cp ${TEMPLATE_FILE} ${envFile} && chmod 600 ${envFile}`,
+    env_init: `npm run real:env:init -- --env ${envFile}`,
+    env_init_plan: `npm run real:env:init:plan -- --env ${envFile}`,
     env_plan: `npm run real:env:plan -- --env ${envFile}`,
     env_validate: `npm run real:env:validate -- --env ${envFile}`,
     preflight: `npm run real:preflight -- --env ${envFile}`,
