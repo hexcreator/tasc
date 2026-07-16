@@ -46,6 +46,7 @@ function assertNoExternalRuntimeDependencies() {
   assert(html.includes("feed-files"), "index should expose feed file import");
   assert(html.includes("verifier-api-url"), "index should expose verifier API URL");
   assert(html.includes("verifier-api-token"), "index should expose verifier API token");
+  assert(html.includes("export-qa-evidence"), "index should expose private beta QA evidence export");
   const app = read(path.join(WEB_DIR, "app.js"));
   assert(app.includes("worker-output"), "app should expose worker output capture");
   assert(app.includes("submission-json"), "app should expose submission proof JSON");
@@ -57,6 +58,10 @@ function assertNoExternalRuntimeDependencies() {
   assert(app.includes("./tasc-local-config.json"), "app should look for same-origin local beta config");
   assert(app.includes("tasc.private_beta.local_config"), "app should require local beta config kind");
   assert(app.includes("source: \"local-beta\""), "app should tag auto-filled local beta verifier config");
+  assert(app.includes("tasc.private_beta.qa_evidence"), "app should export private beta QA evidence");
+  assert(app.includes("redactedVerifierConfig"), "app should redact verifier secrets from QA evidence");
+  assert(app.includes("redactions: [\"verifier.token\"]"), "app should declare verifier token redaction");
+  assert(app.includes("TascPrivateBetaQaEvidence"), "app should expose safe QA evidence builder");
 
   for (const file of ["app.js", "demo-index.js", "tasc-web-core.js"]) {
     const source = read(path.join(WEB_DIR, file));
@@ -460,6 +465,7 @@ async function main() {
     worker_submission_capture: "tasc.worker.submission",
     verifier_api_browser_flow: "tasc.verifier.ingestion",
     local_beta_config: "tasc.private_beta.local_config",
+    private_beta_qa_evidence: "tasc.private_beta.qa_evidence",
     solana_wallet_submission_adapter: ["signAndSendTransaction", "signTransaction+rpc.sendTransaction"],
     solana_wallet_transaction_builds: ["claim", "attest", "release", "refund", "timeout-refund"],
     external_runtime_dependencies: 0,

@@ -11,6 +11,7 @@
     feedImport: document.querySelector("#feed-import"),
     feedFiles: document.querySelector("#feed-files"),
     importFeed: document.querySelector("#import-feed"),
+    exportQaEvidence: document.querySelector("#export-qa-evidence"),
     solanaRpcUrl: document.querySelector("#solana-rpc-url"),
     connectSolana: document.querySelector("#connect-solana"),
     refreshSolana: document.querySelector("#refresh-solana"),
@@ -273,6 +274,134 @@
     const ingestions = state.verifierIngestions || {};
     return ingestions[workerSubmissionKey(entry)] || null;
   }
+
+  function recordValues(record) {
+    return record && typeof record === "object" ? Object.values(record) : [];
+  }
+
+  function redactedVerifierConfig(verifier) {
+    const config = verifier || {};
+    return {
+      apiUrl: config.apiUrl || "",
+      source: config.source || "",
+      token: config.token ? "<redacted>" : "",
+      token_present: Boolean(config.token),
+    };
+  }
+
+  function summarizeEvidenceEntry(entry, state) {
+    const settlement = entry.settlement || {};
+    const funding = entry.funding || {};
+    const account = solanaAccountForEntry(state, entry);
+    const workerSubmission = workerSubmissionForEntry(state, entry);
+    const verifierIngestion = verifierIngestionForEntry(state, entry);
+    return {
+      task_hash: entry.task_hash || "",
+      task_name: entry.task_name || (entry.task && entry.task.name) || "",
+      status: entry.completed_status || entry.status || "",
+      reward: entry.display_reward || { amount: entry.amount || "", currency: "USDC" },
+      input_hash: entry.input_hash || "",
+      settlement: {
+        chain: settlement.chain || entry.chain || "",
+        cluster: settlement.cluster || "",
+        program_id: settlement.program_id || "",
+        task_pda: settlement.task_pda || "",
+        vault: settlement.vault || "",
+      },
+      funding_signature: funding.signature || entry.tx_hash || "",
+      live_account: account
+        ? {
+          status: account.status,
+          worker: account.worker,
+          result_hash: account.result_hash,
+          updated_slot: account.updated_slot,
+        }
+        : null,
+      worker_submission: workerSubmission
+        ? {
+          result_hash: workerSubmission.result_hash,
+          result_hash_bytes32: workerSubmission.result_hash_bytes32,
+          local_verdict: workerSubmission.local_verdict,
+          signed: Boolean(workerSubmission.signature),
+        }
+        : null,
+      verifier_ingestion: verifierIngestion
+        ? {
+          accepted: Boolean(verifierIngestion.accepted),
+          verdict: verifierIngestion.settlement && verifierIngestion.settlement.attest
+            ? verifierIngestion.settlement.attest.verdict
+            : "",
+          result_hash: verifierIngestion.attestation ? verifierIngestion.attestation.result_hash : "",
+        }
+        : null,
+    };
+  }
+
+  function buildPrivateBetaQaEvidence(state, generatedAt) {
+    const solana = state.solana || {};
+    const claimableEntries = Array.isArray(state.claimableEntries) ? state.claimableEntries : [];
+    const evmEntries = Array.isArray(state.entries) ? state.entries : [];
+    const submissions = solana.submissions || {};
+    return {
+      kind: "tasc.private_beta.qa_evidence",
+      version: "0.1",
+      generated_at: generatedAt || new Date().toISOString(),
+      app: {
+        url: window.location.href,
+        storage_key: storageKey,
+      },
+      redactions: ["verifier.token"],
+      feed_source: state.feedSource || null,
+      verifier: redactedVerifierConfig(state.verifier),
+      solana: {
+        rpc_url: solana.rpcUrl || core.DEFAULT_SOLANA_RPC_URL,
+        wallet_address: solana.walletAddress || "",
+        refreshed_at: solana.refreshedAt || "",
+        account_count: solana.accounts ? Object.keys(solana.accounts).length : 0,
+        wallet_submission_count: Object.keys(submissions).length,
+      },
+      counts: {
+        claimable_entries: claimableEntries.length,
+        evm_entries: evmEntries.length,
+        worker_submissions: recordValues(state.workerSubmissions).length,
+        verifier_ingestions: recordValues(state.verifierIngestions).length,
+        wallet_submissions: Object.keys(submissions).length,
+      },
+      entries: claimableEntries.map((entry) => summarizeEvidenceEntry(entry, state)),
+      wallet_submissions: submissions,
+      worker_submissions: state.workerSubmissions || {},
+      verifier_ingestions: state.verifierIngestions || {},
+      cursor: state.cursor || null,
+    };
+  }
+
+  function downloadJson(filename, payload) {
+    const blob = new Blob([`${JSON.stringify(payload, null, 2)}\n`], { type: "application/json" });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    document.body.append(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => window.URL.revokeObjectURL(url), 0);
+  }
+
+  function onExportQaEvidence() {
+    try {
+      const generatedAt = new Date().toISOString();
+      const evidence = buildPrivateBetaQaEvidence(readState(), generatedAt);
+      const filename = `tasc-private-beta-qa-${generatedAt.replace(/[:.]/g, "-")}.json`;
+      downloadJson(filename, evidence);
+      setStatus(`Exported QA evidence: ${evidence.counts.wallet_submissions} wallet send(s), ${evidence.counts.verifier_ingestions} verifier result(s)`, "success");
+    } catch (error) {
+      setStatus(error.message, "error");
+    }
+  }
+
+  window.TascPrivateBetaQaEvidence = {
+    build: () => buildPrivateBetaQaEvidence(readState()),
+  };
 
   function displayReward(entry, custody) {
     if (entry.display_reward && entry.display_reward.amount && entry.display_reward.currency) {
@@ -1149,6 +1278,7 @@
     });
     el.verifierApiUrl.addEventListener("change", saveVerifierConfig);
     el.verifierApiToken.addEventListener("change", saveVerifierConfig);
+    el.exportQaEvidence.addEventListener("click", onExportQaEvidence);
     el.scan.addEventListener("click", onScan);
     el.importHandoff.addEventListener("click", onImportHandoff);
     el.clear.addEventListener("click", onClear);
