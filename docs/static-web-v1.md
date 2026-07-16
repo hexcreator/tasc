@@ -89,6 +89,19 @@ The output includes:
 - the verifier wallet address that should submit the on-chain `attest`
 - rejection of tampered result hashes, task hashes, and inputs
 
+The same ingestion path is exposed by a dependencyless HTTP wrapper:
+
+```sh
+npm run verifier:api
+```
+
+Routes:
+
+- `GET /health`
+- `POST /v1/ingest`
+
+The API starts from a trusted index file and optional ledger file, accepts either a raw `tasc.worker.submission` body or `{ "submission": ... }`, returns CORS headers for static-web callers, records accepted result hashes in memory for duplicate rejection during the process lifetime, and rejects invalid JSON, wrong methods, oversized bodies, and tampered proofs. Production operation still needs auth, durable proof artifacts, and persistent ledger storage.
+
 ## Solana Operator Console
 
 The browser can connect to an injected Solana wallet provider, refresh bundled Solana task accounts from a devnet RPC, decode the live task-account status, and classify the connected wallet as buyer, verifier, worker, worker candidate, or spectator.
@@ -151,6 +164,7 @@ Run:
 ```sh
 npm run validate:web
 npm run validate:verifier-ingest
+npm run validate:verifier-api
 ```
 
 The validator checks that:
@@ -166,6 +180,7 @@ The validator checks that:
 - browser worker submission capture matches the CLI verifier result hash format
 - verifier ingestion converts a captured proof into a `tasc.attestation` and Solana-ready attest hash
 - verifier ingestion rejects duplicate, tampered-hash, tampered-task, and tampered-input cases
+- the verifier API serves `/health`, accepts proof ingestion over HTTP, updates its in-memory duplicate ledger, and rejects invalid JSON, wrong methods, oversized bodies, duplicate proofs, and tampered inputs
 - the browser can build wallet transaction payloads for Solana `claim`, `attest`, `release`, `refund`, and `timeout-refund`
 
 ## Limits
@@ -174,6 +189,6 @@ This is now a guarded operator surface, but still needs:
 
 - live wallet QA in a normal browser extension environment
 - hosted proof-bundle/index publication workflow
-- hosted verifier API, artifact storage, and verifier operations
+- deployed verifier API auth, durable artifact storage, persistent duplicate ledger, and verifier operations
 - multi-RPC fallback
 - reorg handling for cached entries
