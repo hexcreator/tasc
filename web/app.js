@@ -100,6 +100,28 @@
     };
   }
 
+  async function loadLocalBetaConfig() {
+    try {
+      const response = await fetch("./tasc-local-config.json", { cache: "no-store" });
+      if (!response.ok) return;
+      const payload = await response.json();
+      if (!payload || payload.kind !== "tasc.private_beta.local_config" || !payload.verifier) return;
+      const apiUrl = String(payload.verifier.apiUrl || "").trim();
+      const token = String(payload.verifier.token || "").trim();
+      if (!apiUrl) return;
+      const state = readState();
+      const current = state.verifier || {};
+      const hasManualVerifier = (current.apiUrl || current.token) && current.source !== "local-beta";
+      if (hasManualVerifier && (!current.apiUrl || current.apiUrl !== apiUrl)) return;
+      state.verifier = { apiUrl, token, source: "local-beta" };
+      writeState(state);
+      setFormFromState(state);
+      setStatus("Loaded local beta verifier config", "success");
+    } catch (_error) {
+      // Hosted static deployments do not provide local beta config.
+    }
+  }
+
   function requireConfig(config) {
     if (!config.rpcUrl) throw new Error("RPC URL is required");
     if (!config.escrow) throw new Error("Escrow address is required");
@@ -1104,6 +1126,7 @@
     const state = readState();
     setFormFromState(state);
     render();
+    loadLocalBetaConfig();
     el.loadDemo.addEventListener("click", onLoadDemo);
     el.importFeed.addEventListener("click", onImportFeed);
     el.connectSolana.addEventListener("click", onConnectSolana);

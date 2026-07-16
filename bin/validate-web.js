@@ -53,6 +53,10 @@ function assertNoExternalRuntimeDependencies() {
   assert(app.includes("verifierIngestions"), "app should persist verifier ingestion output");
   assert(app.includes("authorization = `Bearer ${token}`"), "app should send verifier bearer auth when configured");
   assert(app.includes("JSON.stringify({ submission })"), "app should submit captured worker proof JSON");
+  assert(app.includes("loadLocalBetaConfig"), "app should load local beta verifier config when served");
+  assert(app.includes("./tasc-local-config.json"), "app should look for same-origin local beta config");
+  assert(app.includes("tasc.private_beta.local_config"), "app should require local beta config kind");
+  assert(app.includes("source: \"local-beta\""), "app should tag auto-filled local beta verifier config");
 
   for (const file of ["app.js", "demo-index.js", "tasc-web-core.js"]) {
     const source = read(path.join(WEB_DIR, file));
@@ -455,6 +459,7 @@ async function main() {
     feed_import_shapes: ["tasc.index", "tasc.index.entry[]", "tasc.solana-devnet.proof"],
     worker_submission_capture: "tasc.worker.submission",
     verifier_api_browser_flow: "tasc.verifier.ingestion",
+    local_beta_config: "tasc.private_beta.local_config",
     solana_wallet_submission_adapter: ["signAndSendTransaction", "signTransaction+rpc.sendTransaction"],
     solana_wallet_transaction_builds: ["claim", "attest", "release", "refund", "timeout-refund"],
     external_runtime_dependencies: 0,

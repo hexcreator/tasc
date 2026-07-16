@@ -34,7 +34,7 @@ Done:
 - verifier ingestion is exposed as a dependencyless HTTP API with bearer auth, durable artifacts, persistent duplicate ledger, health, and proof-ingest routes
 - the static web flow can submit captured proof JSON to the verifier API and fill Solana attest controls from the response
 - the wallet submission adapter is covered with mock `signAndSendTransaction` and `signTransaction` provider validation
-- `npm run beta:local` starts a local private-beta operator session with the static app and verifier API on localhost
+- `npm run beta:local` starts a local private-beta operator session with the static app and verifier API on localhost, and the app auto-fills verifier URL/token from same-origin local config
 
 Next:
 

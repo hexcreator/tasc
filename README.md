@@ -177,9 +177,9 @@ npm run beta:plan
 npm run beta:local
 ```
 
-`beta:local` serves the static app and verifier API together on localhost, prints the app URL, verifier URL, and bearer token, and writes verifier artifacts under `.tascverifier/`.
+`beta:local` serves the static app and verifier API together on localhost, prints the app URL, verifier URL, local config URL, and bearer token, writes verifier artifacts under `.tascverifier/`, and lets the app auto-fill the Verifier API panel from same-origin local config.
 
-Headless validation covers the bytes, API auth/persistence behavior, guarded UI, mock wallet-provider submission transports, and the local beta launcher; a real wallet-extension QA pass is still required before treating this as beta-ready UX.
+Headless validation covers the bytes, API auth/persistence behavior, guarded UI, mock wallet-provider submission transports, local verifier auto-fill, and the local beta launcher; a real wallet-extension QA pass is still required before treating this as beta-ready UX.
 
 ## Repository Map
 

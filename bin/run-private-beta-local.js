@@ -131,6 +131,20 @@ function send(res, statusCode, body, headers = {}) {
   res.end(body);
 }
 
+function localConfigPayload(config) {
+  return {
+    kind: "tasc.private_beta.local_config",
+    version: "0.1",
+    verifier: {
+      apiUrl: `http://${config.host}:${config.verifierPort}`,
+      token: config.token,
+    },
+    trusted_index: config.entryFile,
+    verifier_ledger: config.ledgerOut,
+    verifier_artifacts: config.artifactDir,
+  };
+}
+
 function staticPathFromUrl(url) {
   if (url.pathname === "/") return { redirect: "/web/index.html" };
   let decoded;
@@ -147,13 +161,26 @@ function staticPathFromUrl(url) {
   return { file };
 }
 
-function createStaticServer() {
+function createStaticServer(localConfig) {
   return http.createServer((req, res) => {
     if (req.method !== "GET" && req.method !== "HEAD") {
       send(res, 405, "method not allowed\n", { "content-type": "text/plain; charset=utf-8" });
       return;
     }
     const url = new URL(req.url || "/", "http://127.0.0.1");
+    if (url.pathname === "/web/tasc-local-config.json") {
+      const body = `${JSON.stringify(localConfig || { kind: "tasc.private_beta.local_config", unavailable: true }, null, 2)}\n`;
+      if (req.method === "HEAD") {
+        res.writeHead(200, {
+          "cache-control": "no-store",
+          "content-type": "application/json; charset=utf-8",
+        });
+        res.end();
+        return;
+      }
+      send(res, 200, body, { "content-type": "application/json; charset=utf-8" });
+      return;
+    }
     const target = staticPathFromUrl(url);
     if (target && target.redirect) {
       res.writeHead(302, { location: target.redirect, "cache-control": "no-store" });
@@ -199,6 +226,7 @@ function sessionSummary(config) {
     kind: "tasc.private_beta.local_session",
     app_url: `http://${config.host}:${config.webPort}/web/index.html`,
     verifier_api_url: `http://${config.host}:${config.verifierPort}`,
+    local_config_url: `http://${config.host}:${config.webPort}/web/tasc-local-config.json`,
     verifier_bearer_token: config.token,
     trusted_index: config.entryFile,
     verifier_ledger: config.ledgerOut,
@@ -206,7 +234,7 @@ function sessionSummary(config) {
     wallet_qa_steps: [
       "Open app_url in a browser with Phantom or Solflare on devnet.",
       "Load Devnet Proof.",
-      "Enter verifier_api_url and verifier_bearer_token in the Verifier API panel.",
+      "Confirm the Verifier API panel auto-filled from local_config_url; enter verifier_api_url and verifier_bearer_token manually only if needed.",
       "Connect the role wallet, refresh Solana status, enable wallet sends, and submit the prompted role action.",
       "Capture worker proof, submit it to the verifier API, then use the returned attest hash for verifier attest and release/refund.",
     ],
@@ -228,8 +256,17 @@ async function startPrivateBetaSession(rawOptions = {}) {
     artifactDir,
     authToken: token,
   });
-  const staticServer = createStaticServer();
   const verifierPort = await listen(verifierServer, rawOptions.verifierPort ?? DEFAULT_VERIFIER_PORT, host);
+  const provisionalConfig = {
+    host,
+    webPort: rawOptions.webPort ?? DEFAULT_WEB_PORT,
+    verifierPort,
+    token,
+    entryFile: path.relative(ROOT, entryFile),
+    ledgerOut: path.relative(ROOT, ledgerOut),
+    artifactDir: path.relative(ROOT, artifactDir),
+  };
+  const staticServer = createStaticServer(localConfigPayload(provisionalConfig));
   let webPort = null;
   try {
     webPort = await listen(staticServer, rawOptions.webPort ?? DEFAULT_WEB_PORT, host);

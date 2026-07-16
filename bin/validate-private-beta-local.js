@@ -50,6 +50,19 @@ async function main() {
     assert(html.includes("Tasc Claimable Feed"), "static app HTML mismatch");
     assert(html.includes("verifier-api-url"), "static app should expose verifier API controls");
 
+    const appJs = await fetch(`${appUrl.replace(/\/web\/index\.html$/, "")}/web/app.js`);
+    assert(appJs.status === 200, "static server should serve app.js");
+    const appSource = await appJs.text();
+    assert(appSource.includes("loadLocalBetaConfig"), "static app should load local beta config");
+    assert(appSource.includes("./tasc-local-config.json"), "static app local config path mismatch");
+    assert(appSource.includes("tasc.private_beta.local_config"), "static app local config kind mismatch");
+
+    const localConfig = await requestJson(`${appUrl.replace(/\/web\/index\.html$/, "")}/web/tasc-local-config.json`);
+    assert(localConfig.response.status === 200, "local beta config should be served");
+    assert(localConfig.body && localConfig.body.kind === "tasc.private_beta.local_config", "local beta config kind mismatch");
+    assert(localConfig.body.verifier.apiUrl === verifierUrl, "local beta config verifier URL mismatch");
+    assert(localConfig.body.verifier.token === token, "local beta config token mismatch");
+
     const fixture = await fetch(`${appUrl.replace(/\/web\/index\.html$/, "")}/${WORKER_SUBMISSION}`);
     assert(fixture.status === 200, "static server should serve bundled worker submission fixture");
 
@@ -88,6 +101,7 @@ async function main() {
       app_url: appUrl,
       verifier_api_url: verifierUrl,
       static_routes: ["/web/index.html", `/${WORKER_SUBMISSION}`],
+      local_config: "/web/tasc-local-config.json",
       restricted_routes: ["/package.json"],
       verifier_auth: "Bearer",
       accepted_result_hash: accepted.body.attestation.result_hash,

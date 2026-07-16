@@ -117,9 +117,12 @@ npm run beta:local
 
 - the static app URL
 - the verifier API URL
+- the same-origin local config URL
 - the trusted index file
 - verifier ledger and artifact paths
 - wallet-extension QA steps
+
+The static app fetches `./tasc-local-config.json` on load. When that local-only config exists, the app auto-fills the Verifier API URL/token unless browser storage already has a manually entered verifier pointed at a different API URL. Hosted static deployments do not provide that file and continue without auto-fill.
 
 The static file server intentionally exposes only `web/`, `examples/`, `assets/`, and `docs/`, so local env files and package metadata are not served.
 
@@ -204,6 +207,7 @@ The validator checks that:
 - verifier ingestion rejects duplicate, tampered-hash, tampered-task, and tampered-input cases
 - the verifier API serves `/health`, accepts proof ingestion over HTTP with bearer auth, writes durable artifacts, persists the duplicate ledger across restart, and rejects invalid JSON, wrong methods, oversized bodies, duplicate proofs, and tampered inputs
 - the browser can submit captured proof JSON to the verifier API, persist `tasc.verifier.ingestion`, and fill the Solana attest verdict/hash from the response
+- the browser can auto-load same-origin local beta verifier config when served by `beta:local`
 - the browser can build wallet transaction payloads for Solana `claim`, `attest`, `release`, `refund`, and `timeout-refund`
 - the browser wallet submission adapter accepts mock `signAndSendTransaction` and `signTransaction` providers, serializes the signed transaction bytes for RPC fallback, and rejects unsupported providers or missing signatures
 - the local private-beta launcher serves the static app and verifier API together, restricts static paths, enforces bearer auth, writes verifier artifacts/ledger, and accepts a bundled worker proof
