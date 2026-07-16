@@ -170,7 +170,7 @@ npm run verifier:api
 
 That starts the verifier with bearer-token auth, a persistent duplicate ledger at `.tascverifier/ledger.json`, and durable ingestion artifacts under `.tascverifier/artifacts/`. Enter the API URL and bearer token in the static app's Verifier API panel, capture a worker proof, then use `Submit to Verifier` to call `POST /v1/ingest` from the browser.
 
-Headless validation covers the bytes, API auth/persistence behavior, and guarded UI; a real wallet-extension QA pass is still required before treating this as beta-ready UX.
+Headless validation covers the bytes, API auth/persistence behavior, guarded UI, and mock wallet-provider submission transports; a real wallet-extension QA pass is still required before treating this as beta-ready UX.
 
 ## Repository Map
 

@@ -33,10 +33,11 @@ Done:
 - captured worker proofs can be ingested into `tasc.attestation` output with Solana-ready attest hashes
 - verifier ingestion is exposed as a dependencyless HTTP API with bearer auth, durable artifacts, persistent duplicate ledger, health, and proof-ingest routes
 - the static web flow can submit captured proof JSON to the verifier API and fill Solana attest controls from the response
+- the wallet submission adapter is covered with mock `signAndSendTransaction` and `signTransaction` provider validation
 
 Next:
 
-- live-test the guarded wallet send flow with Phantom or another injected Solana wallet
+- live-test the guarded wallet send flow with Phantom or another injected Solana wallet; mock-provider coverage exists, but extension-prompt QA is still required
 - deploy the verifier API and connect durable artifacts back into hosted feed/index publication
 - publish a fresh proof index as a hosted feed artifact
 - add a short demo video or GIF

@@ -227,6 +227,84 @@ function assertPayload(payload, expected) {
   assert(signed[1] === 7, `${expected.action} signed transaction signature mismatch`);
 }
 
+async function assertWalletSubmissionAdapter(payload) {
+  let signAndSendSawPayload = false;
+  const signAndSend = await core.submitSolanaWalletTransaction({
+    payload,
+    provider: {
+      async signAndSendTransaction(transaction) {
+        signAndSendSawPayload = transaction._tasc.action === payload.action;
+        assert(Array.from(transaction.serializeMessage()).join(",") === payload.message_bytes.join(","), "signAndSend message bytes mismatch");
+        return { signature: "mockSignAndSendSignature111111111111111111111111111111111" };
+      },
+    },
+  });
+  assert(signAndSendSawPayload, "signAndSend provider did not receive wallet payload");
+  assert(signAndSend.transport === "wallet.signAndSendTransaction", "signAndSend transport mismatch");
+  assert(signAndSend.signature.startsWith("mockSignAndSend"), "signAndSend signature mismatch");
+
+  let rpcRawBase64 = "";
+  let rpcOptions = null;
+  const fallback = await core.submitSolanaWalletTransaction({
+    payload,
+    provider: {
+      async signTransaction(transaction) {
+        transaction.addSignature(null, new Uint8Array(64).fill(9));
+        return transaction;
+      },
+    },
+    rpcSendTransaction: async (rawBase64, options) => {
+      rpcRawBase64 = rawBase64;
+      rpcOptions = options;
+      return "mockRpcSignature1111111111111111111111111111111111111111";
+    },
+  });
+  assert(fallback.transport === "wallet.signTransaction+rpc.sendTransaction", "fallback transport mismatch");
+  assert(fallback.signature.startsWith("mockRpcSignature"), "fallback signature mismatch");
+  assert(rpcRawBase64 === core.base64FromBytes(core.encodeSignedSolanaTransactionBytes(payload.message_bytes, new Uint8Array(64).fill(9))), "fallback signed bytes mismatch");
+  assert(rpcOptions && rpcOptions.encoding === "base64", "fallback RPC encoding mismatch");
+  assert(rpcOptions && rpcOptions.preflightCommitment === "confirmed", "fallback RPC commitment mismatch");
+
+  let rejectedUnsupported = false;
+  try {
+    await core.submitSolanaWalletTransaction({ payload, provider: {} });
+  } catch (error) {
+    rejectedUnsupported = /cannot sign/i.test(error.message);
+  }
+  assert(rejectedUnsupported, "unsupported wallet provider should be rejected");
+
+  let rejectedMissingSignature = false;
+  try {
+    await core.submitSolanaWalletTransaction({
+      payload,
+      provider: {
+        async signAndSendTransaction() {
+          return {};
+        },
+      },
+    });
+  } catch (error) {
+    rejectedMissingSignature = /signature/i.test(error.message);
+  }
+  assert(rejectedMissingSignature, "missing wallet signature should be rejected");
+
+  let rejectedMissingRpc = false;
+  try {
+    await core.submitSolanaWalletTransaction({
+      payload,
+      provider: {
+        async signTransaction(transaction) {
+          transaction.addSignature(null, new Uint8Array(64).fill(1));
+          return transaction;
+        },
+      },
+    });
+  } catch (error) {
+    rejectedMissingRpc = /sendTransaction callback/i.test(error.message);
+  }
+  assert(rejectedMissingRpc, "fallback wallet path should require RPC send callback");
+}
+
 async function assertSolanaLifecycleTransactionBuilds() {
   const fixture = loadJson(SOLANA_LIFECYCLE_ACCOUNT);
   const releasePlan = loadJson(SOLANA_RELEASE_PLAN);
@@ -274,6 +352,7 @@ async function assertSolanaLifecycleTransactionBuilds() {
   assert(release.settlement.vault_authority === releasePlan.vault_authority, "release vault authority mismatch");
   assert(release.settlement.destination_token_account === releasePlan.destination_token_account, "release destination token account mismatch");
   assert(release.settlement.token_program_id === core.TOKEN_PROGRAM_ID, "release token program mismatch");
+  await assertWalletSubmissionAdapter(release);
 
   const refund = await core.buildSolanaLifecycleTransaction({
     entry,
@@ -376,6 +455,7 @@ async function main() {
     feed_import_shapes: ["tasc.index", "tasc.index.entry[]", "tasc.solana-devnet.proof"],
     worker_submission_capture: "tasc.worker.submission",
     verifier_api_browser_flow: "tasc.verifier.ingestion",
+    solana_wallet_submission_adapter: ["signAndSendTransaction", "signTransaction+rpc.sendTransaction"],
     solana_wallet_transaction_builds: ["claim", "attest", "release", "refund", "timeout-refund"],
     external_runtime_dependencies: 0,
     next: "Open web/index.html or deploy web/ as static files.",

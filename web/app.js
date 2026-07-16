@@ -1000,37 +1000,12 @@
     }
   }
 
-  function walletResultSignature(result) {
-    if (typeof result === "string") return result;
-    if (result && typeof result.signature === "string") return result.signature;
-    if (result && typeof result.hash === "string") return result.hash;
-    if (result && result.signature && result.signature.toString) return result.signature.toString();
-    return "";
-  }
-
   async function sendWalletSolanaTransaction(provider, rpcUrl, payload) {
-    const transaction = core.createSolanaWalletTransaction(payload);
-    if (provider.signAndSendTransaction) {
-      const result = await provider.signAndSendTransaction(transaction);
-      const signature = walletResultSignature(result);
-      if (!signature) throw new Error("Wallet did not return a transaction signature");
-      return { signature, transport: "wallet.signAndSendTransaction" };
-    }
-    if (provider.signTransaction) {
-      const signed = await provider.signTransaction(transaction);
-      const raw = signed && signed.serialize
-        ? signed.serialize()
-        : transaction.serialize();
-      const signature = await solanaRpcCall(rpcUrl, "sendTransaction", [
-        core.base64FromBytes(Array.from(raw)),
-        {
-          encoding: "base64",
-          preflightCommitment: "confirmed",
-        },
-      ]);
-      return { signature, transport: "wallet.signTransaction+rpc.sendTransaction" };
-    }
-    throw new Error("Wallet cannot sign Solana transactions");
+    return core.submitSolanaWalletTransaction({
+      provider,
+      payload,
+      rpcSendTransaction: (rawBase64, options) => solanaRpcCall(rpcUrl, "sendTransaction", [rawBase64, options]),
+    });
   }
 
   async function pollSolanaSignature(rpcUrl, signature) {

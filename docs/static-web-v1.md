@@ -122,7 +122,7 @@ The send path is dependencyless:
 - builds Global Tasc instruction bytes in `tasc-web-core.js`
 - derives SPL buyer/worker token accounts and the vault-authority PDA in-browser
 - compiles a legacy Solana message with a fresh RPC blockhash
-- hands the transaction to an injected wallet provider
+- hands the transaction to an injected wallet provider through the shared wallet submission adapter
 - falls back to `signTransaction` plus raw RPC `sendTransaction` when the wallet does not expose `signAndSendTransaction`
 
 The UI requires the operator to enable wallet sends before any action button can submit a transaction.
@@ -185,12 +185,13 @@ The validator checks that:
 - the verifier API serves `/health`, accepts proof ingestion over HTTP with bearer auth, writes durable artifacts, persists the duplicate ledger across restart, and rejects invalid JSON, wrong methods, oversized bodies, duplicate proofs, and tampered inputs
 - the browser can submit captured proof JSON to the verifier API, persist `tasc.verifier.ingestion`, and fill the Solana attest verdict/hash from the response
 - the browser can build wallet transaction payloads for Solana `claim`, `attest`, `release`, `refund`, and `timeout-refund`
+- the browser wallet submission adapter accepts mock `signAndSendTransaction` and `signTransaction` providers, serializes the signed transaction bytes for RPC fallback, and rejects unsupported providers or missing signatures
 
 ## Limits
 
 This is now a guarded operator surface, but still needs:
 
-- live wallet QA in a normal browser extension environment
+- live wallet QA in a normal browser extension environment; current coverage validates the adapter with mock providers, not a real extension prompt
 - hosted proof-bundle/index publication workflow
 - deployed verifier operations, secret management, hosted artifact publication, and feed integration
 - multi-RPC fallback

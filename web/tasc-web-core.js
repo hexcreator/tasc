@@ -909,6 +909,42 @@
     };
   }
 
+  function walletResultSignature(result) {
+    if (typeof result === "string") return result;
+    if (result && typeof result.signature === "string") return result.signature;
+    if (result && typeof result.hash === "string") return result.hash;
+    if (result && result.signature && result.signature.toString) return result.signature.toString();
+    return "";
+  }
+
+  async function submitSolanaWalletTransaction(options) {
+    const settings = options || {};
+    const provider = settings.provider;
+    assert(provider, "Solana wallet provider is required");
+    const transaction = createSolanaWalletTransaction(settings.payload);
+    if (provider.signAndSendTransaction) {
+      const result = await provider.signAndSendTransaction(transaction);
+      const signature = walletResultSignature(result);
+      if (!signature) throw new Error("Wallet did not return a transaction signature");
+      return { signature, transport: "wallet.signAndSendTransaction" };
+    }
+    if (provider.signTransaction) {
+      const signed = await provider.signTransaction(transaction);
+      const raw = signed && signed.serialize
+        ? signed.serialize()
+        : transaction.serialize();
+      const rawBase64 = base64FromBytes(Array.from(raw));
+      assert(settings.rpcSendTransaction, "RPC sendTransaction callback is required");
+      const signature = await settings.rpcSendTransaction(rawBase64, {
+        encoding: "base64",
+        preflightCommitment: "confirmed",
+      });
+      if (!signature) throw new Error("RPC did not return a transaction signature");
+      return { signature, transport: "wallet.signTransaction+rpc.sendTransaction" };
+    }
+    throw new Error("Wallet cannot sign Solana transactions");
+  }
+
   function readU64Le(bytes, offset) {
     let value = 0n;
     for (let i = 7; i >= 0; i -= 1) value = (value * 256n) + BigInt(bytes[offset + i]);
@@ -1049,6 +1085,7 @@
     decodeFundedLog,
     decodeSolanaTaskAccountBase64,
     deriveConfigFromHandoff,
+    encodeSignedSolanaTransactionBytes,
     encodeShortVectorLength,
     formatTokenAmount,
     indexEntriesFromImportPayload,
@@ -1060,6 +1097,7 @@
     sha256HexFromText,
     solanaSettlementAccountsForAction,
     solanaNextAction,
+    submitSolanaWalletTransaction,
     solanaWalletRole,
     taskKey,
   };
