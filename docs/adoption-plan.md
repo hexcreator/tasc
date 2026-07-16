@@ -35,6 +35,7 @@ Done:
 - `npm run real:intent:plan`, `npm run real:intent:build`, and `npm run real:intent:attach-signature` create the unsigned mainnet buyer intent, exact canonical wallet-signing payload, and verified signed intent without accepting private keys
 - `npm run real:preflight:plan` and `npm run real:preflight` check mainnet RPC identity, deployed program, role SOL balances, USDC mint, and buyer/worker USDC token accounts before a real run
 - `npm run real:payout:plan` and `npm run real:payout:build` turn mainnet USDC signatures/accounts into the ignored production payout artifact, and `npm run real:readiness` rejects devnet/example evidence or production JSON without live mainnet RPC verification as not real-money ready
+- `npm run real:packet:plan`, `npm run real:packet:build`, and `npm run real:packet:validate` assemble the timed proof, signed mainnet intent, payout evidence, redacted RPC host, evidence checklist, and final command sequence into a sanitized production run packet without private keys, transaction sends, or full RPC URL persistence
 - admitted feed entries carry signed task inputs, input hash, output schema, and verifier rules
 - worker submissions can be captured as hashable proof JSON from the static web task card
 - captured worker proofs can be ingested into `tasc.attestation` output with Solana-ready attest hashes
@@ -50,7 +51,7 @@ Next:
 
 - live-test the guarded wallet send flow with Phantom or another injected Solana wallet using `GLOBAL_TASC_ALLOW_BETA_CLAIMABLE_PUBLISH=1 npm run beta:session`, export QA evidence, and run `npm run beta:qa -- ~/Downloads/tasc-private-beta-qa.json --solana-rpc-url https://api.devnet.solana.com`; mock-provider coverage exists, but extension-prompt QA is still required
 - run `GLOBAL_TASC_ALLOW_SOLANA_DEVNET_PROOF=1 npm run earn:devnet` to capture timed claim-to-payout evidence for the devnet/test-token release branch
-- use `npm run real:intent:build`, wallet-sign its canonical payload, then `npm run real:preflight` before touching real funds, then `npm run real:payout:build` to create the first mainnet USDC payout artifact under `.tascverifier/`; do not count the goal complete until `real:readiness` returns `ready_for_goal: true` with non-example evidence, a mainnet RPC URL, and an expected genesis hash
+- use `npm run real:intent:build`, wallet-sign its canonical payload, then `npm run real:preflight` before touching real funds, then `npm run real:payout:build` and `npm run real:packet:build` to create the first mainnet USDC payout artifact and sanitized run packet under `.tascverifier/`; do not count the goal complete until `real:readiness` returns `ready_for_goal: true` with non-example evidence, a mainnet RPC URL, and an expected genesis hash
 - use `npm run beta:feed -- --proof-summary examples/solana-devnet/proofs/<run-id>/proof-summary.json` after fresh proof runs to publish static feed artifacts
 - use guarded `npm run beta:claimable` immediately before wallet-extension QA when a real active claimable task is needed
 - use guarded `npm run beta:session` as the preferred just-in-time active inventory plus verifier session path
@@ -94,6 +95,7 @@ Next:
 - use `beta:session` as the default just-in-time active inventory plus local verifier path
 - use `beta:claimable` as the lower-level active inventory publication path
 - use `earn:devnet` as the default timed devnet payout proof path
+- use `real:packet` as the default preflight-to-readiness handoff for the first mainnet payout attempt
 - use `real:readiness` as the default gate for distinguishing real-money readiness from devnet/test-token success
 - keep improving the `devnet:proof` script so it reads existing public artifacts without sending transactions
 - keep live sending commands behind guard env vars

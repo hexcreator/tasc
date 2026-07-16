@@ -490,6 +490,23 @@ npm run real:payout:build -- \
   --claim-to-completed-index-ms <ms> \
   --production-rpc-url <mainnet-rpc-url>
 
+npm run real:packet:plan
+npm run real:packet:build -- \
+  --timed-proof examples/solana-devnet/proofs/<run-id>/proof-summary.json \
+  --signed-intent .tascverifier/production-intent/production-intent.signature.json \
+  --production-payout .tascverifier/production-payout-evidence.json \
+  --production-rpc-url <mainnet-rpc-url> \
+  --expected-genesis-hash <mainnet-genesis-hash> \
+  --program-id <program-id> \
+  --token-mint <mainnet-usdc-mint> \
+  --buyer <buyer-wallet> \
+  --worker <worker-wallet> \
+  --verifier <verifier-wallet> \
+  --buyer-usdc-token-account <buyer-usdc-account> \
+  --worker-usdc-token-account <worker-usdc-account> \
+  --task-account <task-account> \
+  --vault-token-account <vault-token-account>
+
 npm run real:readiness -- \
   --timed-proof examples/solana-devnet/proofs/<run-id>/proof-summary.json \
   --production-payout .tascverifier/production-payout-evidence.json \
@@ -497,7 +514,7 @@ npm run real:readiness -- \
   --expected-genesis-hash <mainnet-genesis-hash>
 ```
 
-`real:intent:build` creates the unsigned mainnet buyer intent plus the exact canonical UTF-8 payload a wallet must sign. `real:intent:attach-signature` verifies the base58 Ed25519 wallet signature against the buyer address before writing the signed intent used by funding. `real:preflight` is read-only and checks mainnet RPC identity, deployed program account, role SOL balances, the verified USDC mint, buyer USDC funding capacity, and worker USDC destination readiness before a real run. `real:payout:build` creates the ignored local production payout artifact from mainnet signatures/accounts and read-only token-account balance checks. It must represent mainnet USDC, not devnet/test-token evidence, and none of these commands accept private keys or send transactions. `real:readiness` should still report `ready_for_goal: false` until that artifact is paired with a timed proof, `--production-rpc-url`, and `--expected-genesis-hash`. The live RPC check verifies the genesis hash, fund/claim/attest/release signature confirmations, vault token-account balance, and worker destination token-account balance.
+`real:intent:build` creates the unsigned mainnet buyer intent plus the exact canonical UTF-8 payload a wallet must sign. `real:intent:attach-signature` verifies the base58 Ed25519 wallet signature against the buyer address before writing the signed intent used by funding. `real:preflight` is read-only and checks mainnet RPC identity, deployed program account, role SOL balances, the verified USDC mint, buyer USDC funding capacity, and worker USDC destination readiness before a real run. `real:payout:build` creates the ignored local production payout artifact from mainnet signatures/accounts and read-only token-account balance checks. `real:packet:build` then assembles a sanitized production run packet with the timed proof, signed intent, payout evidence, redacted RPC host, live evidence checklist, and exact remaining commands. It must represent mainnet USDC, not devnet/test-token evidence, and none of these commands accept private keys or send transactions. `real:readiness` should still report `ready_for_goal: false` until that artifact is paired with a timed proof, `--production-rpc-url`, and `--expected-genesis-hash`. The live RPC check verifies the genesis hash, fund/claim/attest/release signature confirmations, vault token-account balance, and worker destination token-account balance.
 
 The next real implementation steps are:
 
