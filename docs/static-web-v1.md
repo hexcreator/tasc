@@ -92,6 +92,7 @@ The output includes:
 The same ingestion path is exposed by a dependencyless HTTP wrapper:
 
 ```sh
+TASC_VERIFIER_API_TOKEN=dev-token \
 npm run verifier:api
 ```
 
@@ -100,7 +101,7 @@ Routes:
 - `GET /health`
 - `POST /v1/ingest`
 
-The API starts from a trusted index file and optional ledger file, accepts either a raw `tasc.worker.submission` body or `{ "submission": ... }`, returns CORS headers for static-web callers, records accepted result hashes in memory for duplicate rejection during the process lifetime, and rejects invalid JSON, wrong methods, oversized bodies, and tampered proofs. Production operation still needs auth, durable proof artifacts, and persistent ledger storage.
+The API starts from a trusted index file and optional seed ledger, accepts either a raw `tasc.worker.submission` body or `{ "submission": ... }`, requires bearer-token auth when `--auth-token-env` is configured, returns CORS headers for static-web callers, records accepted result hashes in memory, persists accepted hashes to `.tascverifier/ledger.json`, writes durable ingestion artifacts under `.tascverifier/artifacts/`, and rejects invalid JSON, wrong methods, oversized bodies, duplicate proofs, and tampered proofs. Production operation still needs deployment, secret management, and a hosted artifact/index publication workflow.
 
 ## Solana Operator Console
 
@@ -180,7 +181,7 @@ The validator checks that:
 - browser worker submission capture matches the CLI verifier result hash format
 - verifier ingestion converts a captured proof into a `tasc.attestation` and Solana-ready attest hash
 - verifier ingestion rejects duplicate, tampered-hash, tampered-task, and tampered-input cases
-- the verifier API serves `/health`, accepts proof ingestion over HTTP, updates its in-memory duplicate ledger, and rejects invalid JSON, wrong methods, oversized bodies, duplicate proofs, and tampered inputs
+- the verifier API serves `/health`, accepts proof ingestion over HTTP with bearer auth, writes durable artifacts, persists the duplicate ledger across restart, and rejects invalid JSON, wrong methods, oversized bodies, duplicate proofs, and tampered inputs
 - the browser can build wallet transaction payloads for Solana `claim`, `attest`, `release`, `refund`, and `timeout-refund`
 
 ## Limits
@@ -189,6 +190,6 @@ This is now a guarded operator surface, but still needs:
 
 - live wallet QA in a normal browser extension environment
 - hosted proof-bundle/index publication workflow
-- deployed verifier API auth, durable artifact storage, persistent duplicate ledger, and verifier operations
+- deployed verifier operations, secret management, hosted artifact publication, and feed integration
 - multi-RPC fallback
 - reorg handling for cached entries

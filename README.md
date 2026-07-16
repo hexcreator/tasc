@@ -164,10 +164,13 @@ The timeout-aware Solana artifact also enforces Clock-backed claim deadlines and
 The static browser operator console can now import index/proof artifacts, show the signed input URL plus verifier rules for each task, capture markdown output as `tasc.worker.submission` proof JSON, derive the verifier-compatible result hash, feed that proof through verifier ingestion into `tasc.attestation`, build the same Solana lifecycle transaction payloads without runtime dependencies, and submit them through an injected wallet provider. The verifier ingestion path also has a dependencyless HTTP API wrapper:
 
 ```bash
+TASC_VERIFIER_API_TOKEN=dev-token \
 npm run verifier:api
 ```
 
-Headless validation covers the bytes, API behavior, and guarded UI; a real wallet-extension QA pass is still required before treating this as beta-ready UX.
+That starts the verifier with bearer-token auth, a persistent duplicate ledger at `.tascverifier/ledger.json`, and durable ingestion artifacts under `.tascverifier/artifacts/`.
+
+Headless validation covers the bytes, API auth/persistence behavior, and guarded UI; a real wallet-extension QA pass is still required before treating this as beta-ready UX.
 
 ## Repository Map
 
@@ -226,7 +229,7 @@ The best first contributions are narrow and verifiable:
 - add dispute handling around release/refund eligibility
 - harden duplicate-task, finality, and concurrency handling around the live Solana proofs
 - publish fresh proof indexes as static feed artifacts
-- deploy the verifier API with authentication and durable proof artifacts
+- deploy the verifier API and feed its durable proof artifacts back into hosted task indexes
 - live-test the guarded Solana operator console in wallet-extension browsers
 - add more TascLang task examples with deterministic verifier rules
 - build an indexer process that watches live Solana task accounts

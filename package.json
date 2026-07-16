@@ -95,7 +95,7 @@
     "validate:scanner": "node bin/validate-scanner.js",
     "validate:web": "node bin/validate-web.js",
     "validate:verifier-ingest": "node bin/validate-verifier-ingest.js",
-    "verifier:api": "node bin/tascverifier-api.js serve --entry examples/index/solana.spl.live.index.json --ledger examples/ledger.json",
+    "verifier:api": "node bin/tascverifier-api.js serve --entry examples/index/solana.spl.live.index.json --ledger examples/ledger.json --ledger-out .tascverifier/ledger.json --artifact-dir .tascverifier/artifacts --auth-token-env TASC_VERIFIER_API_TOKEN",
     "validate:verifier-api": "node bin/validate-verifier-api.js",
     "index:admit": "node bin/tascindex.js admit examples/signatures/summarize_url.signature.json examples/funding/summarize_url.from-log.json --out examples/index/summarize_url.index.json",
     "index:admit-batch": "node bin/tascindex.js admit-batch examples/signatures examples/scan/funded.batch.json --out examples/index/funded.batch.index.json",

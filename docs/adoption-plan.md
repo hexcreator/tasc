@@ -31,12 +31,12 @@ Done:
 - admitted feed entries carry signed task inputs, input hash, output schema, and verifier rules
 - worker submissions can be captured as hashable proof JSON from the static web task card
 - captured worker proofs can be ingested into `tasc.attestation` output with Solana-ready attest hashes
-- verifier ingestion is exposed as a dependencyless HTTP API with health and proof-ingest routes
+- verifier ingestion is exposed as a dependencyless HTTP API with bearer auth, durable artifacts, persistent duplicate ledger, health, and proof-ingest routes
 
 Next:
 
 - live-test the guarded wallet send flow with Phantom or another injected Solana wallet
-- deploy the verifier API with auth, persistent duplicate ledger, and durable artifact storage
+- deploy the verifier API and connect durable artifacts back into hosted feed/index publication
 - publish a fresh proof index as a hosted feed artifact
 - add a short demo video or GIF
 - keep starter issues updated as protocol milestones land
@@ -93,7 +93,7 @@ Open issues for:
 - `indexer`: discover funded task accounts from program-owned accounts
 - `indexer`: scan post-funding lifecycle state
 - `web`: live-test wallet transaction submission in injected wallet browsers
-- `verifier`: deploy the verifier API with durable artifacts and persistent duplicate ledger storage
+- `verifier`: deploy the verifier API and publish durable ingestion artifacts into hosted indexes
 - `security`: define pre-mainnet audit checklist
 
 ### 5. Get External Feedback
@@ -116,7 +116,7 @@ Ask for specific feedback:
 ## Next Engineering Steps
 
 1. Live-test guarded Solana wallet sends from the static operator console in a normal wallet-extension browser.
-2. Deploy the verifier API with auth, durable artifacts, and persistent duplicate ledger storage.
+2. Deploy the verifier API and publish durable ingestion artifacts into hosted feed indexes.
 3. Publish fresh proof indexes as hosted task-feed artifacts instead of only local runner output.
 4. Add finality windows, duplicate-task suppression, and multi-RPC fallback to the browser/indexer boundary.
 5. Start the dispute/reviewer path once pass/fail/timeout UX is usable end to end.
