@@ -1,0 +1,45 @@
+{
+  "kind": "tasc.production_payout.evidence",
+  "version": "0.1",
+  "generated_at": "2026-01-01T00:00:00.000Z",
+  "example_only": true,
+  "real_money": false,
+  "network": {
+    "chain": "solana",
+    "cluster": "solana-mainnet-beta",
+    "network_type": "mainnet"
+  },
+  "token": {
+    "symbol": "USDC",
+    "decimals": 6,
+    "mint": "REPLACE_WITH_VERIFIED_MAINNET_USDC_MINT",
+    "production_asset": true
+  },
+  "amount": {
+    "display": "10 USDC",
+    "base_units": "10000000"
+  },
+  "settlement": {
+    "completed_status": "Released",
+    "action": "release",
+    "task_account": "REPLACE_WITH_MAINNET_TASK_ACCOUNT",
+    "vault_token_account": "REPLACE_WITH_MAINNET_VAULT_TOKEN_ACCOUNT",
+    "destination_role": "worker",
+    "destination_token_account": "REPLACE_WITH_MAINNET_WORKER_USDC_TOKEN_ACCOUNT",
+    "vault_balance_after": "0",
+    "destination_balance_after": "10000000"
+  },
+  "timing": {
+    "target_ms": 60000,
+    "claim_to_release_ms": 12000,
+    "claim_to_completed_index_ms": 12500,
+    "under_60s_to_release_confirmation": true,
+    "under_60s_to_completed_index": true
+  },
+  "signatures": {
+    "fund": "5nHkQn7MxzWzW8vYzYdB9YxQn7MxzWzW8vYzYdB9YxQn7MxzWzW8vYzYdB9YxQ",
+    "claim": "4nHkQn7MxzWzW8vYzYdB9YxQn7MxzWzW8vYzYdB9YxQn7MxzWzW8vYzYdB9Yx",
+    "attest": "3nHkQn7MxzWzW8vYzYdB9YxQn7MxzWzW8vYzYdB9YxQn7MxzWzW8vYzYdB9",
+    "release": "2nHkQn7MxzWzW8vYzYdB9YxQn7MxzWzW8vYzYdB9YxQn7MxzWzW8vYzYd"
+  }
+}

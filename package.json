@@ -6,7 +6,7 @@
   "license": "Apache-2.0",
   "description": "Seed prototype for a decentralized instant micro-work task protocol.",
   "scripts": {
-    "demo": "npm run compile:example && npm run verify:example && npm run demo:market && npm run validate:indexer && npm run validate:static-feed && npm run validate:web && npm run validate:verifier-ingest && npm run validate:verifier-api && npm run validate:private-beta-local && npm run validate:private-beta-qa-evidence && npm run validate:private-beta-qa-runner && npm run validate:beta-claimable-publisher && npm run validate:private-beta-session-runner && npm run validate:solana-spl-escrow && npm run validate:solana-lifecycle-tx && npm run validate:solana-spl-settlement && npm run validate:solana-settlement-scan && npm run validate:solana-proof-runner",
+    "demo": "npm run compile:example && npm run verify:example && npm run demo:market && npm run validate:indexer && npm run validate:static-feed && npm run validate:web && npm run validate:verifier-ingest && npm run validate:verifier-api && npm run validate:private-beta-local && npm run validate:private-beta-qa-evidence && npm run validate:private-beta-qa-runner && npm run validate:beta-claimable-publisher && npm run validate:private-beta-session-runner && npm run validate:solana-spl-escrow && npm run validate:solana-lifecycle-tx && npm run validate:solana-spl-settlement && npm run validate:solana-settlement-scan && npm run validate:solana-proof-runner && npm run validate:real-money-readiness",
     "beta:plan": "node bin/run-private-beta-local.js plan",
     "beta:local": "node bin/run-private-beta-local.js serve",
     "beta:qa": "node bin/run-private-beta-qa.js",
@@ -21,6 +21,9 @@
     "earn:devnet:plan": "node bin/prove-solana-devnet.js plan --live-deadline 60s --timeout-deadline 60s",
     "earn:devnet": "node bin/prove-solana-devnet.js run --live-deadline 60s --timeout-deadline 60s",
     "validate:timed-payout": "node bin/validate-timed-payout-proof.js",
+    "real:readiness:plan": "node bin/validate-real-money-readiness.js plan",
+    "real:readiness": "node bin/validate-real-money-readiness.js validate",
+    "validate:real-money-readiness": "node bin/validate-real-money-readiness.js --self-test",
     "compile:example": "node bin/tasclang.js compile examples/summarize_url.tasc",
     "verify:example": "node bin/tascverify.js examples/summarize_url.tasc examples/submissions/summarize_url.pass.md --input url=https://docs.cdp.coinbase.com/x402/welcome --ledger examples/ledger.json",
     "demo:market": "node bin/tascmarket.js demo examples/summarize_url.tasc examples/submissions/summarize_url.pass.md --input url=https://docs.cdp.coinbase.com/x402/welcome --ledger examples/ledger.json",

@@ -447,6 +447,15 @@ Validate the generated timing evidence with:
 npm run validate:timed-payout -- examples/solana-devnet/proofs/<run-id>/proof-summary.json
 ```
 
+Then run the real-money readiness gate:
+
+```bash
+npm run real:readiness -- \
+  --timed-proof examples/solana-devnet/proofs/<run-id>/proof-summary.json
+```
+
+That command should still report `ready_for_goal: false` until a non-example production payout artifact is supplied with `--production-payout`. The required artifact shape is `examples/private-beta/production-payout-evidence.example.json`; it must represent mainnet USDC, not devnet/test-token evidence.
+
 The next real implementation steps are:
 
 1. Add wallet-backed browser claim/attest controls once the static proof should become interactive.

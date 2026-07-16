@@ -269,6 +269,17 @@ Validate a generated timed proof with:
 npm run validate:timed-payout -- examples/solana-devnet/proofs/<run-id>/proof-summary.json
 ```
 
+Check whether the real `$10 in less than a minute` goal is actually ready:
+
+```bash
+npm run real:readiness:plan
+npm run real:readiness -- \
+  --timed-proof examples/solana-devnet/proofs/<run-id>/proof-summary.json \
+  --production-payout <production-payout-evidence.json>
+```
+
+`real:readiness` accepts the devnet timed proof as a prerequisite, but it refuses to mark the goal ready until a non-example mainnet USDC payout artifact proves funding, claim, attest, release, post-release balances, and under-60-second timing. The schema example lives at `examples/private-beta/production-payout-evidence.example.json`.
+
 ## Why Tasc Might Work
 
 Most micro-work systems fail on trust and timing. Workers do not want to wait for payment, and buyers do not want to pay before proof. Tasc narrows the problem:

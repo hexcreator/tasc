@@ -32,6 +32,7 @@ Done:
 - `npm run beta:claimable:plan` plans a guarded fresh active task publisher that writes `web/feed/claimable-feed.json`
 - `npm run beta:session:plan` plans the guarded fresh active task plus localhost app/verifier session, with the verifier pinned to `web/feed/active.claimable.index.json`
 - `npm run earn:devnet:plan` plans a guarded 60-second devnet release proof whose live output measures claim-to-payout timing for the 10-unit test-token path
+- `npm run real:readiness:plan` shows the remaining evidence needed before the actual `$10 in less than a minute` goal can be claimed, and `npm run real:readiness` rejects devnet/example evidence as not real-money ready
 - admitted feed entries carry signed task inputs, input hash, output schema, and verifier rules
 - worker submissions can be captured as hashable proof JSON from the static web task card
 - captured worker proofs can be ingested into `tasc.attestation` output with Solana-ready attest hashes
@@ -47,6 +48,7 @@ Next:
 
 - live-test the guarded wallet send flow with Phantom or another injected Solana wallet using `GLOBAL_TASC_ALLOW_BETA_CLAIMABLE_PUBLISH=1 npm run beta:session`, export QA evidence, and run `npm run beta:qa -- ~/Downloads/tasc-private-beta-qa.json --solana-rpc-url https://api.devnet.solana.com`; mock-provider coverage exists, but extension-prompt QA is still required
 - run `GLOBAL_TASC_ALLOW_SOLANA_DEVNET_PROOF=1 npm run earn:devnet` to capture timed claim-to-payout evidence for the devnet/test-token release branch
+- use `examples/private-beta/production-payout-evidence.example.json` as the schema for the first mainnet USDC payout artifact; do not count the goal complete until `real:readiness` returns `ready_for_goal: true` with non-example evidence
 - use `npm run beta:feed -- --proof-summary examples/solana-devnet/proofs/<run-id>/proof-summary.json` after fresh proof runs to publish static feed artifacts
 - use guarded `npm run beta:claimable` immediately before wallet-extension QA when a real active claimable task is needed
 - use guarded `npm run beta:session` as the preferred just-in-time active inventory plus verifier session path
@@ -90,6 +92,7 @@ Next:
 - use `beta:session` as the default just-in-time active inventory plus local verifier path
 - use `beta:claimable` as the lower-level active inventory publication path
 - use `earn:devnet` as the default timed devnet payout proof path
+- use `real:readiness` as the default gate for distinguishing real-money readiness from devnet/test-token success
 - keep improving the `devnet:proof` script so it reads existing public artifacts without sending transactions
 - keep live sending commands behind guard env vars
 
