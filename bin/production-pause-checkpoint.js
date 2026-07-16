@@ -271,6 +271,7 @@ function plan(options = {}) {
     no_new_dependencies: true,
     no_spend_resume_commands: {
       pause_check: `npm run real:pause -- --env ${envFile}`,
+      budget_check: `npm run real:budget -- --env ${envFile}`,
       env_validate: `npm run real:env:validate -- --env ${envFile}`,
       preflight_plan: `npm run real:preflight:plan -- --env ${envFile}`,
       packet_plan: `npm run real:packet:plan -- --env ${envFile}`,
@@ -282,6 +283,7 @@ function plan(options = {}) {
 }
 
 function check(options = {}) {
+  options = { ...DEFAULT_PATHS, ...options };
   const envFile = options.envFile || DEFAULT_ENV_FILE;
   const envKeys = [
     PRODUCTION_ENV.rpcUrl,
@@ -332,6 +334,7 @@ function check(options = {}) {
     blockers,
     no_spend_next_commands: [
       `npm run real:pause -- --env ${envFile}`,
+      `npm run real:budget -- --env ${envFile}`,
       `npm run real:env:validate -- --env ${envFile}`,
       `npm run real:packet:plan -- --env ${envFile}`,
       `npm run real:readiness:plan -- --env ${envFile}`,

@@ -6,7 +6,7 @@
   "license": "Apache-2.0",
   "description": "Seed prototype for a decentralized instant micro-work task protocol.",
   "scripts": {
-    "demo": "npm run compile:example && npm run verify:example && npm run demo:market && npm run validate:indexer && npm run validate:static-feed && npm run validate:web && npm run validate:verifier-ingest && npm run validate:verifier-api && npm run validate:private-beta-local && npm run validate:private-beta-qa-evidence && npm run validate:private-beta-qa-runner && npm run validate:beta-claimable-publisher && npm run validate:private-beta-session-runner && npm run validate:solana-spl-escrow && npm run validate:solana-lifecycle-tx && npm run validate:solana-spl-settlement && npm run validate:solana-settlement-scan && npm run validate:solana-proof-runner && npm run validate:production-env-init && npm run validate:production-env && npm run validate:production-deploy-handoff && npm run validate:production-intent && npm run validate:production-preflight && npm run validate:production-token-account-setup && npm run validate:production-fund-transaction && npm run validate:production-lifecycle-transaction && npm run validate:production-payout-builder && npm run validate:production-run-capture && npm run validate:production-run-packet && npm run validate:production-pause-checkpoint && npm run validate:production-submitter-local && npm run validate:real-money-readiness",
+    "demo": "npm run compile:example && npm run verify:example && npm run demo:market && npm run validate:indexer && npm run validate:static-feed && npm run validate:web && npm run validate:verifier-ingest && npm run validate:verifier-api && npm run validate:private-beta-local && npm run validate:private-beta-qa-evidence && npm run validate:private-beta-qa-runner && npm run validate:beta-claimable-publisher && npm run validate:private-beta-session-runner && npm run validate:solana-spl-escrow && npm run validate:solana-lifecycle-tx && npm run validate:solana-spl-settlement && npm run validate:solana-settlement-scan && npm run validate:solana-proof-runner && npm run validate:production-env-init && npm run validate:production-env && npm run validate:production-deploy-handoff && npm run validate:production-intent && npm run validate:production-preflight && npm run validate:production-token-account-setup && npm run validate:production-fund-transaction && npm run validate:production-lifecycle-transaction && npm run validate:production-payout-builder && npm run validate:production-run-capture && npm run validate:production-run-packet && npm run validate:production-pause-checkpoint && npm run validate:production-budget-gate && npm run validate:production-submitter-local && npm run validate:real-money-readiness",
     "beta:plan": "node bin/run-private-beta-local.js plan",
     "beta:local": "node bin/run-private-beta-local.js serve",
     "beta:qa": "node bin/run-private-beta-qa.js",
@@ -66,6 +66,9 @@
     "real:pause:plan": "node bin/production-pause-checkpoint.js plan",
     "real:pause": "node bin/production-pause-checkpoint.js check",
     "validate:production-pause-checkpoint": "node bin/production-pause-checkpoint.js --self-test",
+    "real:budget:plan": "node bin/production-budget-gate.js plan",
+    "real:budget": "node bin/production-budget-gate.js check",
+    "validate:production-budget-gate": "node bin/production-budget-gate.js --self-test",
     "real:submitter:plan": "node bin/run-production-submitter-local.js plan",
     "real:submitter:serve": "node bin/run-production-submitter-local.js serve",
     "validate:production-submitter-local": "node bin/validate-production-submitter-local.js",
