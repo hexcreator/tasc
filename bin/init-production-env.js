@@ -6,6 +6,7 @@ const path = require("path");
 const { base58Decode, base58Encode } = require("./run-solana-devnet");
 const { DEFAULT_ENV_FILE } = require("./production-env");
 const { REQUIRED_ENV, validateProductionEnv } = require("./validate-production-env");
+const { associatedTokenAddress } = require("./tascsolana-spl");
 
 const TEMPLATE_FILE = ".env.example";
 const DEFAULT_DEPLOY_HANDOFF = ".tascverifier/production-deploy-handoff.json";
@@ -46,6 +47,8 @@ function usage() {
     "  --from-process-env                   copy required values from the current process env",
     "  --deploy-handoff <file>              public deploy handoff to read program id from",
     "  --no-deploy-handoff                  skip deploy-handoff program-id discovery",
+    "  --no-derive-associated-token-accounts",
+    "                                      skip standard buyer/worker USDC ATA derivation",
     "  --force                              overwrite selected non-empty keys",
     "  --expected-genesis-hash <hash>       public Solana mainnet genesis hash",
     "  --program-id <address>               public deployed program id",
@@ -82,6 +85,7 @@ function parseArgs(argv) {
     templateFile: TEMPLATE_FILE,
     deployHandoff: DEFAULT_DEPLOY_HANDOFF,
     useDeployHandoff: true,
+    deriveAssociatedTokenAccounts: true,
     fromProcessEnv: false,
     force: false,
     publicValues: {},
@@ -97,6 +101,7 @@ function parseArgs(argv) {
     else if (arg === "--from-process-env") options.fromProcessEnv = true;
     else if (arg === "--deploy-handoff") options.deployHandoff = requireValue(args, ++i, arg);
     else if (arg === "--no-deploy-handoff") options.useDeployHandoff = false;
+    else if (arg === "--no-derive-associated-token-accounts") options.deriveAssociatedTokenAccounts = false;
     else if (arg === "--force") options.force = true;
     else if (arg === "--allow-test-rpc-host") options.allowTestRpcHost = true;
     else if (arg === "--self-test") options.selfTest = true;
@@ -184,6 +189,27 @@ function selectedValues(options, processEnv = process.env) {
     setCandidate(REQUIRED_ENV.programId, handoff.program && handoff.program.id, `deploy-handoff:${rel(options.deployHandoff)}`);
   }
   for (const [key, value] of Object.entries(options.publicValues)) setCandidate(key, value, "cli-public-flag");
+  if (options.deriveAssociatedTokenAccounts) {
+    const effective = {
+      ...loadEnvFile(options.envFile || DEFAULT_ENV_FILE),
+      ...(options.fromProcessEnv ? processEnv : {}),
+      ...values,
+    };
+    if (!values[REQUIRED_ENV.buyerUsdc] && (!effective[REQUIRED_ENV.buyerUsdc] || options.force) && effective[REQUIRED_ENV.buyer] && effective[REQUIRED_ENV.usdcMint]) {
+      setCandidate(
+        REQUIRED_ENV.buyerUsdc,
+        associatedTokenAddress(effective[REQUIRED_ENV.buyer], effective[REQUIRED_ENV.usdcMint]),
+        "associated-token-account:buyer+mint",
+      );
+    }
+    if (!values[REQUIRED_ENV.workerUsdc] && (!effective[REQUIRED_ENV.workerUsdc] || options.force) && effective[REQUIRED_ENV.worker] && effective[REQUIRED_ENV.usdcMint]) {
+      setCandidate(
+        REQUIRED_ENV.workerUsdc,
+        associatedTokenAddress(effective[REQUIRED_ENV.worker], effective[REQUIRED_ENV.usdcMint]),
+        "associated-token-account:worker+mint",
+      );
+    }
+  }
   return { values, sources };
 }
 
@@ -251,6 +277,7 @@ function initProductionEnv(options = {}, processEnv = process.env) {
     templateFile: TEMPLATE_FILE,
     deployHandoff: DEFAULT_DEPLOY_HANDOFF,
     useDeployHandoff: true,
+    deriveAssociatedTokenAccounts: true,
     fromProcessEnv: false,
     force: false,
     publicValues: {},
@@ -281,6 +308,7 @@ function initProductionEnv(options = {}, processEnv = process.env) {
       template_file_exists: fs.existsSync(options.templateFile || TEMPLATE_FILE),
       deploy_handoff_file: options.useDeployHandoff ? rel(options.deployHandoff || DEFAULT_DEPLOY_HANDOFF) : null,
       deploy_handoff_exists: options.useDeployHandoff ? fs.existsSync(options.deployHandoff || DEFAULT_DEPLOY_HANDOFF) : false,
+      derives_associated_token_accounts: options.deriveAssociatedTokenAccounts,
       writes_files: false,
       sends_transactions: false,
       calls_rpc: false,
@@ -336,6 +364,7 @@ function initProductionEnv(options = {}, processEnv = process.env) {
     rpc_url_printed: false,
     full_rpc_url_persisted_in_json: false,
     private_env_file_may_store_rpc_url: true,
+    derives_associated_token_accounts: options.deriveAssociatedTokenAccounts,
     commands: commandBlock(rel(envFile)),
     no_new_dependencies: true,
   };
@@ -368,8 +397,6 @@ async function selfTest() {
     [REQUIRED_ENV.buyer]: sampleAddress(5),
     [REQUIRED_ENV.worker]: sampleAddress(6),
     [REQUIRED_ENV.verifier]: sampleAddress(7),
-    [REQUIRED_ENV.buyerUsdc]: sampleAddress(8),
-    [REQUIRED_ENV.workerUsdc]: sampleAddress(9),
   });
   assert(plan.writes_files === false, "plan must not write files");
   assert(!fs.existsSync(envFile), "plan must not create env file");
@@ -388,13 +415,16 @@ async function selfTest() {
     [REQUIRED_ENV.buyer]: sampleAddress(5),
     [REQUIRED_ENV.worker]: sampleAddress(6),
     [REQUIRED_ENV.verifier]: sampleAddress(7),
-    [REQUIRED_ENV.buyerUsdc]: sampleAddress(8),
-    [REQUIRED_ENV.workerUsdc]: sampleAddress(9),
   });
   assert(result.created_env_file === true, "init should create env file");
   assert(result.env_file_mode_octal === "600", "env file should be chmod 600");
   assert(result.updated_keys.includes(REQUIRED_ENV.rpcUrl), "RPC URL should be copied from process env when requested");
   assert(result.updated_keys.includes(REQUIRED_ENV.programId), "program id should be copied from deploy handoff");
+  assert(result.updated_keys.includes(REQUIRED_ENV.buyerUsdc), "buyer USDC ATA should be derived from buyer and mint");
+  assert(result.updated_keys.includes(REQUIRED_ENV.workerUsdc), "worker USDC ATA should be derived from worker and mint");
+  const loaded = loadEnvFile(envFile);
+  assert(loaded[REQUIRED_ENV.buyerUsdc] === associatedTokenAddress(sampleAddress(5), sampleAddress(4)), "buyer USDC ATA mismatch");
+  assert(loaded[REQUIRED_ENV.workerUsdc] === associatedTokenAddress(sampleAddress(6), sampleAddress(4)), "worker USDC ATA mismatch");
   const serialized = JSON.stringify(result);
   assert(!serialized.includes("do-not-print"), "init result must not print RPC credential");
   assert(!serialized.includes("/sensitive/path"), "init result must not print RPC path");
@@ -422,6 +452,21 @@ async function selfTest() {
   assert(force.updated_keys.includes(REQUIRED_ENV.buyer), "force should overwrite selected keys");
   assert(loadEnvFile(preserveEnv)[REQUIRED_ENV.buyer] === sampleAddress(12), "forced buyer should be written");
 
+  const noDeriveEnv = path.join(dir, "no-derive.env");
+  const noDerive = initProductionEnv({
+    command: "init",
+    envFile: noDeriveEnv,
+    templateFile,
+    useDeployHandoff: false,
+    deriveAssociatedTokenAccounts: false,
+    publicValues: {
+      [REQUIRED_ENV.usdcMint]: sampleAddress(4),
+      [REQUIRED_ENV.buyer]: sampleAddress(5),
+      [REQUIRED_ENV.worker]: sampleAddress(6),
+    },
+  }, {});
+  assert(!noDerive.updated_keys.includes(REQUIRED_ENV.buyerUsdc), "ATA derivation should be skippable");
+
   const privateEnv = path.join(dir, "private.env");
   fs.writeFileSync(privateEnv, `${REQUIRED_ENV.buyer}= ${sampleAddress(13)}\nGLOBAL_TASC_SOLANA_MAINNET_BUYER_PRIVATE_KEY=never\n`);
   let privateRejected = false;
@@ -448,6 +493,8 @@ async function selfTest() {
     chmod_0600: result.env_file_mode_octal === "600",
     deploy_handoff_program_id_loaded: result.updated_keys.includes(REQUIRED_ENV.programId),
     process_env_loaded: result.updated_keys.includes(REQUIRED_ENV.rpcUrl),
+    associated_token_accounts_derived: result.updated_keys.includes(REQUIRED_ENV.buyerUsdc) && result.updated_keys.includes(REQUIRED_ENV.workerUsdc),
+    associated_token_account_derivation_skippable: !noDerive.updated_keys.includes(REQUIRED_ENV.buyerUsdc),
     existing_values_preserved: preserve.preserved_keys.includes(REQUIRED_ENV.buyer),
     force_overwrite_supported: force.updated_keys.includes(REQUIRED_ENV.buyer),
     private_env_entries_rejected: privateRejected,

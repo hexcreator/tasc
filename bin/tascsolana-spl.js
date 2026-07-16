@@ -7,6 +7,7 @@ const { base58Decode, base58Encode } = require("./run-solana-devnet");
 const { createWithSeedAddress } = require("./tascsolana");
 
 const TOKEN_PROGRAM_ID = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
+const ASSOCIATED_TOKEN_PROGRAM_ID = "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL";
 const MINT_ACCOUNT_SIZE = 82;
 const TOKEN_ACCOUNT_SIZE = 165;
 const TRANSFER_CHECKED_TAG = 12;
@@ -29,6 +30,7 @@ function usage() {
     "Usage:",
     "  node bin/tascsolana-spl.js decode-mint-account <account.json>",
     "  node bin/tascsolana-spl.js decode-token-account <account.json>",
+    "  node bin/tascsolana-spl.js derive-associated-token-account <owner> <mint>",
     "",
     "This helper is dependencyless and only handles the SPL Token v1 account/TransferChecked boundary.",
   ].join("\n"));
@@ -203,6 +205,14 @@ function vaultAuthorityPda(programId, taskHash, mint) {
     bytes32Buffer(taskHash, "task_hash"),
     pubkeyBytes(mint, "mint"),
   ], programId);
+}
+
+function associatedTokenAddress(owner, mint, tokenProgramId = TOKEN_PROGRAM_ID, associatedProgramId = ASSOCIATED_TOKEN_PROGRAM_ID) {
+  return findProgramAddress([
+    pubkeyBytes(owner, "token account owner"),
+    pubkeyBytes(tokenProgramId, "token program id"),
+    pubkeyBytes(mint, "token mint"),
+  ], associatedProgramId).address;
 }
 
 function u64Buffer(value, label) {
@@ -465,13 +475,28 @@ function custodyEvidenceFromVault(input) {
 
 function main() {
   const [command, file, ...rest] = process.argv.slice(2);
-  if (rest.length > 0) usage();
   if (command === "decode-mint-account" && file) {
+    if (rest.length > 0) usage();
     process.stdout.write(`${JSON.stringify(decodedMintAccountFromFixture(loadJson(file)), null, 2)}\n`);
     return;
   }
   if (command === "decode-token-account" && file) {
+    if (rest.length > 0) usage();
     process.stdout.write(`${JSON.stringify(decodedTokenAccountFromFixture(loadJson(file)), null, 2)}\n`);
+    return;
+  }
+  if (command === "derive-associated-token-account" && file && rest.length === 1) {
+    const owner = file;
+    const mint = rest[0];
+    process.stdout.write(`${JSON.stringify({
+      kind: "tasc.solana.associated_token_account",
+      version: "0.1",
+      owner,
+      mint,
+      token_program_id: TOKEN_PROGRAM_ID,
+      associated_token_program_id: ASSOCIATED_TOKEN_PROGRAM_ID,
+      address: associatedTokenAddress(owner, mint),
+    }, null, 2)}\n`);
     return;
   }
   usage();
@@ -488,6 +513,7 @@ if (require.main === module) {
 
 module.exports = {
   ACCOUNT_STATE_INITIALIZED,
+  ASSOCIATED_TOKEN_PROGRAM_ID,
   INITIALIZE_ACCOUNT3_TAG,
   INITIALIZE_MINT2_TAG,
   MINT_ACCOUNT_SIZE,
@@ -495,6 +521,7 @@ module.exports = {
   TOKEN_ACCOUNT_SIZE,
   TOKEN_PROGRAM_ID,
   TRANSFER_CHECKED_TAG,
+  associatedTokenAddress,
   createProgramAddress,
   custodyEvidenceFromVault,
   decodeInitializeAccount3Data,
