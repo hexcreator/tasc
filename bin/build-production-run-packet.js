@@ -325,6 +325,42 @@ function buildFundCommand(config, artifacts) {
   ].join("");
 }
 
+function buildLifecycleClaimCommand(config, artifacts) {
+  return [
+    "npm run real:lifecycle:build --",
+    " --action claim",
+    ` --signed-intent ${artifacts.intent.signed_intent_file}`,
+    ` --task-account ${commandValue(config.task_account, "<task-account>")}`,
+    ` --signer ${commandValue(config.worker, "<worker-wallet>")}`,
+    " --production-rpc-url <mainnet-rpc-url>",
+  ].join("");
+}
+
+function buildLifecycleAttestCommand(config, artifacts) {
+  return [
+    "npm run real:lifecycle:build --",
+    " --action attest",
+    ` --signed-intent ${artifacts.intent.signed_intent_file}`,
+    ` --task-account ${commandValue(config.task_account, "<task-account>")}`,
+    ` --signer ${commandValue(config.verifier, "<verifier-wallet>")}`,
+    " --verdict pass",
+    " --result-hash <0x-result-hash>",
+    " --production-rpc-url <mainnet-rpc-url>",
+  ].join("");
+}
+
+function buildLifecycleReleaseCommand(config, artifacts) {
+  return [
+    "npm run real:lifecycle:build --",
+    " --action release",
+    ` --signed-intent ${artifacts.intent.signed_intent_file}`,
+    ` --task-account ${commandValue(config.task_account, "<task-account>")}`,
+    ` --signer ${commandValue(config.worker, "<worker-wallet>")}`,
+    ` --destination-token-account ${commandValue(config.worker_usdc_token_account, "<worker-usdc-account>")}`,
+    " --production-rpc-url <mainnet-rpc-url>",
+  ].join("");
+}
+
 function buildPayoutCommand(config) {
   return [
     "npm run real:payout:build --",
@@ -415,30 +451,60 @@ function commandSequence(config, artifacts) {
     },
     {
       step: 8,
-      phase: "worker-claim",
-      manual_action: "Start the payout timer when the worker claim transaction is submitted; capture the confirmed claim signature.",
+      phase: "build-worker-claim-transaction",
+      command: buildLifecycleClaimCommand(config, artifacts),
+      output: ".tascverifier/production-lifecycle-claim.json",
       required_for_goal: true,
-      sends_transactions: true,
-      network: DEFAULT_CLUSTER,
+      sends_transactions: false,
+      calls_rpc: true,
+      rpc_url_redacted: true,
     },
     {
       step: 9,
-      phase: "verifier-attest",
-      manual_action: "Verifier attests pass with the worker result hash; capture the confirmed attest signature.",
+      phase: "wallet-send-worker-claim-transaction",
+      manual_action: "Submit .tascverifier/production-lifecycle-claim.json with the worker wallet; start the payout timer at wallet submission and capture the confirmed claim signature.",
       required_for_goal: true,
       sends_transactions: true,
       network: DEFAULT_CLUSTER,
     },
     {
       step: 10,
-      phase: "release-to-worker",
-      manual_action: "Release the passed task to the worker USDC token account; capture the release signature and confirmation timestamp.",
+      phase: "build-verifier-attest-transaction",
+      command: buildLifecycleAttestCommand(config, artifacts),
+      output: ".tascverifier/production-lifecycle-attest.json",
+      required_for_goal: true,
+      sends_transactions: false,
+      calls_rpc: true,
+      rpc_url_redacted: true,
+    },
+    {
+      step: 11,
+      phase: "wallet-send-verifier-attest-transaction",
+      manual_action: "Submit .tascverifier/production-lifecycle-attest.json with the verifier wallet after checking the result hash; capture the confirmed attest signature.",
       required_for_goal: true,
       sends_transactions: true,
       network: DEFAULT_CLUSTER,
     },
     {
-      step: 11,
+      step: 12,
+      phase: "build-worker-release-transaction",
+      command: buildLifecycleReleaseCommand(config, artifacts),
+      output: ".tascverifier/production-lifecycle-release.json",
+      required_for_goal: true,
+      sends_transactions: false,
+      calls_rpc: true,
+      rpc_url_redacted: true,
+    },
+    {
+      step: 13,
+      phase: "wallet-send-worker-release-transaction",
+      manual_action: "Submit .tascverifier/production-lifecycle-release.json with the worker wallet; capture the release signature and confirmation timestamp.",
+      required_for_goal: true,
+      sends_transactions: true,
+      network: DEFAULT_CLUSTER,
+    },
+    {
+      step: 14,
       phase: "build-production-payout-evidence",
       command: buildPayoutCommand(config),
       output: artifacts.production_payout.file,
@@ -448,7 +514,7 @@ function commandSequence(config, artifacts) {
       rpc_url_redacted: true,
     },
     {
-      step: 12,
+      step: 15,
       phase: "validate-real-money-readiness",
       command: buildReadinessCommand(config),
       required_for_goal: true,
@@ -601,6 +667,9 @@ function validatePacket(packet) {
     "build-mainnet-buyer-intent",
     "mainnet-preflight",
     "build-mainnet-fund-transaction",
+    "build-worker-claim-transaction",
+    "build-verifier-attest-transaction",
+    "build-worker-release-transaction",
     "build-production-payout-evidence",
     "validate-real-money-readiness",
   ].forEach((phase) => {
@@ -611,6 +680,7 @@ function validatePacket(packet) {
   assert(!packetText.includes("/sensitive/rpc"), "packet must not persist full RPC paths");
   assert(packetText.includes("npm run real:intent:build"), "packet must include intent command");
   assert(packetText.includes("npm run real:preflight"), "packet must include preflight command");
+  assert(packetText.includes("npm run real:lifecycle:build"), "packet must include lifecycle transaction command");
   assert(packetText.includes("npm run real:payout:build"), "packet must include payout command");
   assert(packetText.includes("npm run real:readiness"), "packet must include readiness command");
   return {
