@@ -30,11 +30,12 @@ Done:
 - static feed import exists for `tasc.index`, raw entry arrays, and hosted proof-summary indexes
 - admitted feed entries carry signed task inputs, input hash, output schema, and verifier rules
 - worker submissions can be captured as hashable proof JSON from the static web task card
+- captured worker proofs can be ingested into `tasc.attestation` output with Solana-ready attest hashes
 
 Next:
 
 - live-test the guarded wallet send flow with Phantom or another injected Solana wallet
-- wire captured submission proofs into a verifier service
+- wrap verifier ingestion as a hosted API/worker with artifact storage
 - publish a fresh proof index as a hosted feed artifact
 - add a short demo video or GIF
 - keep starter issues updated as protocol milestones land
@@ -56,6 +57,7 @@ npm run verify:example
 npm run demo:market
 npm run validate:indexer
 npm run validate:solana-spl-escrow
+npm run validate:verifier-ingest
 npm run validate:solana-lifecycle-tx
 npm run validate:solana-spl-settlement
 ```
@@ -74,6 +76,7 @@ The current static web proof should become the main public demo:
 - import fresh proof/index artifacts without editing bundled demo code
 - show task title, reward, 60-second window, signed input URL, output schema, verifier rules, status, chain, vault, and proof coordinates
 - capture markdown output and derive the result hash the verifier will attest
+- ingest captured proof JSON into `tasc.attestation` plus the Solana-ready result hash for `attest`
 - connect a Solana wallet and show live task-account status plus guarded role/action sends
 - link to docs explaining what is real and what is simulated
 
@@ -87,7 +90,7 @@ Open issues for:
 - `indexer`: discover funded task accounts from program-owned accounts
 - `indexer`: scan post-funding lifecycle state
 - `web`: live-test wallet transaction submission in injected wallet browsers
-- `verifier`: ingest `tasc.worker.submission` proof JSON and produce attestable results
+- `verifier`: wrap local proof ingestion in a hosted verifier worker with durable artifacts
 - `security`: define pre-mainnet audit checklist
 
 ### 5. Get External Feedback
@@ -110,7 +113,7 @@ Ask for specific feedback:
 ## Next Engineering Steps
 
 1. Live-test guarded Solana wallet sends from the static operator console in a normal wallet-extension browser.
-2. Wire captured `tasc.worker.submission` proof JSON into a verifier service.
+2. Wrap captured `tasc.worker.submission` proof ingestion as a hosted verifier API/worker.
 3. Publish fresh proof indexes as hosted task-feed artifacts instead of only local runner output.
 4. Add finality windows, duplicate-task suppression, and multi-RPC fallback to the browser/indexer boundary.
 5. Start the dispute/reviewer path once pass/fail/timeout UX is usable end to end.
@@ -125,5 +128,6 @@ Early users are actually using Tasc when:
 - someone can serve a static claimable feed
 - a worker can see the exact signed input and verifier rules from the feed
 - a worker can capture output and produce a verifier-compatible result hash
+- a verifier can ingest the worker proof and produce an attestable `tasc.attestation`
 - someone can connect a wallet and submit the correct guarded live role/action transaction
 - a worker can complete a devnet task and see token release proof

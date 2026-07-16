@@ -21,7 +21,7 @@ EVM:     browser -> RPC eth_blockNumber -> confirmed range -> RPC eth_getLogs ->
 Solana:  browser -> RPC getAccountInfo(task_pda) -> decode 276-byte task account -> role/action readiness
 Solana:  browser -> wallet sign -> RPC sendTransaction -> refreshed task-account status
 Import:  paste/select tasc.index JSON -> merge entries -> refresh live Solana status
-Submit:  markdown output -> SHA-256 result hash -> tasc.worker.submission proof -> attest hash
+Submit:  markdown output -> tasc.worker.submission proof -> verifier ingestion -> tasc.attestation -> attest hash
 ```
 
 The browser reads only `TascEscrow.Funded` logs. It decodes the same event shape used by the CLI scanner:
@@ -67,6 +67,27 @@ The task card can capture markdown output and build a `tasc.worker.submission` p
 - optional Solana `signMessage` signature when the wallet supports it
 
 The captured hash is written into the Solana operator result-hash field, so a verifier can attest the same output hash without recomputing it by hand.
+
+## Verifier Ingestion
+
+Captured worker proofs can be ingested without adding a hosted dependency:
+
+```sh
+node bin/tascverifier-service.js ingest \
+  examples/submissions/summarize_url_spl.worker-submission.json \
+  --entry examples/index/solana.spl.live.index.json \
+  --ledger examples/ledger.json
+```
+
+The verifier ingestion command treats the index entry as trusted task context and the worker proof as an output artifact. It recomputes the markdown hash, checks task hash, input hash, intent hash, inputs, verifier, and Solana settlement coordinates against the trusted entry, then runs the deterministic verifier rules.
+
+The output includes:
+
+- a normal `tasc.attestation`
+- duplicate-result handling through the verifier ledger
+- Solana-ready `result_hash_bytes32`
+- the verifier wallet address that should submit the on-chain `attest`
+- rejection of tampered result hashes, task hashes, and inputs
 
 ## Solana Operator Console
 
@@ -129,6 +150,7 @@ Run:
 
 ```sh
 npm run validate:web
+npm run validate:verifier-ingest
 ```
 
 The validator checks that:
@@ -142,6 +164,8 @@ The validator checks that:
 - the browser accepts `tasc.index`, raw entry arrays, and proof-summary import shapes
 - the bundled Solana feed exposes signed task input metadata and input hash
 - browser worker submission capture matches the CLI verifier result hash format
+- verifier ingestion converts a captured proof into a `tasc.attestation` and Solana-ready attest hash
+- verifier ingestion rejects duplicate, tampered-hash, tampered-task, and tampered-input cases
 - the browser can build wallet transaction payloads for Solana `claim`, `attest`, `release`, `refund`, and `timeout-refund`
 
 ## Limits
@@ -150,6 +174,6 @@ This is now a guarded operator surface, but still needs:
 
 - live wallet QA in a normal browser extension environment
 - hosted proof-bundle/index publication workflow
-- verifier service ingestion for captured submission proofs
+- hosted verifier API, artifact storage, and verifier operations
 - multi-RPC fallback
 - reorg handling for cached entries

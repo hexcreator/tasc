@@ -31,6 +31,7 @@ Tasc currently proves the hard protocol boundary: a task can be compiled, signed
 | Indexer gate | Funding evidence is admitted only when it matches the signed intent and custody proof. |
 | Static discovery | Browser-side scanner/feed proof with JSON index import, signed task inputs, and no hosted backend requirement. |
 | Worker proof | Browser-side markdown submission capture derives verifier-compatible result hashes and proof JSON. |
+| Verifier bridge | Captured worker proof JSON ingests into `tasc.attestation` plus Solana-ready attest hashes. |
 | Wallet operator | Browser-side Solana claim/attest/release/refund/timeout-refund transaction construction behind an explicit send guard. |
 
 Current live Solana SPL proof:
@@ -88,6 +89,7 @@ npm run compile:example
 npm run verify:example
 npm run demo:market
 npm run validate:indexer
+npm run validate:verifier-ingest
 npm run validate:solana-spl-escrow
 npm run validate:dependencies
 ```
@@ -157,7 +159,7 @@ The current Solana program and CLI support program-signed SPL Token `TransferChe
 
 The timeout-aware Solana artifact also enforces Clock-backed claim deadlines and timeout refund eligibility for `Funded` or `Claimed` tasks. A live devnet timeout refund proof now refunds an overdue funded task back to the buyer without a worker claim or verifier failure.
 
-The static browser operator console can now import index/proof artifacts, show the signed input URL plus verifier rules for each task, capture markdown output as `tasc.worker.submission` proof JSON, derive the verifier-compatible result hash, build the same Solana lifecycle transaction payloads without runtime dependencies, and submit them through an injected wallet provider. Headless validation covers the bytes and guarded UI; a real wallet-extension QA pass is still required before treating this as beta-ready UX.
+The static browser operator console can now import index/proof artifacts, show the signed input URL plus verifier rules for each task, capture markdown output as `tasc.worker.submission` proof JSON, derive the verifier-compatible result hash, feed that proof through verifier ingestion into `tasc.attestation`, build the same Solana lifecycle transaction payloads without runtime dependencies, and submit them through an injected wallet provider. Headless validation covers the bytes and guarded UI; a real wallet-extension QA pass is still required before treating this as beta-ready UX.
 
 ## Repository Map
 

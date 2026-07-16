@@ -1,0 +1,61 @@
+{
+  "kind": "tasc.worker.submission",
+  "version": "0.1",
+  "task_hash": "0x103317ad603569805133b51ddd3447461a5ff998e8bca2642728205f7f7db65e",
+  "intent_hash": "sha256:15fe6d73bcedf28ad18646044e61c743f764493e66be52ebe035661ddc5a02b4",
+  "input_hash": "0xad2e20b1f70ba6bf13c6ed2d8f246284beabb0ac70d9548f8691c730c0af4537",
+  "task_name": "summarize_url_spl",
+  "worker": "BfRmLmH7ksPRCRxNBi7c8SspN7zKoyuAPKrJMDL5uQCJ",
+  "submitted_at": "2026-01-01T00:00:00.000Z",
+  "output": {
+    "markdown": "# Summary\n\nThe source describes an internet-native payment pattern where clients can pay for digital work or API access with stablecoins directly inside a request flow. The important idea for a global task market is that payment instructions, authorization, verification, and settlement can be expressed as protocol messages instead of slow account setup or manual invoicing.\n\nFor a sub-minute micro-work market, that means buyers should post pre-funded tasks, workers should claim only tasks with locked value, and verifiers should produce attestations that escrow can trust. The task language should hide chain-specific plumbing and expose only task requirements, proof rules, deadlines, and payout routes.\n\nThis model does not create demand by itself. It compresses the path from existing demand to immediate work and immediate payout. That makes a ten-dollar task realistic when the task is already funded, automatically verifiable, and globally discoverable.\n\nCitation: https://docs.cdp.coinbase.com/x402/welcome\n"
+  },
+  "result_hash": "sha256:0bdfacb7e0ec2c3241da82c7b812b1a0fa28945b47c7f8a6b113b4de3779776f",
+  "result_hash_bytes32": "0x0bdfacb7e0ec2c3241da82c7b812b1a0fa28945b47c7f8a6b113b4de3779776f",
+  "inputs": {
+    "url": "https://docs.cdp.coinbase.com/x402/welcome"
+  },
+  "verifier": "3Siw3mYu8yQVaZ8qvXH5z4quyhhk6vBySn5d3KhNW9Tt",
+  "settlement": {
+    "chain": "solana",
+    "cluster": "devnet",
+    "program_id": "FAqKhKke5pZr4TK6kXq9aKR98hWFy19SMQG9eGfXQrRM",
+    "task_pda": "37hA4KUeR6eLPP1g1mBoTMYHKCPq7LECpLryQc61TmRi"
+  },
+  "checks": [
+    {
+      "rule": {
+        "op": "min_words",
+        "args": [
+          "120"
+        ]
+      },
+      "pass": true,
+      "actual": 148,
+      "expected": ">= 120"
+    },
+    {
+      "rule": {
+        "op": "contains_citation",
+        "args": [
+          "input.url"
+        ]
+      },
+      "pass": true,
+      "actual": "found",
+      "expected": "https://docs.cdp.coinbase.com/x402/welcome"
+    },
+    {
+      "rule": {
+        "op": "no_duplicate",
+        "args": [
+          "worker"
+        ]
+      },
+      "pass": null,
+      "actual": "verifier required",
+      "expected": "unique result hash"
+    }
+  ],
+  "local_verdict": "needs_verifier"
+}

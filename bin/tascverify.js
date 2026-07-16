@@ -105,9 +105,8 @@ function evaluateRule(rule, context) {
   };
 }
 
-function verifyCompiledTask(compiled, submission, inputs, ledgerFile) {
+function verifyCompiledTaskWithLedger(compiled, submission, inputs, ledger) {
   const resultHash = `sha256:${sha256(submission)}`;
-  const ledger = readLedger(ledgerFile);
   const checks = compiled.task.verify.map((rule) => evaluateRule(rule, {
     inputs,
     submission,
@@ -125,6 +124,10 @@ function verifyCompiledTask(compiled, submission, inputs, ledgerFile) {
     verdict,
     checks,
   };
+}
+
+function verifyCompiledTask(compiled, submission, inputs, ledgerFile) {
+  return verifyCompiledTaskWithLedger(compiled, submission, inputs, readLedger(ledgerFile));
 }
 
 function main() {
@@ -149,5 +152,7 @@ if (require.main === module) {
 
 module.exports = {
   readLedger,
+  sha256,
   verifyCompiledTask,
+  verifyCompiledTaskWithLedger,
 };
