@@ -76,11 +76,135 @@ function assertNoExternalRuntimeDependencies() {
   const styles = read(path.join(WEB_DIR, "styles.css"));
   assert(styles.includes(".qa-readiness"), "styles should cover QA readiness panel");
 
-  for (const file of ["app.js", "demo-index.js", "tasc-web-core.js"]) {
+  const productionHtml = read(path.join(WEB_DIR, "production-run.html"));
+  assert(!/(?:src|href)=["']https?:\/\//.test(productionHtml), "web/production-run.html should not load external runtime URLs");
+  assert(productionHtml.includes("./tasc-web-core.js"), "production runner should load dependencyless core");
+  assert(productionHtml.includes("./production-run.js"), "production runner should load its controller");
+  assert(productionHtml.includes("production-rpc-url"), "production runner should expose mainnet RPC input");
+  assert(productionHtml.includes("artifact-json"), "production runner should expose artifact import");
+  assert(productionHtml.includes("enable-production-submit"), "production runner should require guarded sends");
+  assert(productionHtml.includes("capture-command"), "production runner should show capture command output");
+  const productionRun = read(path.join(WEB_DIR, "production-run.js"));
+  assert(productionRun.includes("summarizeProductionTransactionArtifact"), "production runner should validate artifacts through core");
+  assert(productionRun.includes("submitSolanaWalletTransaction"), "production runner should submit through core wallet adapter");
+  assert(productionRun.includes("Connected wallet must match artifact signer"), "production runner should enforce signer match");
+  assert(productionRun.includes("Enable production wallet sends first"), "production runner should enforce send guard");
+  assert(productionRun.includes("real:capture:record") || read(path.join(WEB_DIR, "tasc-web-core.js")).includes("real:capture:record"), "production runner should emit capture commands");
+
+  for (const file of ["app.js", "demo-index.js", "tasc-web-core.js", "production-run.js"]) {
     const source = read(path.join(WEB_DIR, file));
     assert(!/from\s+["']/.test(source), `${file} should not use module imports`);
     assert(!/require\s*\(/.test(source), `${file} should not require packages in browser runtime`);
   }
+}
+
+function sampleSolanaAddress(byte) {
+  return core.base58Encode(new Array(32).fill(byte));
+}
+
+function productionWalletPayload(signer, signerRole, recentBlockhash) {
+  const messageBytes = [1, 2, 3, 4, 5, 6, 7, 8];
+  const unsignedTransactionBytes = [1, ...new Array(64).fill(0), ...messageBytes];
+  return {
+    format: "tasc.solana_wallet_transaction.v0",
+    signer,
+    signer_role: signerRole,
+    recent_blockhash: recentBlockhash,
+    message_bytes: messageBytes,
+    message_base64: core.base64FromBytes(messageBytes),
+    message_sha256: `sha256:${"2".repeat(64)}`,
+    unsigned_transaction_bytes: unsignedTransactionBytes,
+    unsigned_transaction_base64: core.base64FromBytes(unsignedTransactionBytes),
+    unsigned_transaction_base64url: "sample",
+    unsigned_transaction_sha256: `sha256:${"1".repeat(64)}`,
+    placeholder_signatures: 1,
+  };
+}
+
+function productionArtifactBase() {
+  return {
+    ok: true,
+    version: "0.1",
+    cluster: "solana-mainnet-beta",
+    network_type: "mainnet",
+    amount: {
+      display: "10 USDC",
+      base_units: "10000000",
+    },
+    token: {
+      symbol: "USDC",
+      mint: sampleSolanaAddress(3),
+      decimals: 6,
+      production_asset: true,
+    },
+    buyer: sampleSolanaAddress(4),
+    verifier: sampleSolanaAddress(5),
+    program_id: sampleSolanaAddress(6),
+    task_account: sampleSolanaAddress(7),
+    recent_blockhash: DUMMY_BLOCKHASH,
+  };
+}
+
+function assertProductionTransactionArtifactSummary() {
+  const base = productionArtifactBase();
+  const fund = {
+    ...base,
+    kind: "tasc.production_fund_transaction",
+    buyer_usdc_token_account: sampleSolanaAddress(8),
+    vault_token_account: sampleSolanaAddress(9),
+    instructions: [
+      { name: "create_task_account" },
+      { name: "create_vault_token_account" },
+      { name: "spl_token.initialize_account3" },
+      { name: "spl_token.transfer_checked" },
+      { name: "fund" },
+    ],
+    wallet_payload: productionWalletPayload(base.buyer, "buyer", base.recent_blockhash),
+  };
+  const fundSummary = core.summarizeProductionTransactionArtifact(fund, {
+    artifactFile: ".tascverifier/production-fund-transaction.json",
+  });
+  assert(fundSummary.phase === "fund", "production fund phase mismatch");
+  assert(fundSummary.signer_role === "buyer", "production fund signer role mismatch");
+  assert(fundSummary.vault_token_account === fund.vault_token_account, "production fund vault mismatch");
+  assert(fundSummary.capture_command.includes("--transaction .tascverifier/production-fund-transaction.json"), "production fund capture transaction missing");
+  assert(fundSummary.capture_command.includes("--signature <fund-sig>"), "production fund capture signature placeholder missing");
+
+  const release = {
+    ...base,
+    kind: "tasc.production_lifecycle_transaction",
+    action: "release",
+    signer: sampleSolanaAddress(10),
+    signer_role: "worker",
+    instruction: {
+      name: "release",
+      program_instruction: "release",
+      data_hex: "0x03",
+    },
+    settlement: {
+      destination_role: "worker",
+      vault_token_account: sampleSolanaAddress(11),
+      destination_token_account: sampleSolanaAddress(12),
+      token_program_id: core.TOKEN_PROGRAM_ID,
+    },
+    wallet_payload: productionWalletPayload(sampleSolanaAddress(10), "worker", base.recent_blockhash),
+  };
+  const releaseSummary = core.summarizeProductionTransactionArtifact(release, {
+    artifactFile: ".tascverifier/production-lifecycle-release.json",
+  });
+  assert(releaseSummary.phase === "release", "production release phase mismatch");
+  assert(releaseSummary.signer_role === "worker", "production release signer role mismatch");
+  assert(releaseSummary.destination_token_account === release.settlement.destination_token_account, "production release destination mismatch");
+  assert(releaseSummary.capture_command.includes("--release-confirmed-at <iso-release-confirmed>"), "production release capture timestamp missing");
+  assert(releaseSummary.capture_command.includes("--completed-indexed-at <iso-completed-indexed>"), "production release index timestamp missing");
+
+  let rejectedDevnet = false;
+  try {
+    core.summarizeProductionTransactionArtifact({ ...fund, cluster: "solana-devnet" });
+  } catch (error) {
+    rejectedDevnet = /solana-mainnet-beta/.test(error.message);
+  }
+  assert(rejectedDevnet, "production artifact summary should reject devnet cluster");
 }
 
 function assertBundledSolanaIndexMatchesFixture() {
@@ -472,6 +596,7 @@ async function main() {
   await assertWorkerSubmissionCapture();
   assertVerifierApiBrowserFlowSurface();
   await assertSolanaLifecycleTransactionBuilds();
+  assertProductionTransactionArtifactSummary();
 
   process.stdout.write(`${JSON.stringify({
     ok: true,
@@ -487,6 +612,8 @@ async function main() {
     private_beta_qa_evidence: "tasc.private_beta.qa_evidence",
     solana_wallet_submission_adapter: ["signAndSendTransaction", "signTransaction+rpc.sendTransaction"],
     solana_wallet_transaction_builds: ["claim", "attest", "release", "refund", "timeout-refund"],
+    production_wallet_submitter: "web/production-run.html",
+    production_artifact_summary: ["fund", "release", "mainnet-only"],
     external_runtime_dependencies: 0,
     next: "Open web/index.html or deploy web/ as static files.",
   }, null, 2)}\n`);

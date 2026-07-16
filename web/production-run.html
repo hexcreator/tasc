@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Tasc Production Run</title>
+    <link rel="stylesheet" href="./styles.css">
+  </head>
+  <body>
+    <div class="shell">
+      <header class="topbar">
+        <div class="brand">
+          <div class="mark">GT</div>
+          <div>
+            <h1>Tasc Production Run</h1>
+          </div>
+        </div>
+        <div class="stats">
+          <div class="stat">
+            <strong id="artifact-phase">None</strong>
+            <span>phase</span>
+          </div>
+          <div class="stat">
+            <strong id="wallet-match">Offline</strong>
+            <span>wallet match</span>
+          </div>
+        </div>
+      </header>
+
+      <main class="layout">
+        <aside class="panel controls">
+          <section class="section">
+            <h2>Mainnet RPC</h2>
+            <label>
+              RPC URL
+              <input id="production-rpc-url" type="url" autocomplete="off" spellcheck="false" placeholder="https://mainnet.helius-rpc.com/?api-key=...">
+            </label>
+            <div class="actions">
+              <button id="connect-wallet" type="button">Connect Wallet</button>
+            </div>
+            <div id="wallet-readout" class="wallet-readout">No wallet connected</div>
+          </section>
+
+          <section class="section">
+            <h2>Transaction Artifact</h2>
+            <label>
+              Artifact path for capture command
+              <input id="artifact-label" autocomplete="off" spellcheck="false" value=".tascverifier/production-fund-transaction.json">
+            </label>
+            <input id="artifact-file" type="file" accept="application/json,.json">
+            <textarea id="artifact-json" spellcheck="false" placeholder="Paste tasc.production_fund_transaction or tasc.production_lifecycle_transaction JSON"></textarea>
+            <div class="actions">
+              <button id="review-artifact" type="button">Review Artifact</button>
+            </div>
+          </section>
+
+          <section class="section">
+            <h2>Send Guard</h2>
+            <label class="checkline">
+              <input id="enable-production-submit" type="checkbox">
+              <span>Enable production wallet sends</span>
+            </label>
+            <div class="actions">
+              <button id="submit-artifact" class="primary" type="button" disabled>Submit Transaction</button>
+            </div>
+            <div id="status" class="status" data-variant="neutral">Load and review a production artifact.</div>
+          </section>
+        </aside>
+
+        <section class="panel feed">
+          <div class="feed-header">
+            <h2>Reviewed Transaction</h2>
+            <div id="artifact-kind" class="cursor">No artifact loaded</div>
+          </div>
+          <div class="claimable-list">
+            <div class="task-brief">
+              <div class="claimable-meta" id="artifact-summary"></div>
+            </div>
+            <div class="task-brief">
+              <div class="task-brief-group">
+                <span>Capture Command</span>
+                <textarea id="capture-command" class="submission-json" readonly spellcheck="false"></textarea>
+              </div>
+            </div>
+            <div class="task-brief">
+              <div class="task-brief-group">
+                <span>Submission Output</span>
+                <textarea id="submit-output" class="submission-json" readonly spellcheck="false"></textarea>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script src="./tasc-web-core.js"></script>
+    <script src="./production-run.js"></script>
+  </body>
+</html>

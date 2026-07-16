@@ -22,6 +22,10 @@
   const BASE58_ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
   const CLOCK_SYSVAR_ID = "SysvarC1ock11111111111111111111111111111111";
   const TOKEN_PROGRAM_ID = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
+  const PRODUCTION_SOLANA_CLUSTER = "solana-mainnet-beta";
+  const PRODUCTION_USDC_BASE_UNITS = "10000000";
+  const PRODUCTION_USDC_DECIMALS = 6;
+  const PRODUCTION_WALLET_PAYLOAD_FORMAT = "tasc.solana_wallet_transaction.v0";
   const SOLANA_INSTRUCTION_TAGS = {
     claim: 1,
     attest: 2,
@@ -945,6 +949,144 @@
     throw new Error("Wallet cannot sign Solana transactions");
   }
 
+  function assertProductionBaseArtifact(artifact) {
+    assert(artifact && typeof artifact === "object", "production transaction artifact is required");
+    assert(
+      artifact.kind === "tasc.production_fund_transaction" || artifact.kind === "tasc.production_lifecycle_transaction",
+      "artifact kind must be production fund or lifecycle transaction",
+    );
+    assert(artifact.version === "0.1", "artifact version must be 0.1");
+    assert(artifact.cluster === PRODUCTION_SOLANA_CLUSTER, "artifact cluster must be solana-mainnet-beta");
+    assert(artifact.network_type === "mainnet", "artifact network_type must be mainnet");
+    assert(artifact.amount && artifact.amount.base_units === PRODUCTION_USDC_BASE_UNITS, "artifact amount must be exactly 10000000");
+    assert(artifact.token && artifact.token.decimals === PRODUCTION_USDC_DECIMALS, "artifact token decimals must be 6");
+    assert(artifact.token.production_asset === true, "artifact token must be marked as production asset");
+    assertSolanaAddress(artifact.program_id, "program_id");
+    assertSolanaAddress(artifact.token.mint, "token.mint");
+  }
+
+  function assertByteArray(bytes, label) {
+    assert(Array.isArray(bytes) && bytes.length > 0, `${label} is required`);
+    for (const byte of bytes) {
+      assert(Number.isInteger(byte) && byte >= 0 && byte <= 255, `${label} must contain bytes`);
+    }
+    return bytes;
+  }
+
+  function assertProductionWalletPayload(payload, expectedSigner, expectedRole, recentBlockhash) {
+    assert(payload && typeof payload === "object", "wallet payload is required");
+    assert(payload.format === PRODUCTION_WALLET_PAYLOAD_FORMAT, "wallet payload format mismatch");
+    assert(payload.signer === expectedSigner, "wallet payload signer mismatch");
+    assert(payload.signer_role === expectedRole, "wallet payload signer role mismatch");
+    assert(payload.recent_blockhash === recentBlockhash, "wallet payload blockhash mismatch");
+    assertSolanaAddress(payload.signer, "wallet payload signer");
+    assertSolanaAddress(payload.recent_blockhash, "wallet payload recent_blockhash");
+    const messageBytes = assertByteArray(payload.message_bytes, "wallet payload message_bytes");
+    const unsignedBytes = assertByteArray(payload.unsigned_transaction_bytes, "wallet payload unsigned_transaction_bytes");
+    assert(unsignedBytes.length === messageBytes.length + 65, "unsigned transaction bytes size mismatch");
+    assert(payload.message_base64 === base64FromBytes(messageBytes), "wallet payload message_base64 mismatch");
+    assert(payload.unsigned_transaction_base64 === base64FromBytes(unsignedBytes), "wallet payload unsigned_transaction_base64 mismatch");
+    assert(payload.placeholder_signatures === 1, "wallet payload must contain one placeholder signature");
+    return payload;
+  }
+
+  function normalizeProductionPhase(artifact) {
+    if (artifact.kind === "tasc.production_fund_transaction") return "fund";
+    const action = String(artifact.action || "").toLowerCase().replace(/[_\s]+/g, "-");
+    assert(["claim", "attest", "release"].includes(action), "production lifecycle action must be claim, attest, or release");
+    return action;
+  }
+
+  function productionCaptureCommand(phase, artifactFile, signature) {
+    const file = artifactFile || "<transaction-artifact.json>";
+    const sig = signature || `<${phase}-sig>`;
+    const parts = [
+      "npm run real:capture:record --",
+      `--transaction ${file}`,
+      `--signature ${sig}`,
+    ];
+    if (phase === "claim") parts.push("--claim-started-at <iso-claim-started>");
+    if (phase === "release") {
+      parts.push("--release-confirmed-at <iso-release-confirmed>");
+      parts.push("--completed-indexed-at <iso-completed-indexed>");
+    }
+    return parts.join(" ");
+  }
+
+  function summarizeProductionTransactionArtifact(artifact, options) {
+    const settings = options || {};
+    assertProductionBaseArtifact(artifact);
+    const phase = normalizeProductionPhase(artifact);
+    assertSolanaAddress(artifact.buyer, "buyer");
+    assertSolanaAddress(artifact.verifier, "verifier");
+    assertSolanaAddress(artifact.task_account, "task_account");
+    assertSolanaAddress(artifact.recent_blockhash, "recent_blockhash");
+
+    let signer = artifact.signer;
+    let signerRole = artifact.signer_role;
+    let vaultTokenAccount = "";
+    let destinationTokenAccount = "";
+    let resultHash = "";
+
+    if (phase === "fund") {
+      signer = artifact.buyer;
+      signerRole = "buyer";
+      assertSolanaAddress(artifact.buyer_usdc_token_account, "buyer_usdc_token_account");
+      vaultTokenAccount = assertSolanaAddress(artifact.vault_token_account, "vault_token_account");
+      assert(Array.isArray(artifact.instructions) && artifact.instructions.length === 5, "fund artifact must contain five instructions");
+    } else {
+      assertSolanaAddress(signer, "signer");
+      assert(["worker", "verifier"].includes(signerRole), "lifecycle signer_role must be worker or verifier");
+      if (phase === "claim") assert(signerRole === "worker", "claim signer role must be worker");
+      if (phase === "attest") {
+        assert(signerRole === "verifier", "attest signer role must be verifier");
+        assert(signer === artifact.verifier, "attest signer must match verifier");
+        resultHash = assertHex(artifact.instruction && artifact.instruction.result_hash, 32, "instruction.result_hash");
+      }
+      if (phase === "release") {
+        assert(signerRole === "worker", "release signer role must be worker");
+        assert(artifact.settlement, "release settlement is required");
+        assert(artifact.settlement.destination_role === "worker", "release destination role must be worker");
+        vaultTokenAccount = assertSolanaAddress(artifact.settlement.vault_token_account, "settlement.vault_token_account");
+        destinationTokenAccount = assertSolanaAddress(artifact.settlement.destination_token_account, "settlement.destination_token_account");
+        assert(artifact.settlement.token_program_id === TOKEN_PROGRAM_ID, "release token program mismatch");
+      }
+    }
+
+    const walletPayload = assertProductionWalletPayload(
+      artifact.wallet_payload,
+      signer,
+      signerRole,
+      artifact.recent_blockhash,
+    );
+    const artifactFile = settings.artifactFile || "<transaction-artifact.json>";
+    return {
+      ok: true,
+      kind: "tasc.production_wallet_artifact.summary",
+      version: "0.1",
+      artifact_kind: artifact.kind,
+      artifact_file: artifactFile,
+      phase,
+      cluster: artifact.cluster,
+      network_type: artifact.network_type,
+      signer,
+      signer_role: signerRole,
+      buyer: artifact.buyer,
+      verifier: artifact.verifier,
+      program_id: artifact.program_id,
+      token_mint: artifact.token.mint,
+      amount_base_units: artifact.amount.base_units,
+      task_account: artifact.task_account,
+      vault_token_account: vaultTokenAccount || null,
+      destination_token_account: destinationTokenAccount || null,
+      result_hash: resultHash || null,
+      recent_blockhash: artifact.recent_blockhash,
+      unsigned_transaction_sha256: walletPayload.unsigned_transaction_sha256 || null,
+      wallet_payload: walletPayload,
+      capture_command: productionCaptureCommand(phase, artifactFile),
+    };
+  }
+
   function readU64Le(bytes, offset) {
     let value = 0n;
     for (let i = 7; i >= 0; i -= 1) value = (value * 256n) + BigInt(bytes[offset + i]);
@@ -1097,6 +1239,7 @@
     sha256HexFromText,
     solanaSettlementAccountsForAction,
     solanaNextAction,
+    summarizeProductionTransactionArtifact,
     submitSolanaWalletTransaction,
     solanaWalletRole,
     taskKey,
