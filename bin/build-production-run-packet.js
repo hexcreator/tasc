@@ -316,6 +316,15 @@ function buildPreflightCommand(config) {
   ].join("");
 }
 
+function buildFundCommand(config, artifacts) {
+  return [
+    "npm run real:fund:build --",
+    ` --signed-intent ${artifacts.intent.signed_intent_file}`,
+    ` --buyer-usdc-token-account ${commandValue(config.buyer_usdc_token_account, "<buyer-usdc-account>")}`,
+    " --production-rpc-url <mainnet-rpc-url>",
+  ].join("");
+}
+
 function buildPayoutCommand(config) {
   return [
     "npm run real:payout:build --",
@@ -388,14 +397,24 @@ function commandSequence(config, artifacts) {
     },
     {
       step: 6,
-      phase: "fund-mainnet-task",
-      manual_action: "Using the signed intent and a wallet, create/fund the mainnet task, vault token account, and 10 USDC transfer; capture the fund signature, task account, and vault token account.",
+      phase: "build-mainnet-fund-transaction",
+      command: buildFundCommand(config, artifacts),
+      output: ".tascverifier/production-fund-transaction.json",
+      required_for_goal: true,
+      sends_transactions: false,
+      calls_rpc: true,
+      rpc_url_redacted: true,
+    },
+    {
+      step: 7,
+      phase: "wallet-send-mainnet-fund-transaction",
+      manual_action: "Submit .tascverifier/production-fund-transaction.json with the buyer wallet; capture the returned fund signature, task account, and vault token account.",
       required_for_goal: true,
       sends_transactions: true,
       network: DEFAULT_CLUSTER,
     },
     {
-      step: 7,
+      step: 8,
       phase: "worker-claim",
       manual_action: "Start the payout timer when the worker claim transaction is submitted; capture the confirmed claim signature.",
       required_for_goal: true,
@@ -403,7 +422,7 @@ function commandSequence(config, artifacts) {
       network: DEFAULT_CLUSTER,
     },
     {
-      step: 8,
+      step: 9,
       phase: "verifier-attest",
       manual_action: "Verifier attests pass with the worker result hash; capture the confirmed attest signature.",
       required_for_goal: true,
@@ -411,7 +430,7 @@ function commandSequence(config, artifacts) {
       network: DEFAULT_CLUSTER,
     },
     {
-      step: 9,
+      step: 10,
       phase: "release-to-worker",
       manual_action: "Release the passed task to the worker USDC token account; capture the release signature and confirmation timestamp.",
       required_for_goal: true,
@@ -419,7 +438,7 @@ function commandSequence(config, artifacts) {
       network: DEFAULT_CLUSTER,
     },
     {
-      step: 10,
+      step: 11,
       phase: "build-production-payout-evidence",
       command: buildPayoutCommand(config),
       output: artifacts.production_payout.file,
@@ -429,7 +448,7 @@ function commandSequence(config, artifacts) {
       rpc_url_redacted: true,
     },
     {
-      step: 11,
+      step: 12,
       phase: "validate-real-money-readiness",
       command: buildReadinessCommand(config),
       required_for_goal: true,
@@ -581,6 +600,7 @@ function validatePacket(packet) {
   [
     "build-mainnet-buyer-intent",
     "mainnet-preflight",
+    "build-mainnet-fund-transaction",
     "build-production-payout-evidence",
     "validate-real-money-readiness",
   ].forEach((phase) => {
