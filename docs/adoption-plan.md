@@ -30,6 +30,7 @@ Done:
 - static feed import exists for `tasc.index`, raw entry arrays, and hosted proof-summary indexes
 - `npm run beta:feed` builds a same-origin `web/feed/proof-feed.json` bundle for free static hosting
 - `npm run beta:claimable:plan` plans a guarded fresh active task publisher that writes `web/feed/claimable-feed.json`
+- `npm run beta:session:plan` plans the guarded fresh active task plus localhost app/verifier session, with the verifier pinned to `web/feed/active.claimable.index.json`
 - admitted feed entries carry signed task inputs, input hash, output schema, and verifier rules
 - worker submissions can be captured as hashable proof JSON from the static web task card
 - captured worker proofs can be ingested into `tasc.attestation` output with Solana-ready attest hashes
@@ -43,9 +44,10 @@ Done:
 
 Next:
 
-- live-test the guarded wallet send flow with Phantom or another injected Solana wallet using `npm run beta:local`, export QA evidence, and run `npm run beta:qa -- ~/Downloads/tasc-private-beta-qa.json --solana-rpc-url https://api.devnet.solana.com`; mock-provider coverage exists, but extension-prompt QA is still required
+- live-test the guarded wallet send flow with Phantom or another injected Solana wallet using `GLOBAL_TASC_ALLOW_BETA_CLAIMABLE_PUBLISH=1 npm run beta:session`, export QA evidence, and run `npm run beta:qa -- ~/Downloads/tasc-private-beta-qa.json --solana-rpc-url https://api.devnet.solana.com`; mock-provider coverage exists, but extension-prompt QA is still required
 - use `npm run beta:feed -- --proof-summary examples/solana-devnet/proofs/<run-id>/proof-summary.json` after fresh proof runs to publish static feed artifacts
 - use guarded `npm run beta:claimable` immediately before wallet-extension QA when a real active claimable task is needed
+- use guarded `npm run beta:session` as the preferred just-in-time active inventory plus verifier session path
 - deploy the verifier API and connect durable artifacts back into hosted feed/index publication
 - add a short demo video or GIF
 - keep starter issues updated as protocol milestones land
@@ -73,6 +75,7 @@ npm run validate:verifier-api
 npm run validate:private-beta-local
 npm run validate:private-beta-qa-runner
 npm run validate:beta-claimable-publisher
+npm run validate:private-beta-session-runner
 npm run validate:solana-lifecycle-tx
 npm run validate:solana-spl-settlement
 ```
@@ -82,7 +85,8 @@ Next:
 - keep improving the `demo` script so it is the default first-run path
 - use `beta:local` as the default operator session for wallet-extension QA
 - use `beta:feed` as the default static artifact publication path
-- use `beta:claimable` as the just-in-time active inventory publication path
+- use `beta:session` as the default just-in-time active inventory plus local verifier path
+- use `beta:claimable` as the lower-level active inventory publication path
 - keep improving the `devnet:proof` script so it reads existing public artifacts without sending transactions
 - keep live sending commands behind guard env vars
 

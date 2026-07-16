@@ -178,6 +178,7 @@ npm run beta:local
 npm run beta:qa
 npm run beta:feed
 npm run beta:claimable:plan
+npm run beta:session:plan
 ```
 
 `beta:local` serves the static app and verifier API together on localhost, prints the app URL, verifier URL, local config URL, and bearer token, writes verifier artifacts under `.tascverifier/`, and lets the app auto-fill the Verifier API panel from same-origin local config. After a wallet-extension run, use `Export QA Evidence` to download a redacted `tasc.private_beta.qa_evidence` bundle with feed state, verifier results, and wallet transaction signatures.
@@ -192,9 +193,18 @@ For active private-beta inventory, plan a fresh funded 60-second claimable task 
 
 ```bash
 npm run beta:claimable:plan
+npm run beta:session:plan
 ```
 
 The live path is guarded by `GLOBAL_TASC_ALLOW_BETA_CLAIMABLE_PUBLISH=1`. When run, it creates a fresh devnet SPL test-token task, admits it as claimable inventory, and publishes `web/feed/claimable-feed.json`. The static app tries that active feed before falling back to the completed proof feed.
+
+Use `beta:session` when you are ready for wallet-extension QA against a fresh active task:
+
+```bash
+GLOBAL_TASC_ALLOW_BETA_CLAIMABLE_PUBLISH=1 npm run beta:session
+```
+
+That command publishes a fresh active claimable feed, starts the localhost static app plus verifier API, and points the verifier at `web/feed/active.claimable.index.json` so worker proof ingestion trusts the same task the browser loads through `Load Hosted Feed`.
 
 `beta:qa` prints the wallet QA runbook when no evidence path is provided. Validate a real exported bundle with:
 
@@ -205,7 +215,7 @@ npm run beta:qa -- ~/Downloads/tasc-private-beta-qa.json \
 
 That wrapper enforces wallet-send, verifier-ingestion, worker-proof, live-account, and Solana RPC checks. Use `--offline` only for a local schema check; it does not count as a final wallet QA pass.
 
-Headless validation covers the bytes, API auth/persistence behavior, guarded UI, mock wallet-provider submission transports, local verifier auto-fill, QA evidence export wiring, QA evidence redaction checks, optional Solana RPC evidence checks, the local beta launcher, and the guided QA runner; a real wallet-extension QA pass is still required before treating this as beta-ready UX.
+Headless validation covers the bytes, API auth/persistence behavior, guarded UI, mock wallet-provider submission transports, local verifier auto-fill, QA evidence export wiring, QA evidence redaction checks, optional Solana RPC evidence checks, the local beta launcher, the active-session runner, and the guided QA runner; a real wallet-extension QA pass is still required before treating this as beta-ready UX.
 
 ## Repository Map
 

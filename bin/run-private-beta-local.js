@@ -233,7 +233,7 @@ function sessionSummary(config) {
     verifier_artifacts: config.artifactDir,
     wallet_qa_steps: [
       "Open app_url in a browser with Phantom or Solflare on devnet.",
-      "Load Devnet Proof.",
+      "Click Load Hosted Feed, or Load Devnet Proof when using a manual proof artifact.",
       "Confirm the Verifier API panel auto-filled from local_config_url; enter verifier_api_url and verifier_bearer_token manually only if needed.",
       "Connect the role wallet, refresh Solana status, enable wallet sends, and submit the prompted role action.",
       "Capture worker proof, submit it to the verifier API, then use the returned attest hash for verifier attest and release/refund.",

@@ -61,6 +61,8 @@ npm run beta:feed -- --proof-summary examples/solana-devnet/proofs/<run-id>/proo
 
 For live active inventory, `npm run beta:claimable:plan` shows the guarded publish path. `GLOBAL_TASC_ALLOW_BETA_CLAIMABLE_PUBLISH=1 npm run beta:claimable` creates a fresh devnet SPL-funded 60-second task, scans the live task account into funding evidence, admits it as a claimable index, and writes `web/feed/claimable-feed.json`. The hosted loader tries `./feed/claimable-feed.json` before falling back to the completed proof feed.
 
+For wallet-extension QA against a fresh active task, `npm run beta:session:plan` shows the combined path. `GLOBAL_TASC_ALLOW_BETA_CLAIMABLE_PUBLISH=1 npm run beta:session` publishes a fresh active claimable feed, starts the localhost app and verifier API, and configures the verifier to trust `web/feed/active.claimable.index.json`. This keeps the browser's `Load Hosted Feed` inventory and the verifier's trusted index on the same just-in-time task.
+
 Completed index entries replace older claimable entries for the same Solana task account, so proof bundles can show the final `Released` or `Refunded` state instead of duplicating the same task.
 
 When entries include signed task metadata, the claimable card shows the display reward, relative deadline, concrete input URL, expected output field, verifier rules, and input hash. This keeps the worker's fast path inside the same feed artifact instead of requiring a separate task-description service.
@@ -122,6 +124,7 @@ Run:
 npm run beta:plan
 npm run beta:local
 npm run beta:qa
+npm run beta:session:plan
 ```
 
 `beta:local` starts a localhost-only static file server and verifier API together. If `TASC_VERIFIER_API_TOKEN` is unset, it generates an ephemeral bearer token and prints it with:
@@ -134,6 +137,14 @@ npm run beta:qa
 - wallet-extension QA steps
 
 The static app fetches `./tasc-local-config.json` on load. When that local-only config exists, the app auto-fills the Verifier API URL/token unless browser storage already has a manually entered verifier pointed at a different API URL. Hosted static deployments do not provide that file and continue without auto-fill.
+
+Use the combined active session when a fresh claimable task is needed for the same run:
+
+```sh
+GLOBAL_TASC_ALLOW_BETA_CLAIMABLE_PUBLISH=1 npm run beta:session
+```
+
+The command is guarded because it sends devnet setup/fund transactions. Its plan mode sends nothing and is the recommended preflight.
 
 The Beta Evidence panel shows whether the current browser state is ready for strict QA validation. It tracks feed inventory, worker proof capture, verifier ingestion, wallet send evidence, live account refresh evidence, and verifier-token redaction.
 
@@ -217,6 +228,7 @@ npm run validate:verifier-api
 npm run validate:private-beta-local
 npm run validate:private-beta-qa-evidence
 npm run validate:beta-claimable-publisher
+npm run validate:private-beta-session-runner
 ```
 
 The validator checks that:
@@ -244,6 +256,7 @@ The validator checks that:
 - the browser can build wallet transaction payloads for Solana `claim`, `attest`, `release`, `refund`, and `timeout-refund`
 - the browser wallet submission adapter accepts mock `signAndSendTransaction` and `signTransaction` providers, serializes the signed transaction bytes for RPC fallback, and rejects unsupported providers or missing signatures
 - the local private-beta launcher serves the static app and verifier API together, restricts static paths, enforces bearer auth, writes verifier artifacts/ledger, and accepts a bundled worker proof
+- the active private-beta session runner plans without sending transactions, refuses live publish without the existing guard, and starts the verifier against `web/feed/active.claimable.index.json` for the task loaded by `Load Hosted Feed`
 
 ## Limits
 
