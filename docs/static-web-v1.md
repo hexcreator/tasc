@@ -135,7 +135,8 @@ node bin/validate-private-beta-qa-evidence.js ~/Downloads/tasc-private-beta-qa.j
   --require-wallet-send \
   --require-verifier-ingestion \
   --require-worker-submission \
-  --require-live-account
+  --require-live-account \
+  --solana-rpc-url https://api.devnet.solana.com
 ```
 
 The static file server intentionally exposes only `web/`, `examples/`, `assets/`, and `docs/`, so local env files and package metadata are not served.
@@ -225,7 +226,8 @@ The validator checks that:
 - the browser can auto-load same-origin local beta verifier config when served by `beta:local`
 - the browser exposes a redacted `tasc.private_beta.qa_evidence` export for private-beta wallet-extension runs
 - the browser shows a QA evidence readiness panel aligned with the strict evidence validator requirements
-- the exported QA evidence schema validator accepts the safe example fixture and rejects leaked verifier tokens, missing required wallet-send evidence, and mismatched counts
+- the exported QA evidence schema validator accepts the safe example fixture and rejects leaked verifier tokens, missing required wallet-send evidence, mismatched counts, and missing Solana RPC signature status
+- the same validator can optionally verify wallet transaction signatures and decoded Solana task accounts against a live Solana RPC endpoint
 - the browser can build wallet transaction payloads for Solana `claim`, `attest`, `release`, `refund`, and `timeout-refund`
 - the browser wallet submission adapter accepts mock `signAndSendTransaction` and `signTransaction` providers, serializes the signed transaction bytes for RPC fallback, and rejects unsupported providers or missing signatures
 - the local private-beta launcher serves the static app and verifier API together, restricts static paths, enforces bearer auth, writes verifier artifacts/ledger, and accepts a bundled worker proof

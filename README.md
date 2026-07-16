@@ -186,10 +186,11 @@ node bin/validate-private-beta-qa-evidence.js ~/Downloads/tasc-private-beta-qa.j
   --require-wallet-send \
   --require-verifier-ingestion \
   --require-worker-submission \
-  --require-live-account
+  --require-live-account \
+  --solana-rpc-url https://api.devnet.solana.com
 ```
 
-Headless validation covers the bytes, API auth/persistence behavior, guarded UI, mock wallet-provider submission transports, local verifier auto-fill, QA evidence export wiring, QA evidence redaction checks, and the local beta launcher; a real wallet-extension QA pass is still required before treating this as beta-ready UX.
+Headless validation covers the bytes, API auth/persistence behavior, guarded UI, mock wallet-provider submission transports, local verifier auto-fill, QA evidence export wiring, QA evidence redaction checks, optional Solana RPC evidence checks, and the local beta launcher; a real wallet-extension QA pass is still required before treating this as beta-ready UX.
 
 ## Repository Map
 
