@@ -254,6 +254,21 @@ GLOBAL_TASC_ALLOW_SOLANA_DEVNET_PROOF=1 npm run prove:solana-devnet
 
 Do this only with devnet keys and funded devnet SOL balances.
 
+To measure the actual under-60-second payout path on devnet test tokens, use the 60-second command alias:
+
+```bash
+npm run earn:devnet:plan
+GLOBAL_TASC_ALLOW_SOLANA_DEVNET_PROOF=1 npm run earn:devnet
+```
+
+The generated `proof-summary.json` includes `timed_payout`, with claim-to-release timing, claim-to-completed-index timing, the worker destination token account, and explicit `under_60s` booleans. This is still devnet/test-token evidence, not real-money income.
+
+Validate a generated timed proof with:
+
+```bash
+npm run validate:timed-payout -- examples/solana-devnet/proofs/<run-id>/proof-summary.json
+```
+
 ## Why Tasc Might Work
 
 Most micro-work systems fail on trust and timing. Workers do not want to wait for payment, and buyers do not want to pay before proof. Tasc narrows the problem:

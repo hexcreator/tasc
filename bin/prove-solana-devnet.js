@@ -23,6 +23,7 @@ const DEFAULT_DEVNET_PROGRAM_ID = "FAqKhKke5pZr4TK6kXq9aKR98hWFy19SMQG9eGfXQrRM"
 const DEFAULT_SUBMISSION = "examples/submissions/summarize_url.pass.md";
 const DEFAULT_LEDGER = "examples/ledger.json";
 const DEFAULT_INPUTS = { url: "https://docs.cdp.coinbase.com/x402/welcome" };
+const PAYOUT_TARGET_MS = 60_000;
 const ALLOW_ENV = "GLOBAL_TASC_ALLOW_SOLANA_DEVNET_PROOF";
 const FAIL_RESULT_HASH = `0x${"11".repeat(32)}`;
 const SUBGUARDS = {
@@ -191,10 +192,20 @@ function plan(options = {}) {
       "failure refund: fund -> claim -> attest fail -> refund -> completed index",
       "timeout refund: sign an already-expired task -> fund -> timeout-refund -> completed index",
     ],
+    timed_payout_target: {
+      branch: "release",
+      display_reward: "10 USDC",
+      target_seconds: 60,
+      measured_from: "claim transaction start",
+      measured_to: "release confirmation and completed index scan",
+      live_deadline: options.liveDeadline || "10m",
+      recommended_60s_command: "GLOBAL_TASC_ALLOW_SOLANA_DEVNET_PROOF=1 npm run earn:devnet",
+    },
     generated_artifacts: [
       "fresh .tasc files with unique task hashes",
       "signed Solana intents",
       "SPL setup, fund, lifecycle, settlement, and index JSON evidence",
+      "timed release-branch payout report",
       "proof-summary.json",
     ],
     safety: {
@@ -203,6 +214,48 @@ function plan(options = {}) {
       writes_under_gitignored_proof_dir_by_default: true,
       run_sets_only_existing_per_action_devnet_guards_after_top_level_guard: true,
     },
+  };
+}
+
+function nowMark(label) {
+  return {
+    label,
+    unix_ms: Date.now(),
+    iso: new Date().toISOString(),
+  };
+}
+
+function elapsedMs(start, end) {
+  return Math.max(0, end.unix_ms - start.unix_ms);
+}
+
+function payoutTiming(input) {
+  const {
+    fundedReady,
+    claimStarted,
+    releaseConfirmed,
+    completedIndexed,
+    liveDeadline,
+  } = input;
+  const claimToReleaseMs = elapsedMs(claimStarted, releaseConfirmed);
+  const claimToCompletedIndexMs = elapsedMs(claimStarted, completedIndexed);
+  const fundedToCompletedIndexMs = elapsedMs(fundedReady, completedIndexed);
+  return {
+    target_seconds: 60,
+    target_ms: PAYOUT_TARGET_MS,
+    display_reward: "10 USDC",
+    live_deadline: liveDeadline,
+    measured_from: "claim transaction start",
+    measured_to: "release confirmation and completed index scan",
+    funded_ready_at: fundedReady.iso,
+    claim_started_at: claimStarted.iso,
+    release_confirmed_at: releaseConfirmed.iso,
+    completed_indexed_at: completedIndexed.iso,
+    claim_to_release_ms: claimToReleaseMs,
+    claim_to_completed_index_ms: claimToCompletedIndexMs,
+    funded_to_completed_index_ms: fundedToCompletedIndexMs,
+    under_60s_to_release_confirmation: claimToReleaseMs <= PAYOUT_TARGET_MS,
+    under_60s_to_completed_index: claimToCompletedIndexMs <= PAYOUT_TARGET_MS,
   };
 }
 
@@ -310,9 +363,10 @@ async function completeSettlement(input) {
 }
 
 async function runReleaseBranch(input) {
-  const { envFile, paths, setup, signed } = input;
+  const { envFile, paths, setup, signed, liveDeadline } = input;
   const label = "release";
   const funded = await fundAndIndex({ envFile, paths, signed, setup, label });
+  const fundedReady = nowMark("funded_ready");
   const claimFile = paths.file(`${label}.claim.live`);
   const claimedAccountFile = paths.file(`${label}.claimed-account.live`);
   const workerTokenFile = paths.file(`${label}.worker-token.live`);
@@ -321,6 +375,7 @@ async function runReleaseBranch(input) {
   const releasePlanFile = paths.file(`${label}.release-plan.live`);
   const releaseFile = paths.file(`${label}.release.live`);
 
+  const claimStarted = nowMark("claim_started");
   const claim = await lifecycle.sendAction("claim", {
     envFile,
     signedFile: signed.signature_file,
@@ -356,6 +411,7 @@ async function runReleaseBranch(input) {
     destinationTokenAccount: releasePlan.destination_token_account,
     out: releaseFile,
   });
+  const releaseConfirmed = nowMark("release_confirmed");
   const settlement = await completeSettlement({
     envFile,
     paths,
@@ -363,6 +419,7 @@ async function runReleaseBranch(input) {
     txFile: releaseFile,
     label,
   });
+  const completedIndexed = nowMark("completed_indexed");
   return {
     ...funded,
     claim_file: claimFile,
@@ -376,6 +433,25 @@ async function runReleaseBranch(input) {
     attest_signature: attest.signature,
     worker_token_signature: workerToken.signature || null,
     release_signature: release.signature,
+    payout: {
+      display_reward: "10 USDC",
+      amount: funded.amount || releasePlan.amount,
+      token_mint: releasePlan.token_mint,
+      destination_role: releasePlan.destination_role,
+      destination_owner: releasePlan.destination_owner,
+      destination_token_account: releasePlan.destination_token_account,
+      completed_status: settlement.completed_status,
+      settlement_action: settlement.action,
+      vault_balance_after: settlement.vault_balance_after,
+      destination_balance_after: settlement.destination_balance_after,
+    },
+    timing: payoutTiming({
+      fundedReady,
+      claimStarted,
+      releaseConfirmed,
+      completedIndexed,
+      liveDeadline,
+    }),
     ...settlement,
   };
 }
@@ -535,9 +611,32 @@ async function run(options = {}) {
   });
 
   const branches = {
-    release: await runReleaseBranch({ envFile, paths, setup, signed: releaseSigned }),
+    release: await runReleaseBranch({
+      envFile,
+      paths,
+      setup,
+      signed: releaseSigned,
+      liveDeadline: options.liveDeadline || "10m",
+    }),
     refund: await runRefundBranch({ envFile, paths, setup, signed: refundSigned }),
     timeout: await runTimeoutBranch({ envFile, paths, setup, signed: timeoutSigned }),
+  };
+  const timedPayout = {
+    ok: branches.release.completed_status === "Released",
+    branch: "release",
+    task_hash: releaseSigned.task_hash,
+    task_account: branches.release.task_account,
+    claim_signature: branches.release.claim_signature,
+    attest_signature: branches.release.attest_signature,
+    release_signature: branches.release.release_signature,
+    payout: branches.release.payout,
+    timing: branches.release.timing,
+    evidence: {
+      claimable_index_file: branches.release.claimable_index_file,
+      completed_index_file: branches.release.completed_index_file,
+      settlement_file: branches.release.settlement_file,
+      release_file: branches.release.release_file,
+    },
   };
 
   const summary = {
@@ -569,6 +668,7 @@ async function run(options = {}) {
       refund: refundSigned,
       timeout: timeoutSigned,
     },
+    timed_payout: timedPayout,
     branches,
   };
   writeJson(paths.file("proof-summary"), summary);

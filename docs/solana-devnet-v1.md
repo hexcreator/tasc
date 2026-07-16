@@ -422,6 +422,31 @@ GLOBAL_TASC_ALLOW_SOLANA_DEVNET_PROOF=1 npm run prove:solana-devnet
 
 The live runner creates fresh task names and hashes, writes artifacts under ignored `examples/solana-devnet/proofs/`, runs SPL setup once, then proves three branches: pass release, verifier-failed refund, and timeout refund.
 
+For the explicit `$10 in under 60 seconds` devnet measurement, use:
+
+```bash
+npm run earn:devnet:plan
+GLOBAL_TASC_ALLOW_SOLANA_DEVNET_PROOF=1 npm run earn:devnet
+```
+
+This is the same guarded live proof runner with the release task deadline set to `60s`. The generated `proof-summary.json` includes a top-level `timed_payout` object with:
+
+- `payout.display_reward`
+- `payout.destination_token_account`
+- `claim_signature`, `attest_signature`, and `release_signature`
+- `timing.claim_to_release_ms`
+- `timing.claim_to_completed_index_ms`
+- `timing.under_60s_to_release_confirmation`
+- `timing.under_60s_to_completed_index`
+
+The measured window starts when the worker claim transaction starts and ends at release confirmation plus completed-index scan. It proves the devnet/test-token payout mechanics; production still needs real USDC/liquidity, deployed verifier operations, and abuse controls.
+
+Validate the generated timing evidence with:
+
+```bash
+npm run validate:timed-payout -- examples/solana-devnet/proofs/<run-id>/proof-summary.json
+```
+
 The next real implementation steps are:
 
 1. Add wallet-backed browser claim/attest controls once the static proof should become interactive.
