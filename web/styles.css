@@ -291,6 +291,56 @@ button:disabled {
   overflow-wrap: anywhere;
 }
 
+.qa-readiness {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--panel-subtle);
+}
+
+.qa-readiness-title {
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.qa-readiness-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.qa-check {
+  display: inline-flex;
+  min-height: 24px;
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 3px 8px;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.qa-check.ready {
+  border-color: #abefc6;
+  background: #ecfdf3;
+  color: var(--success);
+}
+
+.qa-check.missing {
+  border-color: #fecdca;
+  background: #fef3f2;
+  color: var(--danger);
+}
+
+.qa-readiness-summary {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
 .feed {
   min-width: 0;
   overflow: hidden;

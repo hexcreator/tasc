@@ -12,6 +12,7 @@
     feedFiles: document.querySelector("#feed-files"),
     importFeed: document.querySelector("#import-feed"),
     exportQaEvidence: document.querySelector("#export-qa-evidence"),
+    qaReadiness: document.querySelector("#qa-readiness"),
     solanaRpcUrl: document.querySelector("#solana-rpc-url"),
     connectSolana: document.querySelector("#connect-solana"),
     refreshSolana: document.querySelector("#refresh-solana"),
@@ -373,6 +374,69 @@
       verifier_ingestions: state.verifierIngestions || {},
       cursor: state.cursor || null,
     };
+  }
+
+  function qaEvidenceReadiness(evidence) {
+    const verifier = evidence.verifier || {};
+    const entries = Array.isArray(evidence.entries) ? evidence.entries : [];
+    const checks = [
+      {
+        id: "feed",
+        label: "Feed",
+        pass: entries.length > 0,
+      },
+      {
+        id: "worker",
+        label: "Worker proof",
+        pass: evidence.counts.worker_submissions > 0,
+      },
+      {
+        id: "verifier",
+        label: "Verifier result",
+        pass: evidence.counts.verifier_ingestions > 0 && recordValues(evidence.verifier_ingestions).some((ingestion) => ingestion.accepted === true),
+      },
+      {
+        id: "wallet",
+        label: "Wallet send",
+        pass: evidence.counts.wallet_submissions > 0,
+      },
+      {
+        id: "live",
+        label: "Live account",
+        pass: entries.some((entry) => entry.live_account),
+      },
+      {
+        id: "redaction",
+        label: "Token redacted",
+        pass: evidence.redactions.includes("verifier.token") && (!verifier.token_present || verifier.token === "<redacted>"),
+      },
+    ];
+    return {
+      checks,
+      ready: checks.every((check) => check.pass),
+    };
+  }
+
+  function renderQaReadiness(state) {
+    const evidence = buildPrivateBetaQaEvidence(state);
+    const readiness = qaEvidenceReadiness(evidence);
+    const title = document.createElement("div");
+    title.className = "qa-readiness-title";
+    title.textContent = readiness.ready ? "Strict QA evidence ready" : "Strict QA evidence incomplete";
+
+    const list = document.createElement("div");
+    list.className = "qa-readiness-list";
+    for (const check of readiness.checks) {
+      const item = document.createElement("span");
+      item.className = `qa-check ${check.pass ? "ready" : "missing"}`;
+      item.textContent = check.label;
+      list.append(item);
+    }
+
+    const summary = document.createElement("div");
+    summary.className = "qa-readiness-summary";
+    summary.textContent = `${evidence.counts.wallet_submissions} wallet send(s), ${evidence.counts.verifier_ingestions} verifier result(s), ${evidence.counts.worker_submissions} worker proof(s)`;
+    el.qaReadiness.replaceChildren(title, list, summary);
   }
 
   function downloadJson(filename, payload) {
@@ -758,6 +822,7 @@
     const state = readState();
     const entries = state.entries || [];
     const claimableEntries = state.claimableEntries || [];
+    renderQaReadiness(state);
     el.taskCount.textContent = String(entries.length + claimableEntries.length);
     el.walletRole.textContent = walletRoleText(state);
     el.solanaWallet.textContent = walletReadout(state);

@@ -47,6 +47,7 @@ function assertNoExternalRuntimeDependencies() {
   assert(html.includes("verifier-api-url"), "index should expose verifier API URL");
   assert(html.includes("verifier-api-token"), "index should expose verifier API token");
   assert(html.includes("export-qa-evidence"), "index should expose private beta QA evidence export");
+  assert(html.includes("qa-readiness"), "index should expose QA evidence readiness");
   const app = read(path.join(WEB_DIR, "app.js"));
   assert(app.includes("worker-output"), "app should expose worker output capture");
   assert(app.includes("submission-json"), "app should expose submission proof JSON");
@@ -62,6 +63,14 @@ function assertNoExternalRuntimeDependencies() {
   assert(app.includes("redactedVerifierConfig"), "app should redact verifier secrets from QA evidence");
   assert(app.includes("redactions: [\"verifier.token\"]"), "app should declare verifier token redaction");
   assert(app.includes("TascPrivateBetaQaEvidence"), "app should expose safe QA evidence builder");
+  assert(app.includes("qaEvidenceReadiness"), "app should compute QA evidence readiness");
+  assert(app.includes("Strict QA evidence ready"), "app should show strict QA readiness state");
+  assert(app.includes("Wallet send"), "app should track wallet-send readiness");
+  assert(app.includes("Verifier result"), "app should track verifier-ingestion readiness");
+  assert(app.includes("Worker proof"), "app should track worker-proof readiness");
+  assert(app.includes("Live account"), "app should track live-account readiness");
+  const styles = read(path.join(WEB_DIR, "styles.css"));
+  assert(styles.includes(".qa-readiness"), "styles should cover QA readiness panel");
 
   for (const file of ["app.js", "demo-index.js", "tasc-web-core.js"]) {
     const source = read(path.join(WEB_DIR, file));

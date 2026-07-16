@@ -124,6 +124,8 @@ npm run beta:local
 
 The static app fetches `./tasc-local-config.json` on load. When that local-only config exists, the app auto-fills the Verifier API URL/token unless browser storage already has a manually entered verifier pointed at a different API URL. Hosted static deployments do not provide that file and continue without auto-fill.
 
+The Beta Evidence panel shows whether the current browser state is ready for strict QA validation. It tracks feed inventory, worker proof capture, verifier ingestion, wallet send evidence, live account refresh evidence, and verifier-token redaction.
+
 After a live wallet-extension run, `Export QA Evidence` downloads a redacted `tasc.private_beta.qa_evidence` bundle. It includes feed source, wallet address, task summaries, worker proof hashes, verifier ingestion results, wallet transaction signatures, and local cursor state. It does not include the verifier bearer token; the bundle records that value as `"<redacted>"` and declares `redactions: ["verifier.token"]`.
 
 Validate the exported file before treating it as a private-beta wallet QA pass:
@@ -222,6 +224,7 @@ The validator checks that:
 - the browser can submit captured proof JSON to the verifier API, persist `tasc.verifier.ingestion`, and fill the Solana attest verdict/hash from the response
 - the browser can auto-load same-origin local beta verifier config when served by `beta:local`
 - the browser exposes a redacted `tasc.private_beta.qa_evidence` export for private-beta wallet-extension runs
+- the browser shows a QA evidence readiness panel aligned with the strict evidence validator requirements
 - the exported QA evidence schema validator accepts the safe example fixture and rejects leaked verifier tokens, missing required wallet-send evidence, and mismatched counts
 - the browser can build wallet transaction payloads for Solana `claim`, `attest`, `release`, `refund`, and `timeout-refund`
 - the browser wallet submission adapter accepts mock `signAndSendTransaction` and `signTransaction` providers, serializes the signed transaction bytes for RPC fallback, and rejects unsupported providers or missing signatures
