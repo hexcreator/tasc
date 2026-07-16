@@ -111,6 +111,7 @@ Run:
 ```sh
 npm run beta:plan
 npm run beta:local
+npm run beta:qa
 ```
 
 `beta:local` starts a localhost-only static file server and verifier API together. If `TASC_VERIFIER_API_TOKEN` is unset, it generates an ephemeral bearer token and prints it with:
@@ -128,16 +129,14 @@ The Beta Evidence panel shows whether the current browser state is ready for str
 
 After a live wallet-extension run, `Export QA Evidence` downloads a redacted `tasc.private_beta.qa_evidence` bundle. It includes feed source, wallet address, task summaries, worker proof hashes, verifier ingestion results, wallet transaction signatures, and local cursor state. It does not include the verifier bearer token; the bundle records that value as `"<redacted>"` and declares `redactions: ["verifier.token"]`.
 
-Validate the exported file before treating it as a private-beta wallet QA pass:
+`beta:qa` prints the expected wallet-extension runbook when no evidence path is provided. Validate the exported file before treating it as a private-beta wallet QA pass:
 
 ```sh
-node bin/validate-private-beta-qa-evidence.js ~/Downloads/tasc-private-beta-qa.json \
-  --require-wallet-send \
-  --require-verifier-ingestion \
-  --require-worker-submission \
-  --require-live-account \
+npm run beta:qa -- ~/Downloads/tasc-private-beta-qa.json \
   --solana-rpc-url https://api.devnet.solana.com
 ```
+
+The wrapper always requires wallet-send, accepted verifier-ingestion, worker-proof, and live-account evidence. It requires Solana RPC for a final wallet QA pass; `--offline` is available only for schema-only checks.
 
 The static file server intentionally exposes only `web/`, `examples/`, `assets/`, and `docs/`, so local env files and package metadata are not served.
 

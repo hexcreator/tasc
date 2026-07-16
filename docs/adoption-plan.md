@@ -37,10 +37,11 @@ Done:
 - `npm run beta:local` starts a local private-beta operator session with the static app and verifier API on localhost, and the app auto-fills verifier URL/token from same-origin local config
 - the static operator console exports redacted `tasc.private_beta.qa_evidence` bundles for private-beta wallet-extension runs
 - exported QA evidence can be validated with strict wallet-send, verifier-ingestion, worker-proof, live-account, and optional Solana RPC confirmation requirements
+- `npm run beta:qa` prints the wallet-extension QA runbook and validates exported evidence with strict final-pass requirements
 
 Next:
 
-- live-test the guarded wallet send flow with Phantom or another injected Solana wallet using `npm run beta:local`, export QA evidence, and run the strict evidence validator with Solana RPC verification; mock-provider coverage exists, but extension-prompt QA is still required
+- live-test the guarded wallet send flow with Phantom or another injected Solana wallet using `npm run beta:local`, export QA evidence, and run `npm run beta:qa -- ~/Downloads/tasc-private-beta-qa.json --solana-rpc-url https://api.devnet.solana.com`; mock-provider coverage exists, but extension-prompt QA is still required
 - deploy the verifier API and connect durable artifacts back into hosted feed/index publication
 - publish a fresh proof index as a hosted feed artifact
 - add a short demo video or GIF
@@ -66,6 +67,7 @@ npm run validate:solana-spl-escrow
 npm run validate:verifier-ingest
 npm run validate:verifier-api
 npm run validate:private-beta-local
+npm run validate:private-beta-qa-runner
 npm run validate:solana-lifecycle-tx
 npm run validate:solana-spl-settlement
 ```
