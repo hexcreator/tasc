@@ -165,7 +165,7 @@ function commandBlock(envFile) {
     env_validate: `npm run real:env:validate -- --env ${envFile}`,
     preflight: `npm run real:preflight -- --env ${envFile}`,
     packet_build: `npm run real:packet:build -- --env ${envFile} --timed-proof examples/solana-devnet/proofs/<run-id>/proof-summary.json`,
-    submitter: "serve web/ as static files, open /production-run.html, and use the packet wallet_submitter handoffs",
+    submitter: "npm run real:submitter:serve, open the printed production_submitter_url, and use the packet wallet_submitter handoffs",
   };
 }
 

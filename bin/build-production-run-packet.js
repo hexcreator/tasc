@@ -440,6 +440,7 @@ function buildCaptureReleaseCommand(config) {
 function walletSubmitterHandoff(phase, artifactFile, role, signer, captureCommand, timing) {
   return {
     page: PRODUCTION_SUBMITTER_PAGE,
+    local_server_command: "npm run real:submitter:serve",
     phase,
     artifact: artifactFile,
     required_wallet_role: role,
@@ -451,7 +452,7 @@ function walletSubmitterHandoff(phase, artifactFile, role, signer, captureComman
     capture_command_after_send: captureCommand,
     timing: timing || null,
     instructions: [
-      `Open ${PRODUCTION_SUBMITTER_PAGE} from a local or hosted copy of web/.`,
+      "Run npm run real:submitter:serve and open the printed production_submitter_url.",
       `Paste or select ${artifactFile}.`,
       `Connect the ${role} wallet and verify it matches the artifact signer.`,
       "Enter the mainnet RPC URL locally in the page.",
@@ -900,6 +901,7 @@ function validatePacket(packet) {
     const step = packet.operator_sequence.find((entry) => entry.phase === phaseName);
     assert(step && step.wallet_submitter, `${phaseName} must include production wallet submitter handoff`);
     assert(step.wallet_submitter.page === PRODUCTION_SUBMITTER_PAGE, `${phaseName} submitter page mismatch`);
+    assert(step.wallet_submitter.local_server_command === "npm run real:submitter:serve", `${phaseName} submitter server command mismatch`);
     assert(step.wallet_submitter.phase === phase, `${phaseName} submitter phase mismatch`);
     assert(step.wallet_submitter.artifact === artifact, `${phaseName} submitter artifact mismatch`);
     assert(step.wallet_submitter.required_wallet_role === role, `${phaseName} submitter role mismatch`);
