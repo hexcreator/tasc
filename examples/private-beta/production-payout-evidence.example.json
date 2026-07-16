@@ -20,9 +20,17 @@
     "base_units": "10000000"
   },
   "settlement": {
+    "program_id": "REPLACE_WITH_DEPLOYED_MAINNET_PROGRAM_ID",
     "completed_status": "Released",
     "action": "release",
+    "task_hash": "REPLACE_WITH_0X_TASK_HASH_FROM_SIGNED_INTENT",
     "task_account": "REPLACE_WITH_MAINNET_TASK_ACCOUNT",
+    "buyer": "REPLACE_WITH_BUYER_WALLET",
+    "worker": "REPLACE_WITH_WORKER_WALLET",
+    "verifier": "REPLACE_WITH_VERIFIER_WALLET",
+    "deadline_unix": "REPLACE_WITH_DEADLINE_UNIX",
+    "nonce": "REPLACE_WITH_NONCE",
+    "result_hash": "REPLACE_WITH_0X_RESULT_HASH_FROM_ATTEST",
     "vault_token_account": "REPLACE_WITH_MAINNET_VAULT_TOKEN_ACCOUNT",
     "destination_role": "worker",
     "destination_token_account": "REPLACE_WITH_MAINNET_WORKER_USDC_TOKEN_ACCOUNT",

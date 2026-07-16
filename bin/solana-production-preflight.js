@@ -381,7 +381,7 @@ function plan(options = {}, processEnv = process.env) {
     },
     next_commands: {
       check: "npm run real:preflight -- --production-rpc-url <mainnet-rpc-url> --expected-genesis-hash <mainnet-genesis-hash> --program-id <program-id> --usdc-mint <mainnet-usdc-mint> --buyer <buyer> --worker <worker> --verifier <verifier> --buyer-usdc-token-account <buyer-usdc-account> --worker-usdc-token-account <worker-usdc-account>",
-      build_payout_evidence: "npm run real:payout:build -- --token-mint <mainnet-usdc-mint> --task-account <task-account> --vault-token-account <vault-token-account> --destination-token-account <worker-usdc-account> --fund-signature <sig> --claim-signature <sig> --attest-signature <sig> --release-signature <sig> --claim-to-release-ms <ms> --claim-to-completed-index-ms <ms> --production-rpc-url <mainnet-rpc-url>",
+      build_payout_evidence: "npm run real:payout:build -- --signed-intent .tascverifier/production-intent/production-intent.signature.json --program-id <program-id> --token-mint <mainnet-usdc-mint> --worker <worker-wallet> --result-hash <0x-result-hash> --task-account <task-account> --vault-token-account <vault-token-account> --destination-token-account <worker-usdc-account> --fund-signature <sig> --claim-signature <sig> --attest-signature <sig> --release-signature <sig> --claim-to-release-ms <ms> --claim-to-completed-index-ms <ms> --production-rpc-url <mainnet-rpc-url>",
     },
   };
 }

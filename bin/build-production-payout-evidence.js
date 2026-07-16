@@ -3,6 +3,7 @@
 const fs = require("fs");
 const path = require("path");
 const { base58Decode, base58Encode } = require("./run-solana-devnet");
+const { verifySignedSolanaIntent } = require("./tascsolana");
 const {
   TOKEN_PROGRAM_ID,
   decodeTokenAccountData,
@@ -28,8 +29,17 @@ function usage() {
     "  --out <file>                              output evidence file; default .tascverifier/production-payout-evidence.json",
     "  --generated-at <iso>                      evidence timestamp; default now",
     "  --cluster <name>                          Solana cluster; default solana-mainnet-beta",
+    "  --signed-intent <file>                    signed production intent; fills program/task/buyer/verifier/deadline/nonce",
+    "  --program-id <address>                    deployed mainnet Global Tasc program id",
     "  --token-mint <address>                    production USDC mint address",
     "  --amount-base-units <n>                   amount in 6-decimal USDC base units; default 10000000",
+    "  --task-hash <0xbytes32>                   task hash from signed intent",
+    "  --buyer <address>                         buyer wallet from signed intent",
+    "  --worker <address>                        worker wallet that claimed and received release",
+    "  --verifier <address>                      verifier wallet from signed intent",
+    "  --deadline-unix <n>                       task deadline from signed intent",
+    "  --nonce <n>                               task nonce from signed intent",
+    "  --result-hash <0xbytes32>                 verifier result hash committed by attest",
     "  --task-account <address>                  production task account",
     "  --vault-token-account <address>           post-release vault token account",
     "  --destination-token-account <address>     worker destination token account",
@@ -62,8 +72,17 @@ function parseArgs(argv) {
     out: DEFAULT_OUT,
     generatedAt: "",
     cluster: DEFAULT_CLUSTER,
+    signedIntent: "",
+    programId: "",
     tokenMint: "",
     amountBaseUnits: DEFAULT_AMOUNT_BASE_UNITS,
+    taskHash: "",
+    buyer: "",
+    worker: "",
+    verifier: "",
+    deadlineUnix: "",
+    nonce: "",
+    resultHash: "",
     taskAccount: "",
     vaultTokenAccount: "",
     destinationTokenAccount: "",
@@ -89,8 +108,17 @@ function parseArgs(argv) {
     if (arg === "--out") options.out = requireValue(args, ++i, arg);
     else if (arg === "--generated-at") options.generatedAt = requireValue(args, ++i, arg);
     else if (arg === "--cluster") options.cluster = requireValue(args, ++i, arg);
+    else if (arg === "--signed-intent") options.signedIntent = requireValue(args, ++i, arg);
+    else if (arg === "--program-id") options.programId = requireValue(args, ++i, arg);
     else if (arg === "--token-mint") options.tokenMint = requireValue(args, ++i, arg);
     else if (arg === "--amount-base-units") options.amountBaseUnits = requireValue(args, ++i, arg);
+    else if (arg === "--task-hash") options.taskHash = requireValue(args, ++i, arg);
+    else if (arg === "--buyer") options.buyer = requireValue(args, ++i, arg);
+    else if (arg === "--worker") options.worker = requireValue(args, ++i, arg);
+    else if (arg === "--verifier") options.verifier = requireValue(args, ++i, arg);
+    else if (arg === "--deadline-unix") options.deadlineUnix = requireValue(args, ++i, arg);
+    else if (arg === "--nonce") options.nonce = requireValue(args, ++i, arg);
+    else if (arg === "--result-hash") options.resultHash = requireValue(args, ++i, arg);
     else if (arg === "--task-account") options.taskAccount = requireValue(args, ++i, arg);
     else if (arg === "--vault-token-account") options.vaultTokenAccount = requireValue(args, ++i, arg);
     else if (arg === "--destination-token-account") options.destinationTokenAccount = requireValue(args, ++i, arg);
@@ -152,6 +180,20 @@ function assertExactTenUsdc(value, label) {
   return parsed;
 }
 
+function assertU64(value, label) {
+  const raw = String(value || "");
+  assert(/^[0-9]+$/.test(raw), `${label} must be a u64 integer string`);
+  const parsed = BigInt(raw);
+  assert(parsed >= 0n && parsed <= ((1n << 64n) - 1n), `${label} exceeds u64`);
+  return parsed;
+}
+
+function assertBytes32(value, label) {
+  const text = assertString(value, label);
+  assert(/^0x[a-fA-F0-9]{64}$/.test(text), `${label} must be bytes32 hex`);
+  return text.toLowerCase();
+}
+
 function assertSolanaAddress(value, label) {
   const text = assertString(value, label);
   assert(/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(text), `${label} must be a Solana base58 address`);
@@ -177,6 +219,34 @@ function assertHttpUrl(value, label) {
 
 function rpcHost(rpcUrl) {
   return new URL(rpcUrl).host;
+}
+
+function readSignedIntent(file, cluster) {
+  if (!file) return null;
+  const signed = loadJson(path.resolve(file));
+  const verified = verifySignedSolanaIntent(signed);
+  assert(verified.ok === true, "signed_intent signature is invalid");
+  const message = signed.intent && signed.intent.message || {};
+  assert(message.cluster === cluster, "signed_intent cluster mismatch");
+  return {
+    signed_intent_hash: signed.intent_hash || null,
+    signer: verified.signer,
+    programId: message.program_id,
+    taskHash: message.task_hash,
+    buyer: message.buyer,
+    verifier: message.verifier,
+    tokenMint: message.token_mint,
+    amountBaseUnits: String(message.amount),
+    deadlineUnix: String(message.deadline_unix),
+    nonce: String(message.nonce),
+  };
+}
+
+function resolvedField(explicitValue, derivedValue, label) {
+  if (explicitValue && derivedValue) {
+    assert(String(explicitValue) === String(derivedValue), `${label} does not match signed_intent`);
+  }
+  return explicitValue || derivedValue || "";
 }
 
 function parseIntegerMs(value, label) {
@@ -283,8 +353,17 @@ async function resolveBalances(options, rpcCall) {
 async function buildEvidence(options, rpcCall = defaultRpcCall) {
   assert(options.cluster === DEFAULT_CLUSTER, `cluster must be ${DEFAULT_CLUSTER}`);
   assert(!TEST_NETWORK_RE.test(options.cluster), "cluster must not be devnet/testnet/local/example");
-  const amountBaseUnits = assertExactTenUsdc(options.amountBaseUnits, "amount_base_units");
-  assertSolanaAddress(options.tokenMint, "token_mint");
+  const signedIntent = readSignedIntent(options.signedIntent, options.cluster);
+  const programId = assertSolanaAddress(resolvedField(options.programId, signedIntent && signedIntent.programId, "program_id"), "program_id");
+  const tokenMint = assertSolanaAddress(resolvedField(options.tokenMint, signedIntent && signedIntent.tokenMint, "token_mint"), "token_mint");
+  const amountBaseUnits = assertExactTenUsdc(resolvedField(options.amountBaseUnits, signedIntent && signedIntent.amountBaseUnits, "amount_base_units"), "amount_base_units");
+  const taskHash = assertBytes32(resolvedField(options.taskHash, signedIntent && signedIntent.taskHash, "task_hash"), "task_hash");
+  const buyer = assertSolanaAddress(resolvedField(options.buyer, signedIntent && signedIntent.buyer, "buyer"), "buyer");
+  const worker = assertSolanaAddress(options.worker, "worker");
+  const verifier = assertSolanaAddress(resolvedField(options.verifier, signedIntent && signedIntent.verifier, "verifier"), "verifier");
+  const deadlineUnix = String(assertU64(resolvedField(options.deadlineUnix, signedIntent && signedIntent.deadlineUnix, "deadline_unix"), "deadline_unix"));
+  const nonce = String(assertU64(resolvedField(options.nonce, signedIntent && signedIntent.nonce, "nonce"), "nonce"));
+  const resultHash = assertBytes32(options.resultHash, "result_hash");
   assertSolanaAddress(options.taskAccount, "task_account");
   assertSolanaAddress(options.vaultTokenAccount, "vault_token_account");
   assertSolanaAddress(options.destinationTokenAccount, "destination_token_account");
@@ -313,7 +392,7 @@ async function buildEvidence(options, rpcCall = defaultRpcCall) {
     token: {
       symbol: "USDC",
       decimals: 6,
-      mint: options.tokenMint,
+      mint: tokenMint,
       production_asset: true,
     },
     amount: {
@@ -321,9 +400,17 @@ async function buildEvidence(options, rpcCall = defaultRpcCall) {
       base_units: String(amountBaseUnits),
     },
     settlement: {
+      program_id: programId,
       completed_status: "Released",
       action: "release",
+      task_hash: taskHash,
       task_account: options.taskAccount,
+      buyer,
+      worker,
+      verifier,
+      deadline_unix: deadlineUnix,
+      nonce,
+      result_hash: resultHash,
       vault_token_account: options.vaultTokenAccount,
       destination_role: "worker",
       destination_token_account: options.destinationTokenAccount,
@@ -343,6 +430,8 @@ async function buildEvidence(options, rpcCall = defaultRpcCall) {
       accepts_private_keys: false,
       key_material_printed: false,
       rpc_url_printed: false,
+      signed_intent_verified: Boolean(signedIntent),
+      signed_intent_hash: signedIntent && signedIntent.signed_intent_hash,
       calls_rpc: balances.source.calls_rpc,
       rpc_host: balances.source.rpc_host,
       min_confirmation_for_balance_reads: options.minConfirmation,
@@ -386,6 +475,9 @@ function plan(options = {}) {
     calls_rpc: false,
     writes_files: false,
     required_inputs: [
+      "signed production intent, or explicit program/task/buyer/verifier/deadline/nonce fields",
+      "worker wallet address",
+      "verifier result hash from the pass attestation",
       "production USDC mint address",
       "mainnet task account",
       "vault token account after release",
@@ -395,7 +487,7 @@ function plan(options = {}) {
       "post-release vault and worker token balances, either from --production-rpc-url or explicit balance flags",
     ],
     commands: {
-      build_with_rpc: "npm run real:payout:build -- --token-mint <mainnet-usdc-mint> --task-account <task-account> --vault-token-account <vault-token-account> --destination-token-account <worker-token-account> --fund-signature <sig> --claim-signature <sig> --attest-signature <sig> --release-signature <sig> --claim-to-release-ms <ms> --claim-to-completed-index-ms <ms> --production-rpc-url <mainnet-rpc-url>",
+      build_with_rpc: "npm run real:payout:build -- --signed-intent .tascverifier/production-intent/production-intent.signature.json --program-id <program-id> --token-mint <mainnet-usdc-mint> --worker <worker-wallet> --result-hash <0x-result-hash> --task-account <task-account> --vault-token-account <vault-token-account> --destination-token-account <worker-token-account> --fund-signature <sig> --claim-signature <sig> --attest-signature <sig> --release-signature <sig> --claim-to-release-ms <ms> --claim-to-completed-index-ms <ms> --production-rpc-url <mainnet-rpc-url>",
       validate_goal_readiness: "npm run real:readiness -- --timed-proof examples/solana-devnet/proofs/<run-id>/proof-summary.json --production-payout .tascverifier/production-payout-evidence.json --production-rpc-url <mainnet-rpc-url> --expected-genesis-hash <mainnet-genesis-hash>",
     },
     notes: [
@@ -420,8 +512,17 @@ function sampleOptions(out) {
     out,
     generatedAt: "2026-01-01T00:00:00.000Z",
     cluster: DEFAULT_CLUSTER,
+    signedIntent: "",
+    programId: sampleAddress(8),
     tokenMint: sampleAddress(9),
     amountBaseUnits: DEFAULT_AMOUNT_BASE_UNITS,
+    taskHash: `0x${"18".repeat(32)}`,
+    buyer: sampleAddress(18),
+    worker: sampleAddress(19),
+    verifier: sampleAddress(20),
+    deadlineUnix: "1800000000",
+    nonce: "9001",
+    resultHash: `0x${"21".repeat(32)}`,
     taskAccount: sampleAddress(10),
     vaultTokenAccount: sampleAddress(11),
     destinationTokenAccount: sampleAddress(12),
@@ -466,6 +567,44 @@ function mockRpcCall(options) {
   };
 }
 
+async function sampleSignedIntent(file, options) {
+  const {
+    buildUnsignedIntent,
+    attachSignature,
+  } = require("./build-production-intent");
+  const {
+    fixtureKeypair,
+    signSolanaIntent,
+  } = require("./tascsolana");
+  const buyer = fixtureKeypair("buyer");
+  const built = buildUnsignedIntent({
+    taskFile: path.join(ROOT, "examples/summarize_url.tasc"),
+    buyer: buyer.address,
+    verifier: options.verifier,
+    programId: options.programId,
+    tokenMint: options.tokenMint,
+    inputs: { url: "https://docs.cdp.coinbase.com/x402/welcome" },
+    now: options.deadlineUnix,
+    nonce: options.nonce,
+    decimals: 6,
+  });
+  const unsignedFile = path.join(path.dirname(file), "production-intent.intent.json");
+  writeJson(unsignedFile, built.intent);
+  const intentForSigning = { ...built.intent };
+  delete intentForSigning.signing;
+  delete intentForSigning.network_type;
+  const signedByFixture = signSolanaIntent(intentForSigning, buyer);
+  attachSignature({
+    intentFile: unsignedFile,
+    signature: signedByFixture.signature,
+    out: file,
+  });
+  return {
+    signed_intent_file: file,
+    buyer: buyer.address,
+  };
+}
+
 async function selfTest() {
   fs.mkdirSync(path.join(ROOT, ".tascverifier"), { recursive: true });
   const dir = fs.mkdtempSync(path.join(ROOT, ".tascverifier", "production-payout-builder-"));
@@ -491,6 +630,24 @@ async function selfTest() {
     destinationBalanceAfter: DEFAULT_AMOUNT_BASE_UNITS,
   });
   assert(manualBalances.source.calls_rpc === false, "manual balance build should not call RPC");
+
+  const signed = await sampleSignedIntent(path.join(dir, "production-intent.signature.json"), options);
+  const signedIntentEvidence = await buildEvidence({
+    ...options,
+    signedIntent: signed.signed_intent_file,
+    programId: "",
+    tokenMint: "",
+    taskHash: "",
+    buyer: "",
+    verifier: "",
+    deadlineUnix: "",
+    nonce: "",
+    productionRpcUrl: "",
+    vaultBalanceAfter: "0",
+    destinationBalanceAfter: DEFAULT_AMOUNT_BASE_UNITS,
+  });
+  assert(signedIntentEvidence.source.signed_intent_verified === true, "signed intent should be verified");
+  assert(signedIntentEvidence.settlement.buyer === signed.buyer, "signed intent should fill buyer");
 
   let rejectedDevnet = false;
   try {
@@ -520,6 +677,7 @@ async function selfTest() {
     builder_plan_safe: true,
     build_with_rpc_safe: true,
     build_without_rpc_safe: true,
+    build_from_signed_intent_safe: true,
     rejected_devnet: rejectedDevnet,
     rejected_missing_balance: rejectedMissingBalance,
     no_new_dependencies: true,

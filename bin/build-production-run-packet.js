@@ -384,7 +384,11 @@ function buildLifecycleReleaseCommand(config, artifacts) {
 function buildPayoutCommand(config) {
   return [
     "npm run real:payout:build --",
+    ` --signed-intent ${commandValue(config.signed_intent_file, ".tascverifier/production-intent/production-intent.signature.json")}`,
+    ` --program-id ${commandValue(config.program_id, "<program-id>")}`,
     ` --token-mint ${commandValue(config.token_mint, "<mainnet-usdc-mint>")}`,
+    ` --worker ${commandValue(config.worker, "<worker-wallet>")}`,
+    " --result-hash <0x-result-hash>",
     ` --task-account ${commandValue(config.task_account, "<task-account>")}`,
     ` --vault-token-account ${commandValue(config.vault_token_account, "<vault-token-account>")}`,
     ` --destination-token-account ${commandValue(config.worker_usdc_token_account, "<worker-usdc-account>")}`,
@@ -566,12 +570,15 @@ function buildPacket(options = {}) {
   const missing = [];
   const generatedAt = assertIso(options.now || new Date().toISOString(), "generated_at");
   const rpcHost = rpcHostOnly(options.productionRpcUrl, missing);
+  const paths = intentPaths(options.intentDir || DEFAULT_INTENT_DIR);
+  const signedIntentFile = path.resolve(options.signedIntent || paths.signedIntent);
   const config = {
     task_file: options.taskFile || DEFAULT_TASK_FILE,
     inputs: defaultInputs(options.inputs || {}),
     timed_proof_file: options.timedProof ? rel(options.timedProof) : "",
     production_deploy_file: rel(options.productionDeploy || DEFAULT_PRODUCTION_DEPLOY),
     production_payout_file: rel(options.productionPayout || DEFAULT_PRODUCTION_PAYOUT),
+    signed_intent_file: rel(signedIntentFile),
     expected_genesis_hash: options.expectedGenesisHash || "",
     program_id: options.programId ? optionalAddress(options.programId, "program_id", missing) : "",
     token_mint: optionalAddress(options.tokenMint, "token_mint", missing),
@@ -586,8 +593,6 @@ function buildPacket(options = {}) {
   if (!config.expected_genesis_hash) missing.push("expected mainnet genesis hash is required");
   if (!fs.existsSync(config.task_file)) missing.push(`task file not found: ${config.task_file}`);
 
-  const paths = intentPaths(options.intentDir || DEFAULT_INTENT_DIR);
-  const signedIntentFile = path.resolve(options.signedIntent || paths.signedIntent);
   const artifacts = {
     timed_proof: options.timedProof
       ? fileStatus(options.timedProof, validateTimedProofFile)
@@ -843,7 +848,7 @@ function sampleTimedProof(dir) {
   return summaryFile;
 }
 
-function sampleProductionPayout(file, tokenMint, taskAccount, vaultTokenAccount, destinationTokenAccount) {
+function sampleProductionPayout(file, input) {
   writeJson(file, {
     kind: "tasc.production_payout.evidence",
     version: "0.1",
@@ -858,7 +863,7 @@ function sampleProductionPayout(file, tokenMint, taskAccount, vaultTokenAccount,
     token: {
       symbol: "USDC",
       decimals: 6,
-      mint: tokenMint,
+      mint: input.tokenMint,
       production_asset: true,
     },
     amount: {
@@ -866,12 +871,20 @@ function sampleProductionPayout(file, tokenMint, taskAccount, vaultTokenAccount,
       base_units: DEFAULT_AMOUNT_BASE_UNITS,
     },
     settlement: {
+      program_id: input.programId,
       completed_status: "Released",
       action: "release",
-      task_account: taskAccount,
-      vault_token_account: vaultTokenAccount,
+      task_hash: input.taskHash,
+      task_account: input.taskAccount,
+      buyer: input.buyer,
+      worker: input.worker,
+      verifier: input.verifier,
+      deadline_unix: input.deadlineUnix,
+      nonce: input.nonce,
+      result_hash: input.resultHash,
+      vault_token_account: input.vaultTokenAccount,
       destination_role: "worker",
-      destination_token_account: destinationTokenAccount,
+      destination_token_account: input.destinationTokenAccount,
       vault_balance_after: "0",
       destination_balance_after: DEFAULT_AMOUNT_BASE_UNITS,
     },
@@ -994,6 +1007,9 @@ async function sampleSignedIntent(file, input) {
   });
   return {
     buyer: buyer.address,
+    taskHash: built.intent.message.task_hash,
+    deadlineUnix: String(built.intent.message.deadline_unix),
+    nonce: String(built.intent.message.nonce),
     unsignedFile,
   };
 }
@@ -1012,6 +1028,7 @@ async function selfTest() {
   const workerUsdc = sampleAddress(35);
   const taskAccount = sampleAddress(36);
   const vaultTokenAccount = sampleAddress(37);
+  const resultHash = `0x${"38".repeat(32)}`;
   const signed = await sampleSignedIntent(signedIntent, {
     taskFile: DEFAULT_TASK_FILE,
     verifier,
@@ -1021,7 +1038,20 @@ async function selfTest() {
   const productionDeploy = path.join(dir, "production-deploy-handoff.json");
   sampleProductionDeploy(productionDeploy, programId);
   const productionPayout = path.join(dir, "production-payout-evidence.json");
-  sampleProductionPayout(productionPayout, tokenMint, taskAccount, vaultTokenAccount, workerUsdc);
+  sampleProductionPayout(productionPayout, {
+    programId,
+    tokenMint,
+    taskHash: signed.taskHash,
+    taskAccount,
+    buyer: signed.buyer,
+    worker,
+    verifier,
+    deadlineUnix: signed.deadlineUnix,
+    nonce: signed.nonce,
+    resultHash,
+    vaultTokenAccount,
+    destinationTokenAccount: workerUsdc,
+  });
 
   const options = {
     out: path.join(dir, "packet.json"),

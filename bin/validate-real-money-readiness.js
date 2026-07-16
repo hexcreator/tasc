@@ -3,6 +3,12 @@
 const fs = require("fs");
 const path = require("path");
 const { validate: validateTimedPayout } = require("./validate-timed-payout-proof");
+const { base58Decode, base58Encode } = require("./run-solana-devnet");
+const {
+  TASK_ACCOUNT_SIZE,
+  decodeTaskAccount,
+  encodeTaskAccount,
+} = require("./tascsolana-program");
 const {
   TOKEN_PROGRAM_ID,
   decodeTokenAccountData,
@@ -12,6 +18,7 @@ const {
 const ROOT = path.resolve(__dirname, "..");
 const TARGET_MS = 60_000;
 const MIN_USDC_BASE_UNITS = 10_000_000n;
+const ZERO_BYTES32 = `0x${"00".repeat(32)}`;
 const TEST_NETWORK_RE = /(devnet|testnet|sepolia|local|mock|fixture|example)/i;
 const CONFIRMATION_ORDER = {
   processed: 0,
@@ -107,6 +114,27 @@ function assertBaseUnits(value, label) {
   return BigInt(value);
 }
 
+function assertU64String(value, label) {
+  assert(/^[0-9]+$/.test(String(value || "")), `${label} must be a u64 integer string`);
+  const parsed = BigInt(value);
+  assert(parsed >= 0n && parsed <= ((1n << 64n) - 1n), `${label} exceeds u64`);
+  return String(value);
+}
+
+function assertBytes32(value, label) {
+  assertString(value, label);
+  assert(/^0x[a-fA-F0-9]{64}$/.test(value), `${label} must be bytes32 hex`);
+  return value.toLowerCase();
+}
+
+function assertSolanaAddress(value, label) {
+  assertString(value, label);
+  assert(/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(value), `${label} must be a Solana base58 address`);
+  const decoded = base58Decode(value);
+  assert(decoded.length === 32, `${label} must decode to 32 bytes`);
+  return value;
+}
+
 function assertSignature(value, label) {
   assertString(value, label);
   assert(/^[1-9A-HJ-NP-Za-km-z]{40,100}$/.test(value), `${label} must look like a Solana signature`);
@@ -142,7 +170,8 @@ function validateProductionPayout(payload, options = {}) {
   assert(token.symbol === "USDC", "token.symbol must be USDC");
   assert(token.decimals === 6, "token.decimals must be 6");
   assert(token.production_asset === true, "token.production_asset must be true");
-  assertString(token.mint, "token.mint");
+  if (exampleOnly) assertString(token.mint, "token.mint");
+  else assertSolanaAddress(token.mint, "token.mint");
 
   const amount = payload.amount || {};
   assert(amount.display === "10 USDC", "amount.display must be 10 USDC");
@@ -150,11 +179,37 @@ function validateProductionPayout(payload, options = {}) {
   assert(baseUnits >= MIN_USDC_BASE_UNITS, "amount.base_units must be at least 10000000");
 
   const settlement = payload.settlement || {};
+  if (exampleOnly) {
+    assertString(settlement.program_id, "settlement.program_id");
+    assertString(settlement.task_hash, "settlement.task_hash");
+    assertString(settlement.buyer, "settlement.buyer");
+    assertString(settlement.worker, "settlement.worker");
+    assertString(settlement.verifier, "settlement.verifier");
+    assertString(settlement.deadline_unix, "settlement.deadline_unix");
+    assertString(settlement.nonce, "settlement.nonce");
+    assertString(settlement.result_hash, "settlement.result_hash");
+  } else {
+    assertSolanaAddress(settlement.program_id, "settlement.program_id");
+    assertBytes32(settlement.task_hash, "settlement.task_hash");
+    assertSolanaAddress(settlement.buyer, "settlement.buyer");
+    assertSolanaAddress(settlement.worker, "settlement.worker");
+    assertSolanaAddress(settlement.verifier, "settlement.verifier");
+    assertU64String(settlement.deadline_unix, "settlement.deadline_unix");
+    assertU64String(settlement.nonce, "settlement.nonce");
+    assertBytes32(settlement.result_hash, "settlement.result_hash");
+    assert(settlement.result_hash !== ZERO_BYTES32, "settlement.result_hash must not be zero for release evidence");
+  }
   assert(settlement.completed_status === "Released", "settlement.completed_status must be Released");
   assert(settlement.action === "release", "settlement.action must be release");
-  assertString(settlement.task_account, "settlement.task_account");
-  assertString(settlement.vault_token_account, "settlement.vault_token_account");
-  assertString(settlement.destination_token_account, "settlement.destination_token_account");
+  if (exampleOnly) {
+    assertString(settlement.task_account, "settlement.task_account");
+    assertString(settlement.vault_token_account, "settlement.vault_token_account");
+    assertString(settlement.destination_token_account, "settlement.destination_token_account");
+  } else {
+    assertSolanaAddress(settlement.task_account, "settlement.task_account");
+    assertSolanaAddress(settlement.vault_token_account, "settlement.vault_token_account");
+    assertSolanaAddress(settlement.destination_token_account, "settlement.destination_token_account");
+  }
   assert(settlement.destination_role === "worker", "settlement.destination_role must be worker");
   assertBaseUnits(settlement.vault_balance_after, "settlement.vault_balance_after");
   assert(settlement.vault_balance_after === "0", "settlement vault must be empty after release");
@@ -199,9 +254,17 @@ function validateProductionPayout(payload, options = {}) {
       base_units: amount.base_units,
     },
     settlement: {
+      program_id: settlement.program_id,
       completed_status: settlement.completed_status,
       action: settlement.action,
+      task_hash: settlement.task_hash,
       task_account: settlement.task_account,
+      buyer: settlement.buyer,
+      worker: settlement.worker,
+      verifier: settlement.verifier,
+      deadline_unix: settlement.deadline_unix,
+      nonce: settlement.nonce,
+      result_hash: settlement.result_hash,
       destination_token_account: settlement.destination_token_account,
       vault_balance_after: settlement.vault_balance_after,
       destination_balance_after: settlement.destination_balance_after,
@@ -214,6 +277,10 @@ function validateProductionPayout(payload, options = {}) {
       under_60s_to_completed_index: timing.under_60s_to_completed_index,
     },
   };
+}
+
+function sameBytes32(left, right) {
+  return String(left).toLowerCase() === String(right).toLowerCase();
 }
 
 function confirmationStatusName(status) {
@@ -286,6 +353,30 @@ async function verifyProductionSignatures(payload, options, rpcCall) {
   };
 }
 
+async function fetchTaskAccount(rpcUrl, pubkey, expectedOwner, options, rpcCall) {
+  const result = await rpcCall(rpcUrl, "getAccountInfo", [
+    pubkey,
+    {
+      commitment: options.minConfirmation,
+      encoding: "base64",
+    },
+  ]);
+  const value = result && result.value;
+  assert(value, `production task account ${pubkey} not found`);
+  assert(value.owner === expectedOwner, `production task account ${pubkey} must be owned by deployed program`);
+  assert(Array.isArray(value.data) && value.data[1] === "base64", `production task account ${pubkey} must return base64 data`);
+  const raw = Buffer.from(value.data[0], "base64");
+  assert(raw.length === TASK_ACCOUNT_SIZE, `production task account ${pubkey} must be ${TASK_ACCOUNT_SIZE} bytes`);
+  return {
+    pubkey,
+    owner: value.owner,
+    decoded: decodeTaskAccount(raw, {
+      programId: expectedOwner,
+      taskPda: pubkey,
+    }),
+  };
+}
+
 async function fetchTokenAccount(rpcUrl, pubkey, options, rpcCall) {
   const result = await rpcCall(rpcUrl, "getAccountInfo", [
     pubkey,
@@ -331,12 +422,59 @@ async function verifyProductionTokenAccounts(payload, options, rpcCall) {
   };
 }
 
+async function verifyProductionTaskAccount(payload, options, rpcCall) {
+  const settlement = payload.settlement || {};
+  const token = payload.token || {};
+  const amount = payload.amount || {};
+  const account = await fetchTaskAccount(
+    options.productionRpcUrl,
+    settlement.task_account,
+    settlement.program_id,
+    options,
+    rpcCall,
+  );
+  const decoded = account.decoded;
+  assert(decoded.status === "Released", "production task account status must be Released");
+  assert(sameBytes32(decoded.task_hash, settlement.task_hash), "production task account task_hash mismatch");
+  assert(decoded.buyer === settlement.buyer, "production task account buyer mismatch");
+  assert(decoded.worker === settlement.worker, "production task account worker mismatch");
+  assert(decoded.verifier === settlement.verifier, "production task account verifier mismatch");
+  assert(decoded.token_mint === token.mint, "production task account token_mint mismatch");
+  assert(decoded.vault === settlement.vault_token_account, "production task account vault mismatch");
+  assert(decoded.amount === amount.base_units, "production task account amount mismatch");
+  assert(decoded.deadline_unix === settlement.deadline_unix, "production task account deadline_unix mismatch");
+  assert(decoded.nonce === settlement.nonce, "production task account nonce mismatch");
+  assert(sameBytes32(decoded.result_hash, settlement.result_hash), "production task account result_hash mismatch");
+  assert(decoded.result_hash !== ZERO_BYTES32, "production task account result_hash must not be zero");
+  return {
+    checked: 1,
+    program_id: settlement.program_id,
+    task_account: {
+      pubkey: account.pubkey,
+      owner: account.owner,
+      status: decoded.status,
+      task_hash: decoded.task_hash,
+      buyer: decoded.buyer,
+      worker: decoded.worker,
+      verifier: decoded.verifier,
+      token_mint: decoded.token_mint,
+      vault_token_account: decoded.vault,
+      amount: decoded.amount,
+      deadline_unix: decoded.deadline_unix,
+      nonce: decoded.nonce,
+      result_hash: decoded.result_hash,
+      updated_slot: decoded.updated_slot,
+    },
+  };
+}
+
 async function verifyProductionRpc(payload, options = {}, rpcCall = defaultRpcCall) {
   assertHttpUrl(options.productionRpcUrl, "production RPC URL");
   assertString(options.expectedGenesisHash, "expected genesis hash");
   const genesisHash = await rpcCall(options.productionRpcUrl, "getGenesisHash", []);
   assert(genesisHash === options.expectedGenesisHash, "production RPC genesis hash mismatch");
   const signatures = await verifyProductionSignatures(payload, options, rpcCall);
+  const taskAccount = await verifyProductionTaskAccount(payload, options, rpcCall);
   const tokenAccounts = await verifyProductionTokenAccounts(payload, options, rpcCall);
   return {
     ok: true,
@@ -345,6 +483,7 @@ async function verifyProductionRpc(payload, options = {}, rpcCall = defaultRpcCa
     genesis_hash: genesisHash,
     minimum_confirmation: options.minConfirmation,
     signatures,
+    task_account: taskAccount,
     token_accounts: tokenAccounts,
   };
 }
@@ -402,6 +541,7 @@ async function validateReadiness(options = {}) {
       "mainnet worker claim signature",
       "mainnet verifier attest signature",
       "mainnet release signature",
+      "released mainnet task account owned by deployed program",
       "post-release vault balance of 0",
       "post-release worker USDC balance >= 10000000 base units",
       "claim-to-release and claim-to-completed-index timing <= 60000ms",
@@ -426,10 +566,14 @@ async function plan(options = {}) {
     commands: {
       devnet_timed_proof: "GLOBAL_TASC_ALLOW_SOLANA_DEVNET_PROOF=1 npm run earn:devnet",
       validate_timed_proof: "npm run validate:timed-payout -- examples/solana-devnet/proofs/<run-id>/proof-summary.json",
-      build_production_payout: "npm run real:payout:build -- --token-mint <mainnet-usdc-mint> --task-account <task-account> --vault-token-account <vault-token-account> --destination-token-account <worker-token-account> --fund-signature <sig> --claim-signature <sig> --attest-signature <sig> --release-signature <sig> --claim-to-release-ms <ms> --claim-to-completed-index-ms <ms> --production-rpc-url <mainnet-rpc-url>",
+      build_production_payout: "npm run real:payout:build -- --signed-intent .tascverifier/production-intent/production-intent.signature.json --program-id <program-id> --token-mint <mainnet-usdc-mint> --worker <worker-wallet> --result-hash <0x-result-hash> --task-account <task-account> --vault-token-account <vault-token-account> --destination-token-account <worker-token-account> --fund-signature <sig> --claim-signature <sig> --attest-signature <sig> --release-signature <sig> --claim-to-release-ms <ms> --claim-to-completed-index-ms <ms> --production-rpc-url <mainnet-rpc-url>",
       validate_readiness: "npm run real:readiness -- --timed-proof examples/solana-devnet/proofs/<run-id>/proof-summary.json --production-payout .tascverifier/production-payout-evidence.json --production-rpc-url <mainnet-rpc-url> --expected-genesis-hash <mainnet-genesis-hash>",
     },
   };
+}
+
+function sampleAddress(byte) {
+  return base58Encode(Buffer.alloc(32, byte));
 }
 
 function sampleProductionEvidence(overrides = {}) {
@@ -455,9 +599,17 @@ function sampleProductionEvidence(overrides = {}) {
       base_units: "10000000",
     },
     settlement: {
+      program_id: sampleAddress(8),
       completed_status: "Released",
       action: "release",
+      task_hash: "0x7a65571d274b9d680d14bb05e2a5c736e7f2a2edb7fe0cc235f0fcdc7f81e465",
       task_account: "9h2CPTQfhpQWD3fddC5tdcfMfLCJ4WtudZU8avAiDdCH",
+      buyer: sampleAddress(18),
+      worker: sampleAddress(19),
+      verifier: sampleAddress(20),
+      deadline_unix: "1800000000",
+      nonce: "9001",
+      result_hash: "0x0bdfacb7e0ec2c3241da82c7b812b1a0fa28945b47c7f8a6b113b4de3779776f",
       vault_token_account: "Bu8kBFdxE6RwFbnz7cyLZDs7ixDrN2AabEPhWk24uE3u",
       destination_role: "worker",
       destination_token_account: "8LRqfMkLZnEwaQecoExQ3P8D9rrzNKvAiYqSLN8cHtFx",
@@ -545,6 +697,32 @@ function selfTestProductionRpc(payload, expectedGenesisHash, options = {}) {
     }
     if (method === "getAccountInfo") {
       const pubkey = params[0];
+      if (pubkey === settlement.task_account) {
+        const taskData = encodeTaskAccount({
+          status: options.taskStatus || "Released",
+          task_hash: settlement.task_hash,
+          buyer: settlement.buyer,
+          worker: settlement.worker,
+          verifier: settlement.verifier,
+          token_mint: token.mint,
+          vault: options.badTaskVault ? settlement.destination_token_account : settlement.vault_token_account,
+          amount: payload.amount.base_units,
+          deadline_unix: settlement.deadline_unix,
+          nonce: settlement.nonce,
+          result_hash: options.badTaskResult ? `0x${"00".repeat(32)}` : settlement.result_hash,
+          created_slot: "10",
+          updated_slot: "20",
+        });
+        return {
+          value: {
+            owner: options.badTaskOwner ? sampleAddress(44) : settlement.program_id,
+            data: [
+              taskData.toString("base64"),
+              "base64",
+            ],
+          },
+        };
+      }
       let amount = null;
       if (pubkey === settlement.vault_token_account) amount = options.nonzeroVault ? "1" : settlement.vault_balance_after;
       if (pubkey === settlement.destination_token_account) amount = options.shortDestination ? "9999999" : settlement.destination_balance_after;
@@ -603,6 +781,7 @@ async function selfTest() {
     rpcCall: selfTestProductionRpc(productionPayload, expectedGenesisHash),
   });
   assert(ready.ready_for_goal === true, "real evidence plus RPC should mark readiness true");
+  assert(ready.production_rpc.task_account.task_account.status === "Released", "ready proof should include released task account");
   const missingProduction = await validateReadiness({ timedProof: timedProofFile });
   assert(missingProduction.ready_for_goal === false, "missing production evidence should not be ready");
   const missingRpc = await validateReadiness({ timedProof: timedProofFile, productionPayout: realFile });
@@ -658,6 +837,36 @@ async function selfTest() {
   }
   assert(rejectedShortDestination, "short destination balance should be rejected");
 
+  let rejectedTaskOwner = false;
+  try {
+    await validateReadiness({
+      timedProof: timedProofFile,
+      productionPayout: realFile,
+      productionRpcUrl: "http://127.0.0.1/mock-mainnet-rpc",
+      expectedGenesisHash,
+      minConfirmation: "finalized",
+      rpcCall: selfTestProductionRpc(productionPayload, expectedGenesisHash, { badTaskOwner: true }),
+    });
+  } catch {
+    rejectedTaskOwner = true;
+  }
+  assert(rejectedTaskOwner, "wrong task owner should be rejected");
+
+  let rejectedTaskStatus = false;
+  try {
+    await validateReadiness({
+      timedProof: timedProofFile,
+      productionPayout: realFile,
+      productionRpcUrl: "http://127.0.0.1/mock-mainnet-rpc",
+      expectedGenesisHash,
+      minConfirmation: "finalized",
+      rpcCall: selfTestProductionRpc(productionPayload, expectedGenesisHash, { taskStatus: "Passed" }),
+    });
+  } catch {
+    rejectedTaskStatus = true;
+  }
+  assert(rejectedTaskStatus, "non-released task status should be rejected");
+
   return {
     ok: true,
     self_test: true,
@@ -669,6 +878,8 @@ async function selfTest() {
     rejected_underfunded: rejectedSmallAmount,
     rejected_bad_genesis: rejectedBadGenesis,
     rejected_short_destination: rejectedShortDestination,
+    rejected_task_owner: rejectedTaskOwner,
+    rejected_task_status: rejectedTaskStatus,
     no_new_dependencies: true,
   };
 }
