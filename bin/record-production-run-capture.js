@@ -14,10 +14,18 @@ const { buildEvidence } = require("./build-production-payout-evidence");
 const { validateProductionPayout } = require("./validate-real-money-readiness");
 const { verifySignedSolanaIntent } = require("./tascsolana");
 const { base58Decode, base58Encode } = require("./run-solana-devnet");
+const { TOKEN_PROGRAM_ID, encodeTokenAccount } = require("./tascsolana-spl");
+const {
+  DEFAULT_ENV_FILE,
+  PRODUCTION_ENV,
+  envMetadata,
+  withProductionEnv,
+} = require("./production-env");
 
 const ROOT = path.resolve(__dirname, "..");
 const DEFAULT_CAPTURE = ".tascverifier/production-run-capture.json";
 const DEFAULT_PAYOUT = ".tascverifier/production-payout-evidence.json";
+const DEFAULT_SIGNED_INTENT = ".tascverifier/production-intent/production-intent.signature.json";
 const DEFAULT_CLUSTER = "solana-mainnet-beta";
 const DEFAULT_AMOUNT_BASE_UNITS = "10000000";
 const TARGET_MS = 60_000;
@@ -34,6 +42,7 @@ function usage() {
     "  node bin/record-production-run-capture.js --self-test",
     "",
     "Options:",
+    "  --env <file>                              production env file; default .env.solana-mainnet.local",
     "  --capture <file>                          capture file; default .tascverifier/production-run-capture.json",
     "  --out <file>                              payout evidence output for payout command",
     "  --signed-intent <file>                    signed production intent",
@@ -73,9 +82,10 @@ function assert(condition, message) {
 function parseArgs(argv) {
   const options = {
     command: "plan",
+    envFile: DEFAULT_ENV_FILE,
     capture: DEFAULT_CAPTURE,
     out: DEFAULT_PAYOUT,
-    signedIntent: "",
+    signedIntent: DEFAULT_SIGNED_INTENT,
     transaction: "",
     signature: "",
     programId: "",
@@ -105,7 +115,8 @@ function parseArgs(argv) {
   if (["plan", "init", "record", "validate", "payout"].includes(args[0])) options.command = args.shift();
   for (let i = 0; i < args.length; i += 1) {
     const arg = args[i];
-    if (arg === "--capture") options.capture = requireValue(args, ++i, arg);
+    if (arg === "--env") options.envFile = requireValue(args, ++i, arg);
+    else if (arg === "--capture") options.capture = requireValue(args, ++i, arg);
     else if (arg === "--out") options.out = requireValue(args, ++i, arg);
     else if (arg === "--signed-intent") options.signedIntent = requireValue(args, ++i, arg);
     else if (arg === "--transaction") options.transaction = requireValue(args, ++i, arg);
@@ -136,6 +147,16 @@ function parseArgs(argv) {
     else usage();
   }
   return options;
+}
+
+function optionsWithEnv(options = {}) {
+  return withProductionEnv(options, {
+    productionRpcUrl: PRODUCTION_ENV.rpcUrl,
+    programId: PRODUCTION_ENV.programId,
+    tokenMint: PRODUCTION_ENV.tokenMint,
+    worker: PRODUCTION_ENV.worker,
+    destinationTokenAccount: PRODUCTION_ENV.workerUsdc,
+  });
 }
 
 function requireValue(args, index, label) {
@@ -549,18 +570,20 @@ function validateCapture(capture, options = {}) {
 
 function plan(options = {}) {
   const capture = options.capture || DEFAULT_CAPTURE;
+  const envFile = options.envFile || DEFAULT_ENV_FILE;
   return {
     ok: true,
     kind: "tasc.production_run.capture.plan",
     version: "0.1",
     default_capture: capture,
     default_payout: options.out || DEFAULT_PAYOUT,
+    default_env_file: envFile,
     sends_transactions: false,
     accepts_private_keys: false,
     calls_rpc: false,
     writes_files: false,
     operator_flow: [
-      `npm run real:capture:init -- --signed-intent .tascverifier/production-intent/production-intent.signature.json --program-id <program-id> --token-mint <mainnet-usdc-mint> --worker <worker-wallet> --destination-token-account <worker-usdc-account>`,
+      `npm run real:capture:init -- --env ${envFile} --signed-intent .tascverifier/production-intent/production-intent.signature.json`,
       `npm run real:capture:record -- --transaction .tascverifier/production-fund-transaction.json --signature <fund-sig>`,
       `npm run real:capture:record -- --fund-signature <fund-sig> --task-account <task-account> --vault-token-account <vault-token-account>`,
       `npm run real:capture:record -- --transaction .tascverifier/production-lifecycle-claim.json --signature <claim-sig> --claim-started-at <iso>`,
@@ -569,12 +592,13 @@ function plan(options = {}) {
       `npm run real:capture:record -- --attest-signature <attest-sig> --result-hash <0x-result-hash>`,
       `npm run real:capture:record -- --transaction .tascverifier/production-lifecycle-release.json --signature <release-sig> --release-confirmed-at <iso> --completed-indexed-at <iso>`,
       `npm run real:capture:record -- --release-signature <release-sig> --release-confirmed-at <iso> --completed-indexed-at <iso>`,
-      `npm run real:capture:payout -- --production-rpc-url <mainnet-rpc-url> --out ${options.out || DEFAULT_PAYOUT}`,
+      `npm run real:capture:payout -- --env ${envFile} --out ${options.out || DEFAULT_PAYOUT}`,
     ],
   };
 }
 
 function init(options = {}) {
+  options = optionsWithEnv(options);
   const generatedAt = assertIso(options.generatedAt || new Date().toISOString(), "generated_at");
   const signedIntent = readSignedIntent(options.signedIntent, {
     programId: options.programId || "",
@@ -591,6 +615,12 @@ function init(options = {}) {
     kind: "tasc.production_run.capture.init_result",
     version: "0.1",
     capture_file: rel(out),
+    ...envMetadata(options.envFile, [
+      PRODUCTION_ENV.programId,
+      PRODUCTION_ENV.tokenMint,
+      PRODUCTION_ENV.worker,
+      PRODUCTION_ENV.workerUsdc,
+    ]),
     complete_for_payout: missingForPayout(capture).length === 0,
     sends_transactions: false,
     accepts_private_keys: false,
@@ -655,6 +685,7 @@ function evidenceOptionsFromCapture(capture, options = {}) {
 }
 
 async function payout(options = {}, rpcCall) {
+  options = optionsWithEnv(options);
   if (options.productionRpcUrl) assertHttpUrl(options.productionRpcUrl, "production_rpc_url");
   const minConfirmation = options.minConfirmation || "finalized";
   assert(["processed", "confirmed", "finalized"].includes(minConfirmation), "min_confirmation must be processed, confirmed, or finalized");
@@ -671,6 +702,7 @@ async function payout(options = {}, rpcCall) {
     version: "0.1",
     capture_file: rel(file),
     evidence_file: rel(out),
+    ...envMetadata(options.envFile, [PRODUCTION_ENV.rpcUrl]),
     capture_complete: validation.complete_for_payout,
     sends_transactions: false,
     accepts_private_keys: false,
@@ -678,6 +710,31 @@ async function payout(options = {}, rpcCall) {
     rpc_host: options.productionRpcUrl ? new URL(options.productionRpcUrl).host : null,
     rpc_url_printed: false,
     no_new_dependencies: true,
+  };
+}
+
+function mockPayoutRpc(input) {
+  return async (_rpcUrl, method, params) => {
+    if (method !== "getAccountInfo") throw new Error(`unexpected RPC method ${method}`);
+    const pubkey = params[0];
+    let amount = null;
+    if (pubkey === input.vaultTokenAccount) amount = "0";
+    if (pubkey === input.destinationTokenAccount) amount = DEFAULT_AMOUNT_BASE_UNITS;
+    assert(amount !== null, `unexpected payout token account ${pubkey}`);
+    return {
+      value: {
+        owner: TOKEN_PROGRAM_ID,
+        data: [
+          encodeTokenAccount({
+            pubkey,
+            mint: input.tokenMint,
+            owner: input.worker,
+            amount,
+          }).toString("base64"),
+          "base64",
+        ],
+      },
+    };
   };
 }
 
@@ -738,6 +795,15 @@ async function selfTest() {
   const worker = sampleAddress(34);
   const destination = sampleAddress(35);
   const resultHash = `0x${"38".repeat(32)}`;
+  const envFile = path.join(dir, ".env.solana-mainnet.local");
+  fs.writeFileSync(envFile, [
+    `${PRODUCTION_ENV.rpcUrl}=https://mainnet.example.com/sensitive/rpc?credential=env-do-not-store`,
+    `${PRODUCTION_ENV.programId}=${programId}`,
+    `${PRODUCTION_ENV.tokenMint}=${tokenMint}`,
+    `${PRODUCTION_ENV.worker}=${worker}`,
+    `${PRODUCTION_ENV.workerUsdc}=${destination}`,
+    "",
+  ].join("\n"));
   const signed = await sampleSignedIntent(signedIntentFile, { programId, tokenMint, verifier });
   const recentBlockhash = sampleAddress(36);
   const fundTransactionFile = path.join(dir, "production-fund-transaction.json");
@@ -783,12 +849,9 @@ async function selfTest() {
   assert(planResult.writes_files === false, "plan must not write files");
 
   const initResult = init({
+    envFile,
     capture: captureFile,
     signedIntent: signed.signed_intent_file,
-    programId,
-    tokenMint,
-    worker,
-    destinationTokenAccount: destination,
     generatedAt: "2026-01-01T00:00:00.000Z",
   });
   assert(initResult.ok === true, "init should succeed");
@@ -829,10 +892,16 @@ async function selfTest() {
   assert(validation.complete_for_payout === true, "validation should be complete");
   const payoutFile = path.join(dir, "production-payout-evidence.json");
   const payoutResult = await payout({
+    envFile,
     capture: captureFile,
     out: payoutFile,
     generatedAt: "2026-01-01T00:00:08.000Z",
-  });
+  }, mockPayoutRpc({
+    tokenMint,
+    worker,
+    vaultTokenAccount: vault,
+    destinationTokenAccount: destination,
+  }));
   assert(payoutResult.ok === true, "payout should build");
   const evidence = loadJson(payoutFile);
   assert(evidence.settlement.buyer === signed.buyer, "payout evidence should keep signed buyer");
@@ -840,6 +909,10 @@ async function selfTest() {
   assert(evidence.settlement.task_account === taskAccount, "payout evidence should keep artifact task account");
   assert(evidence.settlement.vault_token_account === vault, "payout evidence should keep artifact vault account");
   assert(evidence.timing.claim_to_release_ms === 4669, "claim-to-release timing mismatch");
+  assert(evidence.source.rpc_host === "mainnet.example.com", "payout should only persist RPC host");
+  const payoutText = JSON.stringify(evidence);
+  assert(!payoutText.includes("env-do-not-store"), "payout evidence must not store RPC query credential");
+  assert(!payoutText.includes("/sensitive/rpc"), "payout evidence must not store full RPC path");
 
   let rejectedMismatchedArtifact = false;
   try {
@@ -876,6 +949,7 @@ async function selfTest() {
     record_from_transaction_artifacts: true,
     validate_capture: true,
     payout_from_capture: true,
+    env_file_config: true,
     rejected_mismatched_transaction_artifact: true,
     rejected_incomplete_capture: true,
     sends_transactions: false,

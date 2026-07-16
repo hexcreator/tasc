@@ -22,6 +22,12 @@ const {
 } = require("./tascsolana");
 const { fundAddresses } = require("./run-solana-fund");
 const { TOKEN_PROGRAM_ID } = require("./tascsolana-spl");
+const {
+  DEFAULT_ENV_FILE,
+  PRODUCTION_ENV,
+  envMetadata,
+  withProductionEnv,
+} = require("./production-env");
 
 const ROOT = path.resolve(__dirname, "..");
 const DEFAULT_SIGNED_INTENT = ".tascverifier/production-intent/production-intent.signature.json";
@@ -32,7 +38,7 @@ const DEFAULT_DECIMALS = 6;
 const DEFAULT_COMMITMENT = "confirmed";
 const CLOCK_SYSVAR_ID = "SysvarC1ock11111111111111111111111111111111";
 const ACTIONS = new Set(["claim", "attest", "release"]);
-const TEST_RPC_HOST_RE = /(devnet|testnet|localhost|127\.0\.0\.1|0\.0\.0\.0)/i;
+const TEST_RPC_HOST_RE = /(devnet|testnet|localhost|127\.0\.0\.1|0\.0\.0\.0|(^|\.)example\.(com|net|org|invalid)$)/i;
 
 function usage() {
   console.error([
@@ -43,6 +49,7 @@ function usage() {
     "  node bin/build-production-lifecycle-transaction.js --self-test",
     "",
     "Build options:",
+    "  --env <file>                              production env file; default .env.solana-mainnet.local",
     "  --action claim|attest|release             lifecycle action",
     "  --signed-intent <file>                    signed production intent; default .tascverifier/production-intent/production-intent.signature.json",
     "  --task-account <address>                  mainnet task account",
@@ -68,6 +75,7 @@ function parseArgs(argv) {
   const options = {
     command: "plan",
     artifactFile: "",
+    envFile: DEFAULT_ENV_FILE,
     action: "",
     signedIntent: DEFAULT_SIGNED_INTENT,
     taskAccount: "",
@@ -86,7 +94,8 @@ function parseArgs(argv) {
   if (options.command === "validate" && args[0] && !args[0].startsWith("--")) options.artifactFile = args.shift();
   for (let i = 0; i < args.length; i += 1) {
     const arg = args[i];
-    if (arg === "--action") options.action = requireValue(args, ++i, arg);
+    if (arg === "--env") options.envFile = requireValue(args, ++i, arg);
+    else if (arg === "--action") options.action = requireValue(args, ++i, arg);
     else if (arg === "--signed-intent") options.signedIntent = requireValue(args, ++i, arg);
     else if (arg === "--task-account") options.taskAccount = requireValue(args, ++i, arg);
     else if (arg === "--signer") options.signer = requireValue(args, ++i, arg);
@@ -102,6 +111,17 @@ function parseArgs(argv) {
     else usage();
   }
   return options;
+}
+
+function optionsWithEnv(options = {}) {
+  const action = String(options.action || "").toLowerCase().replace(/[_\s]+/g, "-");
+  const mapping = {
+    productionRpcUrl: PRODUCTION_ENV.rpcUrl,
+  };
+  if (action === "claim" || action === "release") mapping.signer = PRODUCTION_ENV.worker;
+  if (action === "attest") mapping.signer = PRODUCTION_ENV.verifier;
+  if (action === "release") mapping.destinationTokenAccount = PRODUCTION_ENV.workerUsdc;
+  return withProductionEnv(options, mapping);
 }
 
 function requireValue(args, index, label) {
@@ -218,7 +238,7 @@ async function resolveBlockhash(options, rpcCall) {
   if (options.productionRpcUrl) {
     const url = assertHttpUrl(options.productionRpcUrl, "production_rpc_url");
     if (!options.allowTestRpcHost && TEST_RPC_HOST_RE.test(url.host)) {
-      throw new Error("production RPC host must not look like devnet/testnet/local");
+      throw new Error("production RPC host must not look like devnet/testnet/local/example");
     }
     const latest = await rpcCall(options.productionRpcUrl, "getLatestBlockhash", [{ commitment }]);
     source.calls_rpc = true;
@@ -256,6 +276,7 @@ function validateActionInputs(action, signed, options) {
 }
 
 async function buildArtifact(options = {}, rpcCall = defaultRpcCall) {
+  options = optionsWithEnv(options);
   const action = normalizeAction(options.action);
   const { signed, verified } = loadSignedProductionIntent(options.signedIntent);
   const message = signed.intent.message;
@@ -360,6 +381,12 @@ async function buildArtifact(options = {}, rpcCall = defaultRpcCall) {
     },
     source: {
       built_by: "bin/build-production-lifecycle-transaction.js",
+      ...envMetadata(options.envFile, [
+        PRODUCTION_ENV.rpcUrl,
+        PRODUCTION_ENV.worker,
+        PRODUCTION_ENV.verifier,
+        PRODUCTION_ENV.workerUsdc,
+      ]),
       sends_transactions: false,
       accepts_private_keys: false,
       key_material_printed: false,
@@ -445,6 +472,7 @@ function validateArtifact(artifact) {
 }
 
 async function build(options, rpcCall = defaultRpcCall) {
+  options = optionsWithEnv(options);
   const artifact = await buildArtifact(options, rpcCall);
   validateArtifact(artifact);
   const out = artifactPath(options);
@@ -471,12 +499,14 @@ async function build(options, rpcCall = defaultRpcCall) {
 }
 
 function plan(options = {}) {
+  const envFile = options.envFile || DEFAULT_ENV_FILE;
   return {
     ok: true,
     kind: "tasc.production_lifecycle_transaction.plan",
     version: "0.1",
     goal: "build unsigned mainnet wallet transactions for claim, attest, and release",
     default_signed_intent: options.signedIntent || DEFAULT_SIGNED_INTENT,
+    default_env_file: envFile,
     default_output_pattern: ".tascverifier/production-lifecycle-<action>.json",
     cluster: DEFAULT_CLUSTER,
     network_type: "mainnet",
@@ -488,15 +518,15 @@ function plan(options = {}) {
     required_inputs: [
       "verified signed mainnet buyer intent",
       "task account from real:fund",
-      "worker signer for claim and release",
-      "verifier signer plus result hash for attest",
-      "worker destination USDC token account for release",
-      "either --production-rpc-url or --recent-blockhash",
+      "worker signer from --signer or env for claim and release",
+      "verifier signer from --signer or env plus result hash for attest",
+      "worker destination USDC token account from --destination-token-account or env for release",
+      "either --production-rpc-url/env RPC or --recent-blockhash",
     ],
     commands: {
-      claim: "npm run real:lifecycle:build -- --action claim --signed-intent .tascverifier/production-intent/production-intent.signature.json --task-account <task-account> --signer <worker-wallet> --production-rpc-url <mainnet-rpc-url>",
-      attest: "npm run real:lifecycle:build -- --action attest --signed-intent .tascverifier/production-intent/production-intent.signature.json --task-account <task-account> --signer <verifier-wallet> --verdict pass --result-hash <0x-result-hash> --production-rpc-url <mainnet-rpc-url>",
-      release: "npm run real:lifecycle:build -- --action release --signed-intent .tascverifier/production-intent/production-intent.signature.json --task-account <task-account> --signer <worker-wallet> --destination-token-account <worker-usdc-account> --production-rpc-url <mainnet-rpc-url>",
+      claim: `npm run real:lifecycle:build -- --env ${envFile} --action claim --signed-intent .tascverifier/production-intent/production-intent.signature.json --task-account <task-account>`,
+      attest: `npm run real:lifecycle:build -- --env ${envFile} --action attest --signed-intent .tascverifier/production-intent/production-intent.signature.json --task-account <task-account> --verdict pass --result-hash <0x-result-hash>`,
+      release: `npm run real:lifecycle:build -- --env ${envFile} --action release --signed-intent .tascverifier/production-intent/production-intent.signature.json --task-account <task-account>`,
       validate: "npm run real:lifecycle:validate -- .tascverifier/production-lifecycle-claim.json",
     },
     notes: [
@@ -556,22 +586,40 @@ async function selfTest() {
   const destination = sampleAddress(44);
   const resultHash = `0x${"12".repeat(32)}`;
   const rpcUrl = "https://mainnet.example.com/sensitive/rpc?credential=do-not-store";
+  const envFile = path.join(dir, ".env.solana-mainnet.local");
+  fs.writeFileSync(envFile, [
+    `${PRODUCTION_ENV.rpcUrl}=${rpcUrl}`,
+    `${PRODUCTION_ENV.worker}=${worker}`,
+    `${PRODUCTION_ENV.verifier}=${fixture.verifier.address}`,
+    `${PRODUCTION_ENV.workerUsdc}=${destination}`,
+    "",
+  ].join("\n"));
+  const noRpcEnvFile = path.join(dir, "worker-only.env");
+  fs.writeFileSync(noRpcEnvFile, [
+    `${PRODUCTION_ENV.worker}=${worker}`,
+    `${PRODUCTION_ENV.workerUsdc}=${destination}`,
+    "",
+  ].join("\n"));
   const planResult = plan();
   assert(planResult.sends_transactions === false, "plan must not send transactions");
   assert(planResult.calls_rpc === false, "plan must not call RPC");
   assert(planResult.writes_files === false, "plan must not write files");
 
   const claim = await build({
+    envFile,
     action: "claim",
     signedIntent: signedFile,
     taskAccount,
-    signer: worker,
-    productionRpcUrl: rpcUrl,
+    signer: "",
+    productionRpcUrl: "",
     out: path.join(dir, "production-lifecycle-claim.json"),
     allowTestRpcHost: true,
   }, mockRpcCall());
   assert(claim.ok === true, "claim build should succeed");
-  validateArtifact(loadJson(path.join(dir, "production-lifecycle-claim.json")));
+  const claimArtifact = loadJson(path.join(dir, "production-lifecycle-claim.json"));
+  assert(claimArtifact.signer === worker, "claim should load signer from env");
+  assert(claimArtifact.source.rpc_host === "mainnet.example.com", "claim should only store RPC host");
+  validateArtifact(claimArtifact);
 
   const attest = await build({
     action: "attest",
@@ -587,17 +635,19 @@ async function selfTest() {
   validateArtifact(loadJson(path.join(dir, "production-lifecycle-attest.json")));
 
   const release = await build({
+    envFile: noRpcEnvFile,
     action: "release",
     signedIntent: signedFile,
     taskAccount,
-    signer: worker,
-    destinationTokenAccount: destination,
+    signer: "",
+    destinationTokenAccount: "",
     recentBlockhash: sampleAddress(52),
     out: path.join(dir, "production-lifecycle-release.json"),
   });
   assert(release.ok === true, "release build should succeed");
   const releaseArtifact = loadJson(path.join(dir, "production-lifecycle-release.json"));
   assert(releaseArtifact.settlement.destination_token_account === destination, "release destination mismatch");
+  assert(releaseArtifact.signer === worker, "release should load signer from env");
   validateArtifact(releaseArtifact);
 
   let rejectedDevnet = false;

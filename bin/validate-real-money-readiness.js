@@ -14,6 +14,11 @@ const {
   decodeTokenAccountData,
   encodeTokenAccount,
 } = require("./tascsolana-spl");
+const {
+  DEFAULT_ENV_FILE,
+  PRODUCTION_ENV,
+  withProductionEnv,
+} = require("./production-env");
 
 const ROOT = path.resolve(__dirname, "..");
 const TARGET_MS = 60_000;
@@ -34,6 +39,7 @@ function usage() {
     "  node bin/validate-real-money-readiness.js --self-test",
     "",
     "Options:",
+    "  --env <file>                              production env file; default .env.solana-mainnet.local",
     "  --timed-proof <proof-summary.json>          devnet timed payout proof from npm run earn:devnet",
     "  --production-payout <evidence.json>         real-money payout evidence JSON",
     "  --production-rpc-url <url>                  Solana mainnet RPC URL for live verification",
@@ -60,6 +66,7 @@ function writeJson(file, value) {
 function parseArgs(argv) {
   const options = {
     command: "validate",
+    envFile: DEFAULT_ENV_FILE,
     timedProof: "",
     productionPayout: "",
     productionRpcUrl: "",
@@ -72,7 +79,10 @@ function parseArgs(argv) {
   if (args[0] === "plan" || args[0] === "validate") options.command = args.shift();
   for (let i = 0; i < args.length; i += 1) {
     const arg = args[i];
-    if (arg === "--timed-proof") {
+    if (arg === "--env") {
+      options.envFile = args[++i] || "";
+      if (!options.envFile) usage();
+    } else if (arg === "--timed-proof") {
       options.timedProof = args[++i] || "";
       if (!options.timedProof) usage();
     } else if (arg === "--production-payout") {
@@ -98,6 +108,13 @@ function parseArgs(argv) {
     }
   }
   return options;
+}
+
+function optionsWithEnv(options = {}, processEnv = process.env) {
+  return withProductionEnv(options, {
+    productionRpcUrl: PRODUCTION_ENV.rpcUrl,
+    expectedGenesisHash: PRODUCTION_ENV.expectedGenesisHash,
+  }, processEnv);
 }
 
 function assertString(value, label) {
@@ -488,7 +505,8 @@ async function verifyProductionRpc(payload, options = {}, rpcCall = defaultRpcCa
   };
 }
 
-async function validateReadiness(options = {}) {
+async function validateReadiness(options = {}, processEnv = process.env) {
+  options = optionsWithEnv(options, processEnv);
   const missing = [];
   let timedProof = null;
   let productionPayout = null;
@@ -551,11 +569,13 @@ async function validateReadiness(options = {}) {
 }
 
 async function plan(options = {}) {
+  const envFile = options.envFile || DEFAULT_ENV_FILE;
   const result = await validateReadiness({
     ...options,
+    envFile: path.join(ROOT, ".tascverifier", "missing-plan-env"),
     productionRpcUrl: "",
     expectedGenesisHash: "",
-  });
+  }, {});
   return {
     ...result,
     mode: "plan",
@@ -563,13 +583,14 @@ async function plan(options = {}) {
     calls_rpc: false,
     writes_files: false,
     production_schema_example: "examples/private-beta/production-payout-evidence.example.json",
+    default_env_file: envFile,
     commands: {
       devnet_timed_proof: "GLOBAL_TASC_ALLOW_SOLANA_DEVNET_PROOF=1 npm run earn:devnet",
       validate_timed_proof: "npm run validate:timed-payout -- examples/solana-devnet/proofs/<run-id>/proof-summary.json",
-      init_production_capture: "npm run real:capture:init -- --signed-intent .tascverifier/production-intent/production-intent.signature.json --program-id <program-id> --token-mint <mainnet-usdc-mint> --worker <worker-wallet> --destination-token-account <worker-token-account>",
+      init_production_capture: `npm run real:capture:init -- --env ${envFile} --signed-intent .tascverifier/production-intent/production-intent.signature.json`,
       record_production_evidence: "npm run real:capture:record -- --transaction .tascverifier/production-fund-transaction.json --signature <fund-sig>",
-      build_production_payout: "npm run real:capture:payout -- --production-rpc-url <mainnet-rpc-url>",
-      validate_readiness: "npm run real:readiness -- --timed-proof examples/solana-devnet/proofs/<run-id>/proof-summary.json --production-payout .tascverifier/production-payout-evidence.json --production-rpc-url <mainnet-rpc-url> --expected-genesis-hash <mainnet-genesis-hash>",
+      build_production_payout: `npm run real:capture:payout -- --env ${envFile}`,
+      validate_readiness: `npm run real:readiness -- --env ${envFile} --timed-proof examples/solana-devnet/proofs/<run-id>/proof-summary.json --production-payout .tascverifier/production-payout-evidence.json`,
     },
   };
 }
@@ -774,11 +795,18 @@ async function selfTest() {
 
   const productionPayload = loadJson(realFile);
   const expectedGenesisHash = "mainnet-self-test-genesis-hash";
+  const envFile = path.join(dir, ".env.solana-mainnet.local");
+  fs.writeFileSync(envFile, [
+    `${PRODUCTION_ENV.rpcUrl}=http://127.0.0.1/mock-mainnet-rpc`,
+    `${PRODUCTION_ENV.expectedGenesisHash}=${expectedGenesisHash}`,
+    "",
+  ].join("\n"));
   const ready = await validateReadiness({
+    envFile,
     timedProof: timedProofFile,
     productionPayout: realFile,
-    productionRpcUrl: "http://127.0.0.1/mock-mainnet-rpc",
-    expectedGenesisHash,
+    productionRpcUrl: "",
+    expectedGenesisHash: "",
     minConfirmation: "finalized",
     rpcCall: selfTestProductionRpc(productionPayload, expectedGenesisHash),
   });

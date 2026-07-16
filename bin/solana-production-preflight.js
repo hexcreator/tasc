@@ -27,7 +27,7 @@ const PROGRAM_OWNERS = new Set([
   "BPFLoader2111111111111111111111111111111111",
   "BPFLoaderUpgradeab1e11111111111111111111111",
 ]);
-const TEST_RPC_HOST_RE = /(devnet|testnet|localhost|127\.0\.0\.1|0\.0\.0\.0)/i;
+const TEST_RPC_HOST_RE = /(devnet|testnet|localhost|127\.0\.0\.1|0\.0\.0\.0|(^|\.)example\.(com|net|org|invalid)$)/i;
 
 const ENV = {
   rpcUrl: "SOLANA_MAINNET_RPC_URL",
@@ -408,7 +408,7 @@ async function check(options = {}, rpcCall = defaultRpcCall, processEnv = proces
       const url = assertHttpUrl(rpcUrl, "production_rpc_url");
       rpcHost = url.host;
       if (!options.allowTestRpcHost && TEST_RPC_HOST_RE.test(rpcHost)) {
-        blockers.push("production RPC host must not look like devnet/testnet/local");
+        blockers.push("production RPC host must not look like devnet/testnet/local/example");
       }
     } catch (error) {
       blockers.push(error.message);

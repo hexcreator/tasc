@@ -10,6 +10,12 @@ const {
   encodeTokenAccount,
 } = require("./tascsolana-spl");
 const { validateProductionPayout } = require("./validate-real-money-readiness");
+const {
+  DEFAULT_ENV_FILE,
+  PRODUCTION_ENV,
+  envMetadata,
+  withProductionEnv,
+} = require("./production-env");
 
 const ROOT = path.resolve(__dirname, "..");
 const DEFAULT_OUT = ".tascverifier/production-payout-evidence.json";
@@ -26,6 +32,7 @@ function usage() {
     "  node bin/build-production-payout-evidence.js --self-test",
     "",
     "Build options:",
+    "  --env <file>                              production env file; default .env.solana-mainnet.local",
     "  --out <file>                              output evidence file; default .tascverifier/production-payout-evidence.json",
     "  --generated-at <iso>                      evidence timestamp; default now",
     "  --cluster <name>                          Solana cluster; default solana-mainnet-beta",
@@ -69,6 +76,7 @@ function assert(condition, message) {
 function parseArgs(argv) {
   const options = {
     command: "plan",
+    envFile: DEFAULT_ENV_FILE,
     out: DEFAULT_OUT,
     generatedAt: "",
     cluster: DEFAULT_CLUSTER,
@@ -105,7 +113,8 @@ function parseArgs(argv) {
   if (args[0] === "plan" || args[0] === "build") options.command = args.shift();
   for (let i = 0; i < args.length; i += 1) {
     const arg = args[i];
-    if (arg === "--out") options.out = requireValue(args, ++i, arg);
+    if (arg === "--env") options.envFile = requireValue(args, ++i, arg);
+    else if (arg === "--out") options.out = requireValue(args, ++i, arg);
     else if (arg === "--generated-at") options.generatedAt = requireValue(args, ++i, arg);
     else if (arg === "--cluster") options.cluster = requireValue(args, ++i, arg);
     else if (arg === "--signed-intent") options.signedIntent = requireValue(args, ++i, arg);
@@ -140,6 +149,18 @@ function parseArgs(argv) {
     else usage();
   }
   return options;
+}
+
+function optionsWithEnv(options = {}) {
+  return withProductionEnv(options, {
+    productionRpcUrl: PRODUCTION_ENV.rpcUrl,
+    programId: PRODUCTION_ENV.programId,
+    tokenMint: PRODUCTION_ENV.tokenMint,
+    buyer: PRODUCTION_ENV.buyer,
+    worker: PRODUCTION_ENV.worker,
+    verifier: PRODUCTION_ENV.verifier,
+    destinationTokenAccount: PRODUCTION_ENV.workerUsdc,
+  });
 }
 
 function requireValue(args, index, label) {
@@ -351,6 +372,7 @@ async function resolveBalances(options, rpcCall) {
 }
 
 async function buildEvidence(options, rpcCall = defaultRpcCall) {
+  options = optionsWithEnv(options);
   assert(options.cluster === DEFAULT_CLUSTER, `cluster must be ${DEFAULT_CLUSTER}`);
   assert(!TEST_NETWORK_RE.test(options.cluster), "cluster must not be devnet/testnet/local/example");
   const signedIntent = readSignedIntent(options.signedIntent, options.cluster);
@@ -426,6 +448,15 @@ async function buildEvidence(options, rpcCall = defaultRpcCall) {
     },
     source: {
       built_by: "bin/build-production-payout-evidence.js",
+      ...envMetadata(options.envFile, [
+        PRODUCTION_ENV.rpcUrl,
+        PRODUCTION_ENV.programId,
+        PRODUCTION_ENV.tokenMint,
+        PRODUCTION_ENV.buyer,
+        PRODUCTION_ENV.worker,
+        PRODUCTION_ENV.verifier,
+        PRODUCTION_ENV.workerUsdc,
+      ]),
       sends_transactions: false,
       accepts_private_keys: false,
       key_material_printed: false,
@@ -443,6 +474,7 @@ async function buildEvidence(options, rpcCall = defaultRpcCall) {
 }
 
 async function build(options, rpcCall = defaultRpcCall) {
+  options = optionsWithEnv(options);
   const evidence = await buildEvidence(options, rpcCall);
   const out = path.resolve(options.out || DEFAULT_OUT);
   writeJson(out, evidence);
@@ -463,11 +495,13 @@ async function build(options, rpcCall = defaultRpcCall) {
 }
 
 function plan(options = {}) {
+  const envFile = options.envFile || DEFAULT_ENV_FILE;
   return {
     ok: true,
     kind: "tasc.production_payout.plan",
     version: "0.1",
     goal: "build the non-example mainnet USDC payout artifact required by real:readiness",
+    default_env_file: envFile,
     default_output: options.out || DEFAULT_OUT,
     sends_transactions: false,
     accepts_private_keys: false,
@@ -476,19 +510,19 @@ function plan(options = {}) {
     writes_files: false,
     required_inputs: [
       "signed production intent, or explicit program/task/buyer/verifier/deadline/nonce fields",
-      "worker wallet address",
+      "worker wallet address from --worker or env",
       "verifier result hash from the pass attestation",
-      "production USDC mint address",
+      "production USDC mint address from --token-mint or env",
       "mainnet task account",
       "vault token account after release",
-      "worker destination token account after release",
+      "worker destination token account after release from --destination-token-account or env",
       "fund, claim, attest, and release transaction signatures",
       "claim-to-release and claim-to-completed-index timings under 60000ms",
-      "post-release vault and worker token balances, either from --production-rpc-url or explicit balance flags",
+      "post-release vault and worker token balances, either from --production-rpc-url/env RPC or explicit balance flags",
     ],
     commands: {
-      build_with_rpc: "npm run real:payout:build -- --signed-intent .tascverifier/production-intent/production-intent.signature.json --program-id <program-id> --token-mint <mainnet-usdc-mint> --worker <worker-wallet> --result-hash <0x-result-hash> --task-account <task-account> --vault-token-account <vault-token-account> --destination-token-account <worker-token-account> --fund-signature <sig> --claim-signature <sig> --attest-signature <sig> --release-signature <sig> --claim-to-release-ms <ms> --claim-to-completed-index-ms <ms> --production-rpc-url <mainnet-rpc-url>",
-      validate_goal_readiness: "npm run real:readiness -- --timed-proof examples/solana-devnet/proofs/<run-id>/proof-summary.json --production-payout .tascverifier/production-payout-evidence.json --production-rpc-url <mainnet-rpc-url> --expected-genesis-hash <mainnet-genesis-hash>",
+      build_with_env_rpc: `npm run real:payout:build -- --env ${envFile} --signed-intent .tascverifier/production-intent/production-intent.signature.json --result-hash <0x-result-hash> --task-account <task-account> --vault-token-account <vault-token-account> --fund-signature <sig> --claim-signature <sig> --attest-signature <sig> --release-signature <sig> --claim-to-release-ms <ms> --claim-to-completed-index-ms <ms>`,
+      validate_goal_readiness: `npm run real:readiness -- --env ${envFile} --timed-proof examples/solana-devnet/proofs/<run-id>/proof-summary.json --production-payout .tascverifier/production-payout-evidence.json`,
     },
     notes: [
       "The RPC URL is only used for read-only SPL token balance checks and is never written to the evidence file.",
@@ -610,6 +644,17 @@ async function selfTest() {
   const dir = fs.mkdtempSync(path.join(ROOT, ".tascverifier", "production-payout-builder-"));
   const out = path.join(dir, "production-payout-evidence.json");
   const options = sampleOptions(out);
+  const envFile = path.join(dir, ".env.solana-mainnet.local");
+  fs.writeFileSync(envFile, [
+    `${PRODUCTION_ENV.rpcUrl}=http://127.0.0.1/mock-mainnet-rpc`,
+    `${PRODUCTION_ENV.programId}=${options.programId}`,
+    `${PRODUCTION_ENV.tokenMint}=${options.tokenMint}`,
+    `${PRODUCTION_ENV.buyer}=${options.buyer}`,
+    `${PRODUCTION_ENV.worker}=${options.worker}`,
+    `${PRODUCTION_ENV.verifier}=${options.verifier}`,
+    `${PRODUCTION_ENV.workerUsdc}=${options.destinationTokenAccount}`,
+    "",
+  ].join("\n"));
   const planResult = plan();
   assert(planResult.sends_transactions === false, "plan must not send transactions");
   assert(planResult.calls_rpc === false, "plan must not call RPC");
@@ -649,6 +694,21 @@ async function selfTest() {
   assert(signedIntentEvidence.source.signed_intent_verified === true, "signed intent should be verified");
   assert(signedIntentEvidence.settlement.buyer === signed.buyer, "signed intent should fill buyer");
 
+  const envEvidence = await buildEvidence({
+    ...options,
+    envFile,
+    programId: "",
+    tokenMint: "",
+    buyer: "",
+    worker: "",
+    verifier: "",
+    destinationTokenAccount: "",
+    productionRpcUrl: "",
+  }, mockRpcCall(options));
+  assert(envEvidence.settlement.worker === options.worker, "env should fill worker");
+  assert(envEvidence.settlement.destination_token_account === options.destinationTokenAccount, "env should fill destination");
+  assert(envEvidence.source.rpc_host === "127.0.0.1", "env RPC evidence should keep only host");
+
   let rejectedDevnet = false;
   try {
     await buildEvidence({
@@ -678,6 +738,7 @@ async function selfTest() {
     build_with_rpc_safe: true,
     build_without_rpc_safe: true,
     build_from_signed_intent_safe: true,
+    build_from_env_safe: true,
     rejected_devnet: rejectedDevnet,
     rejected_missing_balance: rejectedMissingBalance,
     no_new_dependencies: true,

@@ -26,6 +26,12 @@ const {
   signSolanaIntent,
   verifySignedSolanaIntent,
 } = require("./tascsolana");
+const {
+  DEFAULT_ENV_FILE,
+  PRODUCTION_ENV,
+  envMetadata,
+  withProductionEnv,
+} = require("./production-env");
 
 const ROOT = path.resolve(__dirname, "..");
 const DEFAULT_SIGNED_INTENT = ".tascverifier/production-intent/production-intent.signature.json";
@@ -34,7 +40,7 @@ const DEFAULT_CLUSTER = "solana-mainnet-beta";
 const DEFAULT_AMOUNT_BASE_UNITS = "10000000";
 const DEFAULT_DECIMALS = 6;
 const DEFAULT_COMMITMENT = "confirmed";
-const TEST_RPC_HOST_RE = /(devnet|testnet|localhost|127\.0\.0\.1|0\.0\.0\.0)/i;
+const TEST_RPC_HOST_RE = /(devnet|testnet|localhost|127\.0\.0\.1|0\.0\.0\.0|(^|\.)example\.(com|net|org|invalid)$)/i;
 
 function usage() {
   console.error([
@@ -45,6 +51,7 @@ function usage() {
     "  node bin/build-production-fund-transaction.js --self-test",
     "",
     "Build options:",
+    "  --env <file>                              production env file; default .env.solana-mainnet.local",
     "  --signed-intent <file>                    signed production intent; default .tascverifier/production-intent/production-intent.signature.json",
     "  --buyer-usdc-token-account <address>      buyer USDC source token account",
     "  --production-rpc-url <url>                optional read-only mainnet RPC for blockhash/rent/source-account checks",
@@ -67,6 +74,7 @@ function parseArgs(argv) {
   const options = {
     command: "plan",
     artifactFile: "",
+    envFile: DEFAULT_ENV_FILE,
     signedIntent: DEFAULT_SIGNED_INTENT,
     buyerUsdcTokenAccount: "",
     productionRpcUrl: "",
@@ -82,7 +90,8 @@ function parseArgs(argv) {
   if (options.command === "validate" && args[0] && !args[0].startsWith("--")) options.artifactFile = args.shift();
   for (let i = 0; i < args.length; i += 1) {
     const arg = args[i];
-    if (arg === "--signed-intent") options.signedIntent = requireValue(args, ++i, arg);
+    if (arg === "--env") options.envFile = requireValue(args, ++i, arg);
+    else if (arg === "--signed-intent") options.signedIntent = requireValue(args, ++i, arg);
     else if (arg === "--buyer-usdc-token-account") options.buyerUsdcTokenAccount = requireValue(args, ++i, arg);
     else if (arg === "--production-rpc-url") options.productionRpcUrl = requireValue(args, ++i, arg);
     else if (arg === "--recent-blockhash") options.recentBlockhash = requireValue(args, ++i, arg);
@@ -95,6 +104,13 @@ function parseArgs(argv) {
     else usage();
   }
   return options;
+}
+
+function optionsWithEnv(options = {}) {
+  return withProductionEnv(options, {
+    productionRpcUrl: PRODUCTION_ENV.rpcUrl,
+    buyerUsdcTokenAccount: PRODUCTION_ENV.buyerUsdc,
+  });
 }
 
 function requireValue(args, index, label) {
@@ -234,7 +250,7 @@ async function resolveInputs(options, signed, addresses, rpcCall) {
   if (options.productionRpcUrl) {
     const url = assertHttpUrl(options.productionRpcUrl, "production_rpc_url");
     if (!options.allowTestRpcHost && TEST_RPC_HOST_RE.test(url.host)) {
-      throw new Error("production RPC host must not look like devnet/testnet/local");
+      throw new Error("production RPC host must not look like devnet/testnet/local/example");
     }
     source.calls_rpc = true;
     source.rpc_host = url.host;
@@ -272,6 +288,7 @@ async function resolveInputs(options, signed, addresses, rpcCall) {
 }
 
 async function buildArtifact(options = {}, rpcCall = defaultRpcCall) {
+  options = optionsWithEnv(options);
   assert(options.signedIntent, "--signed-intent is required");
   const buyerTokenAccount = assertSolanaAddress(options.buyerUsdcTokenAccount, "buyer_usdc_token_account");
   const { signed, verified } = loadSignedProductionIntent(options.signedIntent);
@@ -370,6 +387,10 @@ async function buildArtifact(options = {}, rpcCall = defaultRpcCall) {
     },
     source: {
       built_by: "bin/build-production-fund-transaction.js",
+      ...envMetadata(options.envFile, [
+        PRODUCTION_ENV.rpcUrl,
+        PRODUCTION_ENV.buyerUsdc,
+      ]),
       sends_transactions: false,
       accepts_private_keys: false,
       key_material_printed: false,
@@ -444,6 +465,7 @@ function validateArtifact(artifact) {
 }
 
 async function build(options, rpcCall = defaultRpcCall) {
+  options = optionsWithEnv(options);
   const artifact = await buildArtifact(options, rpcCall);
   validateArtifact(artifact);
   const out = path.resolve(options.out || DEFAULT_OUT);
@@ -469,12 +491,14 @@ async function build(options, rpcCall = defaultRpcCall) {
 }
 
 function plan(options = {}) {
+  const envFile = options.envFile || DEFAULT_ENV_FILE;
   return {
     ok: true,
     kind: "tasc.production_fund_transaction.plan",
     version: "0.1",
     goal: "build the unsigned mainnet wallet transaction that funds a 10 USDC Tasc task",
     default_signed_intent: options.signedIntent || DEFAULT_SIGNED_INTENT,
+    default_env_file: envFile,
     default_output: options.out || DEFAULT_OUT,
     cluster: DEFAULT_CLUSTER,
     network_type: "mainnet",
@@ -485,11 +509,11 @@ function plan(options = {}) {
     writes_files: false,
     required_inputs: [
       "verified signed mainnet buyer intent",
-      "buyer USDC source token account",
-      "either --production-rpc-url or explicit --recent-blockhash, --task-rent-lamports, and --vault-token-rent-lamports",
+      "buyer USDC source token account from --buyer-usdc-token-account or env",
+      "either --production-rpc-url/env RPC or explicit --recent-blockhash, --task-rent-lamports, and --vault-token-rent-lamports",
     ],
     commands: {
-      build_with_rpc: "npm run real:fund:build -- --signed-intent .tascverifier/production-intent/production-intent.signature.json --buyer-usdc-token-account <buyer-usdc-account> --production-rpc-url <mainnet-rpc-url>",
+      build_with_env_rpc: `npm run real:fund:build -- --env ${envFile} --signed-intent .tascverifier/production-intent/production-intent.signature.json`,
       build_without_rpc: "npm run real:fund:build -- --signed-intent .tascverifier/production-intent/production-intent.signature.json --buyer-usdc-token-account <buyer-usdc-account> --recent-blockhash <blockhash> --task-rent-lamports <lamports> --vault-token-rent-lamports <lamports>",
       validate: "npm run real:fund:validate -- .tascverifier/production-fund-transaction.json",
     },
@@ -583,6 +607,7 @@ async function selfTest() {
     token_decimals: DEFAULT_DECIMALS,
   });
   const baseOptions = {
+    envFile: path.join(dir, ".env.solana-mainnet.local"),
     signedIntent: signedFile,
     buyerUsdcTokenAccount: buyerTokenAccount,
     productionRpcUrl: "https://mainnet.example.com/sensitive/rpc?credential=do-not-store",
@@ -590,6 +615,11 @@ async function selfTest() {
     out: path.join(dir, "production-fund-transaction.json"),
     allowTestRpcHost: true,
   };
+  fs.writeFileSync(baseOptions.envFile, [
+    `${PRODUCTION_ENV.rpcUrl}=https://mainnet.example.com/sensitive/rpc?credential=env-do-not-store`,
+    `${PRODUCTION_ENV.buyerUsdc}=${buyerTokenAccount}`,
+    "",
+  ].join("\n"));
   const rpcInput = {
     buyer: fixture.buyer.address,
     buyerTokenAccount,
@@ -615,6 +645,7 @@ async function selfTest() {
 
   const manualArtifact = await buildArtifact({
     ...baseOptions,
+    envFile: path.join(dir, "missing.env"),
     productionRpcUrl: "",
     recentBlockhash: sampleAddress(31),
     taskRentLamports: "2039280",
@@ -622,6 +653,18 @@ async function selfTest() {
   });
   assert(manualArtifact.source.calls_rpc === false, "manual build should not call RPC");
   validateArtifact(manualArtifact);
+
+  const envArtifact = await buildArtifact({
+    ...baseOptions,
+    buyerUsdcTokenAccount: "",
+    productionRpcUrl: "",
+  }, mockRpcCall(rpcInput));
+  assert(envArtifact.source.calls_rpc === true, "env build should use RPC");
+  assert(envArtifact.buyer_usdc_token_account === buyerTokenAccount, "env build should load buyer token account");
+  assert(envArtifact.source.rpc_host === "mainnet.example.com", "env build should only store RPC host");
+  const envText = JSON.stringify(envArtifact);
+  assert(!envText.includes("env-do-not-store"), "env artifact must not store RPC query credential");
+  assert(!envText.includes("/sensitive/rpc"), "env artifact must not store full RPC path");
 
   const devnetSignedFile = path.join(dir, "devnet.signature.json");
   signedIntentFixture(devnetSignedFile, "devnet");
@@ -658,6 +701,7 @@ async function selfTest() {
     plan_safe: true,
     build_with_rpc: true,
     build_without_rpc: true,
+    build_with_env: true,
     validate_artifact: true,
     rejected_devnet: rejectedDevnet,
     rejected_short_buyer_balance: rejectedShortBuyerBalance,
