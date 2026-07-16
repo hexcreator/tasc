@@ -20,6 +20,7 @@ const DEFAULT_CLUSTER = "solana-mainnet-beta";
 const DEFAULT_AMOUNT_BASE_UNITS = "10000000";
 const DEFAULT_TARGET_MS = 60_000;
 const DEFAULT_INPUT = "url=https://docs.cdp.coinbase.com/x402/welcome";
+const PRODUCTION_SUBMITTER_PAGE = "web/production-run.html";
 
 function usage() {
   console.error([
@@ -445,6 +446,30 @@ function buildCaptureReleaseCommand(config) {
   ].join("");
 }
 
+function walletSubmitterHandoff(phase, artifactFile, role, signer, captureCommand, timing) {
+  return {
+    page: PRODUCTION_SUBMITTER_PAGE,
+    phase,
+    artifact: artifactFile,
+    required_wallet_role: role,
+    required_signer: commandValue(signer, `<${role}-wallet>`),
+    rpc_url_input: "<mainnet-rpc-url>",
+    guarded_send_checkbox: "Enable production wallet sends",
+    accepts_private_keys: false,
+    full_rpc_url_persisted: false,
+    capture_command_after_send: captureCommand,
+    timing: timing || null,
+    instructions: [
+      `Open ${PRODUCTION_SUBMITTER_PAGE} from a local or hosted copy of web/.`,
+      `Paste or select ${artifactFile}.`,
+      `Connect the ${role} wallet and verify it matches the artifact signer.`,
+      "Enter the mainnet RPC URL locally in the page.",
+      "Enable production wallet sends only after reviewing the artifact summary.",
+      "Submit the transaction and run the generated capture command.",
+    ],
+  };
+}
+
 function buildReadinessCommand(config) {
   return [
     "npm run real:readiness --",
@@ -535,7 +560,14 @@ function commandSequence(config, artifacts) {
     {
       step: 10,
       phase: "wallet-send-mainnet-fund-transaction",
-      manual_action: "Submit .tascverifier/production-fund-transaction.json with the buyer wallet; capture the returned fund signature, task account, and vault token account.",
+      manual_action: `Submit .tascverifier/production-fund-transaction.json through ${PRODUCTION_SUBMITTER_PAGE} with the buyer wallet; capture the returned fund signature, task account, and vault token account.`,
+      wallet_submitter: walletSubmitterHandoff(
+        "fund",
+        ".tascverifier/production-fund-transaction.json",
+        "buyer",
+        config.buyer,
+        buildCaptureFundCommand(config),
+      ),
       required_for_goal: true,
       sends_transactions: true,
       network: DEFAULT_CLUSTER,
@@ -561,7 +593,19 @@ function commandSequence(config, artifacts) {
     {
       step: 13,
       phase: "wallet-send-worker-claim-transaction",
-      manual_action: "Submit .tascverifier/production-lifecycle-claim.json with the worker wallet; start the payout timer at wallet submission and capture the confirmed claim signature.",
+      manual_action: `Submit .tascverifier/production-lifecycle-claim.json through ${PRODUCTION_SUBMITTER_PAGE} with the worker wallet; start the payout timer at wallet submission and capture the confirmed claim signature.`,
+      wallet_submitter: walletSubmitterHandoff(
+        "claim",
+        ".tascverifier/production-lifecycle-claim.json",
+        "worker",
+        config.worker,
+        buildCaptureClaimCommand(config),
+        {
+          timer_starts_at: "wallet submission in production-run.html",
+          capture_field: "--claim-started-at",
+          target_ms: DEFAULT_TARGET_MS,
+        },
+      ),
       required_for_goal: true,
       sends_transactions: true,
       network: DEFAULT_CLUSTER,
@@ -587,7 +631,14 @@ function commandSequence(config, artifacts) {
     {
       step: 16,
       phase: "wallet-send-verifier-attest-transaction",
-      manual_action: "Submit .tascverifier/production-lifecycle-attest.json with the verifier wallet after checking the result hash; capture the confirmed attest signature.",
+      manual_action: `Submit .tascverifier/production-lifecycle-attest.json through ${PRODUCTION_SUBMITTER_PAGE} with the verifier wallet after checking the result hash; capture the confirmed attest signature.`,
+      wallet_submitter: walletSubmitterHandoff(
+        "attest",
+        ".tascverifier/production-lifecycle-attest.json",
+        "verifier",
+        config.verifier,
+        buildCaptureAttestCommand(config),
+      ),
       required_for_goal: true,
       sends_transactions: true,
       network: DEFAULT_CLUSTER,
@@ -613,7 +664,19 @@ function commandSequence(config, artifacts) {
     {
       step: 19,
       phase: "wallet-send-worker-release-transaction",
-      manual_action: "Submit .tascverifier/production-lifecycle-release.json with the worker wallet; capture the release signature and confirmation timestamp.",
+      manual_action: `Submit .tascverifier/production-lifecycle-release.json through ${PRODUCTION_SUBMITTER_PAGE} with the worker wallet; capture the release signature and confirmation timestamp.`,
+      wallet_submitter: walletSubmitterHandoff(
+        "release",
+        ".tascverifier/production-lifecycle-release.json",
+        "worker",
+        config.worker,
+        buildCaptureReleaseCommand(config),
+        {
+          timer_ends_at: "release confirmation in production-run.html",
+          capture_fields: ["--release-confirmed-at", "--completed-indexed-at"],
+          target_ms: DEFAULT_TARGET_MS,
+        },
+      ),
       required_for_goal: true,
       sends_transactions: true,
       network: DEFAULT_CLUSTER,
@@ -828,6 +891,24 @@ function validatePacket(packet) {
   assert(packetText.includes("--transaction .tascverifier/production-"), "packet must include artifact-aware capture commands");
   assert(packetText.includes("npm run real:capture:payout"), "packet must include payout command");
   assert(packetText.includes("npm run real:readiness"), "packet must include readiness command");
+  [
+    ["wallet-send-mainnet-fund-transaction", "fund", ".tascverifier/production-fund-transaction.json", "buyer"],
+    ["wallet-send-worker-claim-transaction", "claim", ".tascverifier/production-lifecycle-claim.json", "worker"],
+    ["wallet-send-verifier-attest-transaction", "attest", ".tascverifier/production-lifecycle-attest.json", "verifier"],
+    ["wallet-send-worker-release-transaction", "release", ".tascverifier/production-lifecycle-release.json", "worker"],
+  ].forEach(([phaseName, phase, artifact, role]) => {
+    const step = packet.operator_sequence.find((entry) => entry.phase === phaseName);
+    assert(step && step.wallet_submitter, `${phaseName} must include production wallet submitter handoff`);
+    assert(step.wallet_submitter.page === PRODUCTION_SUBMITTER_PAGE, `${phaseName} submitter page mismatch`);
+    assert(step.wallet_submitter.phase === phase, `${phaseName} submitter phase mismatch`);
+    assert(step.wallet_submitter.artifact === artifact, `${phaseName} submitter artifact mismatch`);
+    assert(step.wallet_submitter.required_wallet_role === role, `${phaseName} submitter role mismatch`);
+    assert(step.wallet_submitter.accepts_private_keys === false, `${phaseName} submitter must not accept private keys`);
+    assert(step.wallet_submitter.full_rpc_url_persisted === false, `${phaseName} submitter must not persist full RPC URL`);
+    assert(step.wallet_submitter.capture_command_after_send.includes(`--transaction ${artifact}`), `${phaseName} capture command must reference artifact`);
+    assert(step.wallet_submitter.capture_command_after_send.includes("npm run real:capture:record"), `${phaseName} capture command missing recorder`);
+    assert(Array.isArray(step.wallet_submitter.instructions) && step.wallet_submitter.instructions.length >= 5, `${phaseName} submitter instructions missing`);
+  });
   return {
     ok: true,
     kind: "tasc.production_run.packet.validation",
@@ -836,6 +917,7 @@ function validatePacket(packet) {
     ready_for_readiness_check: packet.ready_for_readiness_check,
     ready_for_goal: packet.ready_for_goal,
     command_steps: packet.operator_sequence.length,
+    wallet_submitter_handoffs: 4,
     no_new_dependencies: true,
   };
 }
@@ -1199,6 +1281,7 @@ async function selfTest() {
     plan_no_send_no_write: true,
     build_packet: true,
     validate_packet: true,
+    wallet_submitter_handoffs: true,
     ready_to_attempt_when_complete: buildResult.ready_to_attempt_mainnet,
     ready_for_readiness_check: buildResult.ready_for_readiness_check,
     ready_for_goal: buildResult.ready_for_goal,

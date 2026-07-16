@@ -194,6 +194,8 @@ It does not build new transactions, accept private keys, or persist the RPC URL.
 
 After submission, the page polls `getSignatureStatuses` through the operator-provided RPC URL and prints the matching `npm run real:capture:record -- --transaction <artifact> --signature <sig>` command. Claim and release artifacts include the timer placeholders required by the production capture recorder.
 
+The production run packet includes structured handoffs for this page for the fund, claim, attest, and release artifacts. That makes `.tascverifier/production-run-packet.json` the safest operator checklist for the first mainnet payout attempt.
+
 ## Handoff Import
 
 After a live testnet run writes:
