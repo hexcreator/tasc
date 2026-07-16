@@ -27,10 +27,12 @@ Done:
 - Apache-2.0 license exists
 - GitHub topics and starter issues exist
 - guarded Solana wallet transaction construction exists in the static operator console
+- static feed import exists for `tasc.index`, raw entry arrays, and hosted proof-summary indexes
 
 Next:
 
 - live-test the guarded wallet send flow with Phantom or another injected Solana wallet
+- publish a fresh proof index as a hosted feed artifact
 - add a short demo video or GIF
 - keep starter issues updated as protocol milestones land
 
@@ -66,6 +68,7 @@ Next:
 The current static web proof should become the main public demo:
 
 - load `examples/index/solana.spl.live.index.json`
+- import fresh proof/index artifacts without editing bundled demo code
 - show task title, reward, deadline, status, chain, vault, and proof coordinates
 - connect a Solana wallet and show live task-account status plus guarded role/action sends
 - link to docs explaining what is real and what is simulated
@@ -102,7 +105,7 @@ Ask for specific feedback:
 ## Next Engineering Steps
 
 1. Live-test guarded Solana wallet sends from the static operator console in a normal wallet-extension browser.
-2. Turn proof bundles into loadable task-feed artifacts instead of only a local runner output.
+2. Publish fresh proof indexes as hosted task-feed artifacts instead of only local runner output.
 3. Add finality windows, duplicate-task suppression, and multi-RPC fallback to the browser/indexer boundary.
 4. Start the dispute/reviewer path once pass/fail/timeout UX is usable end to end.
 

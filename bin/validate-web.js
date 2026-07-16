@@ -10,6 +10,7 @@ const LOG = "examples/events/summarize_url.funded-log.json";
 const FUNDING = "examples/funding/summarize_url.from-log.json";
 const HANDOFF = "examples/testnet/base-sepolia.handoff.example.json";
 const SOLANA_INDEX = "examples/index/solana.spl.live.index.json";
+const SOLANA_RELEASE_INDEX = "examples/index/solana.spl.release.index.json";
 const SOLANA_LIFECYCLE_ACCOUNT = "examples/solana-devnet/summarize_url_spl.lifecycle-account.live.json";
 const SOLANA_RELEASE_PLAN = "examples/solana-devnet/summarize_url_spl.release-plan.live.json";
 const SOLANA_TIMEOUT_FUNDING = "examples/solana-devnet/summarize_url_timeout_job_spl.funding.live.json";
@@ -39,6 +40,8 @@ function assertNoExternalRuntimeDependencies() {
   assert(html.includes("refresh-solana"), "index should expose Solana task refresh");
   assert(html.includes("enable-solana-submit"), "index should expose guarded Solana submit toggle");
   assert(html.includes("attest-result-hash"), "index should expose Solana attest result hash");
+  assert(html.includes("feed-import"), "index should expose feed JSON import");
+  assert(html.includes("feed-files"), "index should expose feed file import");
 
   for (const file of ["app.js", "demo-index.js", "tasc-web-core.js"]) {
     const source = read(path.join(WEB_DIR, file));
@@ -86,6 +89,45 @@ function assertSolanaTaskAccountDecode() {
     assert(decoded[field] === fixture.decoded[field], `Solana task account ${field} mismatch`);
   }
   assert(core.solanaNextAction(demoIndex.entries[0], decoded, fixture.decoded.worker).action === "complete", "released task should be complete");
+}
+
+function assertFeedImportPayloads() {
+  const claimableIndex = loadJson(SOLANA_INDEX);
+  const completedIndex = loadJson(SOLANA_RELEASE_INDEX);
+  const fromIndex = core.indexEntriesFromImportPayload(claimableIndex);
+  assert(fromIndex.entries.length === 1, "index import entry count mismatch");
+  assert(fromIndex.entries[0].task_hash === claimableIndex.entries[0].task_hash, "index import task hash mismatch");
+
+  const fromArray = core.indexEntriesFromImportPayload([claimableIndex.entries[0]]);
+  assert(fromArray.entries.length === 1, "array import entry count mismatch");
+  assert(fromArray.entries[0].settlement.task_pda === claimableIndex.entries[0].settlement.task_pda, "array import task account mismatch");
+
+  const merged = core.mergeIndexEntries(claimableIndex.entries, completedIndex.entries);
+  assert(merged.length === 1, "completed merge should replace claimable entry for same task");
+  assert(merged[0].status === "completed", "completed merge precedence mismatch");
+  assert(core.solanaNextAction(merged[0], null, "").action === "complete", "completed import should render complete action");
+
+  const proofSummary = {
+    kind: "tasc.solana-devnet.proof",
+    branches: {
+      release: {
+        claimable_index_file: SOLANA_INDEX,
+        completed_index_file: SOLANA_RELEASE_INDEX,
+      },
+    },
+  };
+  const fromProof = core.indexEntriesFromImportPayload(proofSummary);
+  assert(fromProof.entries.length === 0, "proof summary should not invent entries without referenced indexes");
+  assert(fromProof.index_paths.includes(SOLANA_INDEX), "proof summary claimable index path missing");
+  assert(fromProof.index_paths.includes(SOLANA_RELEASE_INDEX), "proof summary completed index path missing");
+
+  let rejected = false;
+  try {
+    core.indexEntriesFromImportPayload({ ok: true });
+  } catch {
+    rejected = true;
+  }
+  assert(rejected, "invalid feed import should be rejected");
 }
 
 function entryFromFunding(funding) {
@@ -263,6 +305,7 @@ async function main() {
   assertFilterAndHandoff();
   assertBundledSolanaIndexMatchesFixture();
   assertSolanaTaskAccountDecode();
+  assertFeedImportPayloads();
   await assertSolanaLifecycleTransactionBuilds();
 
   process.stdout.write(`${JSON.stringify({
@@ -272,6 +315,7 @@ async function main() {
     handoff_fixture: HANDOFF,
     bundled_solana_index: SOLANA_INDEX,
     solana_task_account_fixture: SOLANA_LIFECYCLE_ACCOUNT,
+    feed_import_shapes: ["tasc.index", "tasc.index.entry[]", "tasc.solana-devnet.proof"],
     solana_wallet_transaction_builds: ["claim", "attest", "release", "refund", "timeout-refund"],
     external_runtime_dependencies: 0,
     next: "Open web/index.html or deploy web/ as static files.",

@@ -8,6 +8,9 @@
 
   const el = {
     loadDemo: document.querySelector("#load-demo"),
+    feedImport: document.querySelector("#feed-import"),
+    feedFiles: document.querySelector("#feed-files"),
+    importFeed: document.querySelector("#import-feed"),
     solanaRpcUrl: document.querySelector("#solana-rpc-url"),
     connectSolana: document.querySelector("#connect-solana"),
     refreshSolana: document.querySelector("#refresh-solana"),
@@ -223,6 +226,13 @@
     return submissions[solanaSubmissionKey(entry, action)] || null;
   }
 
+  function feedSourceText(state) {
+    if (state.feedSource && state.feedSource.label) {
+      return `${state.feedSource.label}: ${state.feedSource.count} task(s)`;
+    }
+    return "Bundled devnet proof loaded";
+  }
+
   function walletReadout(state) {
     const wallet = connectedWallet(state);
     if (!wallet) return "No wallet connected";
@@ -249,7 +259,7 @@
     el.cursor.textContent = state.cursor
       ? `Next block ${state.cursor.nextFromBlock}; head ${state.cursor.headBlock}`
       : claimableEntries.length > 0
-        ? "Bundled devnet proof loaded"
+        ? feedSourceText(state)
         : "No cursor";
     el.claimableList.replaceChildren(...claimableEntries.map((entry) => renderClaimableCard(entry, state)));
     el.empty.hidden = entries.length > 0 || claimableEntries.length > 0;
@@ -279,6 +289,7 @@
     const settlement = entry.settlement || {};
     const funding = entry.funding || {};
     const custody = funding.custody || {};
+    const completedSettlement = entry.completed_settlement || {};
     const cluster = settlement.cluster || "devnet";
     const reward = `${core.formatTokenAmount(entry.amount, custody.decimals ?? 6)} USDC`;
     const liveAccount = solanaAccountForEntry(state, entry);
@@ -296,9 +307,11 @@
     eyebrow.className = "eyebrow";
     eyebrow.textContent = `${settlement.chain || "chain"} / ${cluster}`;
     const title = document.createElement("h3");
-    title.textContent = "summarize_url_spl";
+    title.textContent = entry.task_name || entry.name || "Tasc task";
     const subtitle = document.createElement("p");
-    subtitle.textContent = "Live devnet task admitted from signed intent plus SPL vault custody.";
+    subtitle.textContent = entry.completed_status
+      ? `Completed with ${entry.completed_status} settlement evidence.`
+      : "Live devnet task admitted from signed intent plus SPL vault custody.";
     titleWrap.append(eyebrow, title, subtitle);
 
     const rewardNode = document.createElement("div");
@@ -308,15 +321,19 @@
 
     const meta = document.createElement("div");
     meta.className = "claimable-meta";
+    const evidenceSignature = completedSettlement.signature || funding.signature || "";
+    const evidenceLabel = completedSettlement.signature ? "Settlement tx" : "Funding tx";
+    const amountLabel = completedSettlement.signature ? "Settled" : "Custody";
+    const amountValue = completedSettlement.amount || custody.amount || entry.amount || "0";
     meta.append(
-      metaItem("Status", entry.status),
+      metaItem("Status", entry.completed_status || entry.status),
       metaItem("Live", liveAccount ? liveAccount.status : "not scanned"),
       metaItem("Task", shortHash(entry.task_hash)),
       metaItem("Program", shortMiddle(settlement.program_id), solanaExplorerUrl(`address/${settlement.program_id}`, cluster)),
       metaItem("Task account", shortMiddle(settlement.task_pda), solanaExplorerUrl(`address/${settlement.task_pda}`, cluster)),
       metaItem("Vault", shortMiddle(settlement.vault), solanaExplorerUrl(`address/${settlement.vault}`, cluster)),
-      metaItem("Custody", `${core.formatTokenAmount(custody.amount || "0", custody.decimals ?? 6)} USDC`),
-      metaItem("Funding tx", shortMiddle(funding.signature), solanaExplorerUrl(`tx/${funding.signature}`, cluster)),
+      metaItem(amountLabel, `${core.formatTokenAmount(amountValue, custody.decimals ?? 6)} USDC`),
+      metaItem(evidenceLabel, shortMiddle(evidenceSignature), evidenceSignature ? solanaExplorerUrl(`tx/${evidenceSignature}`, cluster) : null),
       metaItem("Verifier", shortMiddle(entry.verifier), solanaExplorerUrl(`address/${entry.verifier}`, cluster)),
     );
     if (liveAccount && liveAccount.worker !== core.ZERO_SOLANA_PUBKEY) {
@@ -393,6 +410,11 @@
   function onLoadDemo() {
     const state = readState();
     state.claimableEntries = demoIndex && Array.isArray(demoIndex.entries) ? demoIndex.entries : [];
+    state.feedSource = {
+      label: "Bundled devnet proof",
+      count: state.claimableEntries.length,
+      importedAt: new Date().toISOString(),
+    };
     state.solana = {
       ...(state.solana || {}),
       rpcUrl: readSolanaConfig().rpcUrl,
@@ -403,6 +425,93 @@
     writeState(state);
     render();
     setStatus(`Loaded ${state.claimableEntries.length} bundled devnet proof task(s)`, "success");
+  }
+
+  function importPathCandidates(rawPath) {
+    const value = String(rawPath || "");
+    if (/^https?:\/\//.test(value) || value.startsWith("/")) return [value];
+    return [
+      new URL(`../${value}`, window.location.href).toString(),
+      new URL(value, window.location.href).toString(),
+    ];
+  }
+
+  async function fetchImportJson(rawPath) {
+    const errors = [];
+    for (const candidate of importPathCandidates(rawPath)) {
+      try {
+        const response = await fetch(candidate, { cache: "no-store" });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return await response.json();
+      } catch (error) {
+        errors.push(`${candidate}: ${error.message}`);
+      }
+    }
+    throw new Error(`Could not fetch ${rawPath}. Paste or select the referenced index JSON instead. ${errors.join("; ")}`);
+  }
+
+  async function entriesFromImportPayload(payload) {
+    const parsed = core.indexEntriesFromImportPayload(payload);
+    let entries = parsed.entries;
+    for (const path of parsed.index_paths) {
+      const fetched = await fetchImportJson(path);
+      const fetchedParsed = await entriesFromImportPayload(fetched);
+      entries = core.mergeIndexEntries(entries, fetchedParsed.entries);
+    }
+    return { entries, indexPaths: parsed.index_paths };
+  }
+
+  function readFileText(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result || ""));
+      reader.onerror = () => reject(new Error(`Could not read ${file.name}`));
+      reader.readAsText(file);
+    });
+  }
+
+  async function payloadsFromFeedInputs() {
+    const payloads = [];
+    const pasted = el.feedImport.value.trim();
+    if (pasted) payloads.push(JSON.parse(pasted));
+    for (const file of Array.from(el.feedFiles.files || [])) {
+      payloads.push(JSON.parse(await readFileText(file)));
+    }
+    if (payloads.length === 0) throw new Error("Paste or select a feed JSON file first");
+    return payloads;
+  }
+
+  async function onImportFeed() {
+    el.importFeed.disabled = true;
+    try {
+      const payloads = await payloadsFromFeedInputs();
+      let importedEntries = [];
+      let referencedPaths = [];
+      for (const payload of payloads) {
+        const imported = await entriesFromImportPayload(payload);
+        importedEntries = core.mergeIndexEntries(importedEntries, imported.entries);
+        referencedPaths = [...referencedPaths, ...imported.indexPaths];
+      }
+      if (importedEntries.length === 0) throw new Error("No index entries found in import");
+      const state = readState();
+      state.claimableEntries = core.mergeIndexEntries(state.claimableEntries || [], importedEntries);
+      state.feedSource = {
+        label: referencedPaths.length > 0 ? "Imported proof bundle" : "Imported feed",
+        count: importedEntries.length,
+        importedAt: new Date().toISOString(),
+      };
+      state.solana = {
+        ...(state.solana || {}),
+        ...readSolanaConfig(),
+      };
+      writeState(state);
+      render();
+      setStatus(`Imported ${importedEntries.length} feed task(s)`, "success");
+    } catch (error) {
+      setStatus(error.message, "error");
+    } finally {
+      el.importFeed.disabled = false;
+    }
   }
 
   async function onScan() {
@@ -651,6 +760,7 @@
     setFormFromState(state);
     render();
     el.loadDemo.addEventListener("click", onLoadDemo);
+    el.importFeed.addEventListener("click", onImportFeed);
     el.connectSolana.addEventListener("click", onConnectSolana);
     el.refreshSolana.addEventListener("click", onRefreshSolana);
     el.attestVerdict.addEventListener("change", () => {

@@ -20,6 +20,7 @@ There is no build step, no bundled dependency, no hosted database, and no requir
 EVM:     browser -> RPC eth_blockNumber -> confirmed range -> RPC eth_getLogs -> Funded events -> local task cache
 Solana:  browser -> RPC getAccountInfo(task_pda) -> decode 276-byte task account -> role/action readiness
 Solana:  browser -> wallet sign -> RPC sendTransaction -> refreshed task-account status
+Import:  paste/select tasc.index JSON -> merge entries -> refresh live Solana status
 ```
 
 The browser reads only `TascEscrow.Funded` logs. It decodes the same event shape used by the CLI scanner:
@@ -34,8 +35,21 @@ The local cache uses browser storage. It stores:
 - decoded funding entries
 - connected Solana wallet address
 - decoded Solana task account snapshots
+- imported index entries and feed source metadata
 - the next block cursor
 - the last observed head block
+
+## Inventory Import
+
+The static app can load inventory without rebuilding `web/demo-index.js`.
+
+Supported import payloads:
+
+- `tasc.index` JSON files
+- raw arrays of `tasc.index.entry` objects
+- `tasc.solana-devnet.proof` summaries, when the referenced index JSON files are served from the same static host
+
+Completed index entries replace older claimable entries for the same Solana task account, so proof bundles can show the final `Released` or `Refunded` state instead of duplicating the same task.
 
 ## Solana Operator Console
 
@@ -108,6 +122,7 @@ The validator checks that:
 - handoff import derives the expected scanner config
 - the generated `eth_getLogs` filter matches the escrow and `Funded` topic
 - the browser Solana task-account decoder matches a committed live Solana lifecycle account fixture
+- the browser accepts `tasc.index`, raw entry arrays, and proof-summary import shapes
 - the browser can build wallet transaction payloads for Solana `claim`, `attest`, `release`, `refund`, and `timeout-refund`
 
 ## Limits
@@ -116,6 +131,6 @@ This is now a guarded operator surface, but still needs:
 
 - live wallet QA in a normal browser extension environment
 - richer task metadata retrieval
-- proof-bundle import beyond the single bundled demo index
+- hosted proof-bundle/index publication workflow
 - multi-RPC fallback
 - reorg handling for cached entries

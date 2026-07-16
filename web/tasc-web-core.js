@@ -166,6 +166,94 @@
     });
   }
 
+  function solanaIndexEntryKey(entry) {
+    const settlement = entry && entry.settlement ? entry.settlement : {};
+    if (settlement.chain === "solana" && settlement.task_pda) return `solana:${settlement.task_pda}`;
+    if (entry && entry.task_hash) return `task:${entry.task_hash}`;
+    return JSON.stringify(entry);
+  }
+
+  function entryPriority(entry) {
+    if (entry && entry.status === "completed") return 3;
+    if (entry && entry.completed_status) return 3;
+    if (entry && entry.status === "claimable") return 2;
+    return 1;
+  }
+
+  function mergeIndexEntries(existingEntries, incomingEntries) {
+    const map = new Map();
+    for (const entry of existingEntries || []) map.set(solanaIndexEntryKey(entry), entry);
+    for (const entry of incomingEntries || []) {
+      const key = solanaIndexEntryKey(entry);
+      const previous = map.get(key);
+      if (!previous || entryPriority(entry) >= entryPriority(previous)) map.set(key, entry);
+    }
+    return Array.from(map.values()).sort((a, b) => {
+      const aStatus = entryPriority(a);
+      const bStatus = entryPriority(b);
+      if (aStatus !== bStatus) return bStatus - aStatus;
+      return String(b.admitted_at || "").localeCompare(String(a.admitted_at || ""));
+    });
+  }
+
+  function assertIndexEntry(entry, label) {
+    assert(entry && typeof entry === "object", `${label} must be an object`);
+    assert(entry.kind === "tasc.index.entry" || entry.task_hash, `${label} must be a tasc index entry`);
+    assert(entry.task_hash, `${label} missing task_hash`);
+    assert(entry.settlement && typeof entry.settlement === "object", `${label} missing settlement`);
+    assert(entry.settlement.chain, `${label} missing settlement chain`);
+    assert(entry.status, `${label} missing status`);
+    return entry;
+  }
+
+  function proofSummaryIndexPaths(proof) {
+    const branches = proof && proof.branches ? proof.branches : {};
+    const paths = [];
+    for (const branch of Object.values(branches)) {
+      if (!branch || typeof branch !== "object") continue;
+      for (const field of ["claimable_index_file", "completed_index_file"]) {
+        if (branch[field]) paths.push(String(branch[field]));
+      }
+    }
+    return Array.from(new Set(paths));
+  }
+
+  function indexEntriesFromImportPayload(payload) {
+    const entries = [];
+    const indexPaths = [];
+    const visit = (value, label) => {
+      assert(value !== null && value !== undefined, `${label} is empty`);
+      if (Array.isArray(value)) {
+        value.forEach((item, index) => visit(item, `${label}[${index}]`));
+        return;
+      }
+      assert(typeof value === "object", `${label} must be a JSON object or array`);
+      if (value.kind === "tasc.index") {
+        assert(Array.isArray(value.entries), `${label} entries must be an array`);
+        value.entries.forEach((entry, index) => entries.push(assertIndexEntry(entry, `${label}.entries[${index}]`)));
+        return;
+      }
+      if (value.kind === "tasc.index.entry" || value.task_hash) {
+        entries.push(assertIndexEntry(value, label));
+        return;
+      }
+      if (value.kind === "tasc.solana-devnet.proof") {
+        indexPaths.push(...proofSummaryIndexPaths(value));
+        return;
+      }
+      if (Array.isArray(value.entries)) {
+        value.entries.forEach((entry, index) => entries.push(assertIndexEntry(entry, `${label}.entries[${index}]`)));
+        return;
+      }
+      throw new Error(`${label} is not a supported Tasc feed import`);
+    };
+    visit(payload, "import");
+    return {
+      entries: mergeIndexEntries([], entries),
+      index_paths: Array.from(new Set(indexPaths)),
+    };
+  }
+
   function deriveConfigFromHandoff(handoff) {
     assert(handoff && handoff.kind === "tasc.testnet.handoff", "handoff kind must be tasc.testnet.handoff");
     const scannerEnv = handoff.scanner && handoff.scanner.env ? handoff.scanner.env : {};
@@ -752,7 +840,7 @@
   }
 
   function solanaNextAction(entry, account, walletAddress, nowUnix) {
-    const status = account ? account.status : entry.status;
+    const status = account ? account.status : entry.completed_status || entry.status;
     const role = solanaWalletRole(entry, account, walletAddress);
     const deadline = Number((account && account.deadline_unix) || entry.deadline_unix || 0);
     const now = Number(nowUnix || Math.floor(Date.now() / 1000));
@@ -840,6 +928,8 @@
     deriveConfigFromHandoff,
     encodeShortVectorLength,
     formatTokenAmount,
+    indexEntriesFromImportPayload,
+    mergeIndexEntries,
     mergeEntries,
     normalizeAddress,
     numberFromRpcQuantity,
