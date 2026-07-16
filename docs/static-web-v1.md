@@ -104,6 +104,25 @@ Routes:
 
 The API starts from a trusted index file and optional seed ledger, accepts either a raw `tasc.worker.submission` body or `{ "submission": ... }`, requires bearer-token auth when `--auth-token-env` is configured, returns CORS headers for static-web callers, records accepted result hashes in memory, persists accepted hashes to `.tascverifier/ledger.json`, writes durable ingestion artifacts under `.tascverifier/artifacts/`, and rejects invalid JSON, wrong methods, oversized bodies, duplicate proofs, and tampered proofs. Production operation still needs deployment, secret management, and a hosted artifact/index publication workflow.
 
+## Local Private Beta Session
+
+Run:
+
+```sh
+npm run beta:plan
+npm run beta:local
+```
+
+`beta:local` starts a localhost-only static file server and verifier API together. If `TASC_VERIFIER_API_TOKEN` is unset, it generates an ephemeral bearer token and prints it with:
+
+- the static app URL
+- the verifier API URL
+- the trusted index file
+- verifier ledger and artifact paths
+- wallet-extension QA steps
+
+The static file server intentionally exposes only `web/`, `examples/`, `assets/`, and `docs/`, so local env files and package metadata are not served.
+
 ## Solana Operator Console
 
 The browser can connect to an injected Solana wallet provider, refresh bundled Solana task accounts from a devnet RPC, decode the live task-account status, and classify the connected wallet as buyer, verifier, worker, worker candidate, or spectator.
@@ -167,6 +186,7 @@ Run:
 npm run validate:web
 npm run validate:verifier-ingest
 npm run validate:verifier-api
+npm run validate:private-beta-local
 ```
 
 The validator checks that:
@@ -186,6 +206,7 @@ The validator checks that:
 - the browser can submit captured proof JSON to the verifier API, persist `tasc.verifier.ingestion`, and fill the Solana attest verdict/hash from the response
 - the browser can build wallet transaction payloads for Solana `claim`, `attest`, `release`, `refund`, and `timeout-refund`
 - the browser wallet submission adapter accepts mock `signAndSendTransaction` and `signTransaction` providers, serializes the signed transaction bytes for RPC fallback, and rejects unsupported providers or missing signatures
+- the local private-beta launcher serves the static app and verifier API together, restricts static paths, enforces bearer auth, writes verifier artifacts/ledger, and accepts a bundled worker proof
 
 ## Limits
 

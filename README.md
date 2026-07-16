@@ -170,7 +170,16 @@ npm run verifier:api
 
 That starts the verifier with bearer-token auth, a persistent duplicate ledger at `.tascverifier/ledger.json`, and durable ingestion artifacts under `.tascverifier/artifacts/`. Enter the API URL and bearer token in the static app's Verifier API panel, capture a worker proof, then use `Submit to Verifier` to call `POST /v1/ingest` from the browser.
 
-Headless validation covers the bytes, API auth/persistence behavior, guarded UI, and mock wallet-provider submission transports; a real wallet-extension QA pass is still required before treating this as beta-ready UX.
+For the local private-beta operator session, run:
+
+```bash
+npm run beta:plan
+npm run beta:local
+```
+
+`beta:local` serves the static app and verifier API together on localhost, prints the app URL, verifier URL, and bearer token, and writes verifier artifacts under `.tascverifier/`.
+
+Headless validation covers the bytes, API auth/persistence behavior, guarded UI, mock wallet-provider submission transports, and the local beta launcher; a real wallet-extension QA pass is still required before treating this as beta-ready UX.
 
 ## Repository Map
 
@@ -231,6 +240,7 @@ The best first contributions are narrow and verifiable:
 - publish fresh proof indexes as static feed artifacts
 - deploy the verifier API and feed its durable proof artifacts back into hosted task indexes
 - live-test the guarded Solana operator console in wallet-extension browsers
+- use `npm run beta:local` as the local operator session while testing Phantom/Solflare flows
 - add more TascLang task examples with deterministic verifier rules
 - build an indexer process that watches live Solana task accounts
 - package the CLI so people can create and sign tasks without reading the internals

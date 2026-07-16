@@ -34,10 +34,11 @@ Done:
 - verifier ingestion is exposed as a dependencyless HTTP API with bearer auth, durable artifacts, persistent duplicate ledger, health, and proof-ingest routes
 - the static web flow can submit captured proof JSON to the verifier API and fill Solana attest controls from the response
 - the wallet submission adapter is covered with mock `signAndSendTransaction` and `signTransaction` provider validation
+- `npm run beta:local` starts a local private-beta operator session with the static app and verifier API on localhost
 
 Next:
 
-- live-test the guarded wallet send flow with Phantom or another injected Solana wallet; mock-provider coverage exists, but extension-prompt QA is still required
+- live-test the guarded wallet send flow with Phantom or another injected Solana wallet using `npm run beta:local`; mock-provider coverage exists, but extension-prompt QA is still required
 - deploy the verifier API and connect durable artifacts back into hosted feed/index publication
 - publish a fresh proof index as a hosted feed artifact
 - add a short demo video or GIF
@@ -62,6 +63,7 @@ npm run validate:indexer
 npm run validate:solana-spl-escrow
 npm run validate:verifier-ingest
 npm run validate:verifier-api
+npm run validate:private-beta-local
 npm run validate:solana-lifecycle-tx
 npm run validate:solana-spl-settlement
 ```
@@ -69,6 +71,7 @@ npm run validate:solana-spl-settlement
 Next:
 
 - keep improving the `demo` script so it is the default first-run path
+- use `beta:local` as the default operator session for wallet-extension QA
 - keep improving the `devnet:proof` script so it reads existing public artifacts without sending transactions
 - keep live sending commands behind guard env vars
 
