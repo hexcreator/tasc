@@ -6,7 +6,7 @@
   "license": "Apache-2.0",
   "description": "Seed prototype for a decentralized instant micro-work task protocol.",
   "scripts": {
-    "demo": "npm run compile:example && npm run verify:example && npm run demo:market && npm run validate:indexer && npm run validate:static-feed && npm run validate:web && npm run validate:verifier-ingest && npm run validate:verifier-api && npm run validate:private-beta-local && npm run validate:private-beta-qa-evidence && npm run validate:private-beta-qa-runner && npm run validate:beta-claimable-publisher && npm run validate:private-beta-session-runner && npm run validate:solana-spl-escrow && npm run validate:solana-lifecycle-tx && npm run validate:solana-spl-settlement && npm run validate:solana-settlement-scan && npm run validate:solana-proof-runner && npm run validate:production-deploy-handoff && npm run validate:production-intent && npm run validate:production-preflight && npm run validate:production-fund-transaction && npm run validate:production-lifecycle-transaction && npm run validate:production-payout-builder && npm run validate:production-run-capture && npm run validate:production-run-packet && npm run validate:real-money-readiness",
+    "demo": "npm run compile:example && npm run verify:example && npm run demo:market && npm run validate:indexer && npm run validate:static-feed && npm run validate:web && npm run validate:verifier-ingest && npm run validate:verifier-api && npm run validate:private-beta-local && npm run validate:private-beta-qa-evidence && npm run validate:private-beta-qa-runner && npm run validate:beta-claimable-publisher && npm run validate:private-beta-session-runner && npm run validate:solana-spl-escrow && npm run validate:solana-lifecycle-tx && npm run validate:solana-spl-settlement && npm run validate:solana-settlement-scan && npm run validate:solana-proof-runner && npm run validate:production-env && npm run validate:production-deploy-handoff && npm run validate:production-intent && npm run validate:production-preflight && npm run validate:production-fund-transaction && npm run validate:production-lifecycle-transaction && npm run validate:production-payout-builder && npm run validate:production-run-capture && npm run validate:production-run-packet && npm run validate:real-money-readiness",
     "beta:plan": "node bin/run-private-beta-local.js plan",
     "beta:local": "node bin/run-private-beta-local.js serve",
     "beta:qa": "node bin/run-private-beta-qa.js",
@@ -21,6 +21,9 @@
     "earn:devnet:plan": "node bin/prove-solana-devnet.js plan --live-deadline 60s --timeout-deadline 60s",
     "earn:devnet": "node bin/prove-solana-devnet.js run --live-deadline 60s --timeout-deadline 60s",
     "validate:timed-payout": "node bin/validate-timed-payout-proof.js",
+    "real:env:plan": "node bin/validate-production-env.js plan",
+    "real:env:validate": "node bin/validate-production-env.js validate",
+    "validate:production-env": "node bin/validate-production-env.js --self-test",
     "real:deploy:plan": "node bin/build-production-deploy-handoff.js plan",
     "real:deploy:build": "node bin/build-production-deploy-handoff.js build",
     "real:deploy:validate": "node bin/build-production-deploy-handoff.js validate",

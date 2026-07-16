@@ -14,8 +14,14 @@ const DEFAULT_ARTIFACT = "build/solana/global_tasc_solana_program.so";
 const DEFAULT_MANIFEST = "build/solana-tasc.sbf.json";
 const DEFAULT_PROGRAM_KEYPAIR = "build/solana/global_tasc_solana_program-keypair.json";
 const DEFAULT_OUT = ".tascverifier/production-deploy-handoff.json";
+const DEFAULT_ENV_FILE = ".env.solana-mainnet.local";
 const DEFAULT_CLUSTER = "solana-mainnet-beta";
 const TEST_RPC_HOST_RE = /(devnet|testnet|localhost|127\.0\.0\.1|0\.0\.0\.0)/i;
+const PRODUCTION_ENV = {
+  rpcUrl: "SOLANA_MAINNET_RPC_URL",
+  expectedGenesisHash: "SOLANA_MAINNET_EXPECTED_GENESIS_HASH",
+  programId: "GLOBAL_TASC_SOLANA_MAINNET_PROGRAM_ID",
+};
 
 function usage() {
   console.error([
@@ -26,6 +32,7 @@ function usage() {
     "  node bin/build-production-deploy-handoff.js --self-test",
     "",
     "Build options:",
+    "  --env <file>                              production env file; default .env.solana-mainnet.local",
     "  --artifact <file>                         SBF artifact; default build/solana/global_tasc_solana_program.so",
     "  --manifest <file>                         SBF manifest; default build/solana-tasc.sbf.json",
     "  --program-keypair <file>                  generated program-id keypair JSON; default build/solana/global_tasc_solana_program-keypair.json",
@@ -48,6 +55,7 @@ function parseArgs(argv) {
   const options = {
     command: "plan",
     handoffFile: "",
+    envFile: DEFAULT_ENV_FILE,
     artifact: DEFAULT_ARTIFACT,
     manifest: DEFAULT_MANIFEST,
     programKeypair: DEFAULT_PROGRAM_KEYPAIR,
@@ -64,7 +72,8 @@ function parseArgs(argv) {
   if (options.command === "validate" && args[0] && !args[0].startsWith("--")) options.handoffFile = args.shift();
   for (let i = 0; i < args.length; i += 1) {
     const arg = args[i];
-    if (arg === "--artifact") options.artifact = requireValue(args, ++i, arg);
+    if (arg === "--env") options.envFile = requireValue(args, ++i, arg);
+    else if (arg === "--artifact") options.artifact = requireValue(args, ++i, arg);
     else if (arg === "--manifest") options.manifest = requireValue(args, ++i, arg);
     else if (arg === "--program-keypair") options.programKeypair = requireValue(args, ++i, arg);
     else if (arg === "--program-id") options.programId = requireValue(args, ++i, arg);
@@ -87,6 +96,19 @@ function requireValue(args, index, label) {
 
 function loadJson(file) {
   return JSON.parse(fs.readFileSync(file, "utf8"));
+}
+
+function loadEnvFile(file) {
+  if (!fs.existsSync(file)) return {};
+  const env = {};
+  for (const line of fs.readFileSync(file, "utf8").split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) continue;
+    const index = line.indexOf("=");
+    if (index === -1) continue;
+    env[line.slice(0, index).trim()] = line.slice(index + 1).trim();
+  }
+  return env;
 }
 
 function writeJson(file, value) {
@@ -181,6 +203,11 @@ function deployCommand(options) {
 }
 
 function buildHandoff(options = {}) {
+  const envFile = options.envFile || DEFAULT_ENV_FILE;
+  const env = { ...loadEnvFile(envFile), ...process.env };
+  const expectedProgramId = options.programId || env[PRODUCTION_ENV.programId] || "";
+  const productionRpcUrl = options.productionRpcUrl || env[PRODUCTION_ENV.rpcUrl] || "";
+  const expectedGenesisHash = options.expectedGenesisHash || env[PRODUCTION_ENV.expectedGenesisHash] || "";
   const artifactFile = path.resolve(options.artifact || DEFAULT_ARTIFACT);
   const manifestFile = path.resolve(options.manifest || DEFAULT_MANIFEST);
   const programKeypairFile = path.resolve(options.programKeypair || DEFAULT_PROGRAM_KEYPAIR);
@@ -190,9 +217,9 @@ function buildHandoff(options = {}) {
   assertSolanaAddress(programId, "program_id");
   const permissions = programKeypairPermissions(programKeypairFile);
   assert(permissions.private_to_owner, "program keypair file must not be group/world readable");
-  if (options.programId) assert(assertSolanaAddress(options.programId, "program_id") === programId, "program_id must match generated program keypair");
-  const rpcHost = options.productionRpcUrl
-    ? assertHttpUrl(options.productionRpcUrl, "production_rpc_url", options.allowTestRpcHost).host
+  if (expectedProgramId) assert(assertSolanaAddress(expectedProgramId, "program_id") === programId, "program_id must match generated program keypair");
+  const rpcHost = productionRpcUrl
+    ? assertHttpUrl(productionRpcUrl, "production_rpc_url", options.allowTestRpcHost).host
     : null;
   const deployer = options.deployer ? assertSolanaAddress(options.deployer, "deployer") : "";
   return {
@@ -211,14 +238,16 @@ function buildHandoff(options = {}) {
       program_keypair_material_persisted_in_handoff: false,
     },
     deploy: {
+      env_file: rel(envFile),
+      env_file_exists: fs.existsSync(envFile),
       deployer: deployer || "<mainnet-deployer-wallet>",
       command: deployCommand({
         artifact: artifactFile,
         programKeypair: programKeypairFile,
       }),
-      expected_genesis_hash: options.expectedGenesisHash || "<mainnet-genesis-hash>",
+      expected_genesis_hash: expectedGenesisHash || "<mainnet-genesis-hash>",
       production_rpc_host: rpcHost,
-      production_rpc_url_set: Boolean(options.productionRpcUrl),
+      production_rpc_url_set: Boolean(productionRpcUrl),
       production_rpc_url_persisted: false,
       capture: [
         "mainnet deploy transaction signature",
@@ -227,15 +256,8 @@ function buildHandoff(options = {}) {
       ],
       next_preflight_command: [
         "npm run real:preflight --",
-        " --production-rpc-url <mainnet-rpc-url>",
-        ` --expected-genesis-hash ${options.expectedGenesisHash || "<mainnet-genesis-hash>"}`,
+        ` --env ${rel(envFile)}`,
         ` --program-id ${programId}`,
-        " --usdc-mint <mainnet-usdc-mint>",
-        " --buyer <buyer-wallet>",
-        " --worker <worker-wallet>",
-        " --verifier <verifier-wallet>",
-        " --buyer-usdc-token-account <buyer-usdc-account>",
-        " --worker-usdc-token-account <worker-usdc-account>",
       ].join(""),
     },
     source: {
@@ -331,6 +353,7 @@ function plan(options = {}) {
     cluster: DEFAULT_CLUSTER,
     network_type: "mainnet",
     default_artifact: options.artifact || DEFAULT_ARTIFACT,
+    default_env_file: options.envFile || DEFAULT_ENV_FILE,
     default_manifest: options.manifest || DEFAULT_MANIFEST,
     default_program_keypair: options.programKeypair || DEFAULT_PROGRAM_KEYPAIR,
     default_output: options.out || DEFAULT_OUT,
@@ -348,7 +371,7 @@ function plan(options = {}) {
       "mainnet deployer wallet with enough SOL, supplied to Solana CLI outside this handoff",
     ],
     commands: {
-      build_handoff: "npm run real:deploy:build -- --production-rpc-url <mainnet-rpc-url> --expected-genesis-hash <mainnet-genesis-hash>",
+      build_handoff: "npm run real:deploy:build -- --env .env.solana-mainnet.local",
       validate_handoff: "npm run real:deploy:validate -- .tascverifier/production-deploy-handoff.json",
       deploy_program: "solana program deploy build/solana/global_tasc_solana_program.so --program-id build/solana/global_tasc_solana_program-keypair.json --keypair <mainnet-deployer-keypair> --url <mainnet-rpc-url> --output json",
     },

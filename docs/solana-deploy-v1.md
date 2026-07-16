@@ -42,14 +42,16 @@ npm run solana:deploy-plan
 Build the no-send mainnet deploy handoff:
 
 ```sh
+cp .env.example .env.solana-mainnet.local
+chmod 600 .env.solana-mainnet.local
+npm run real:env:plan -- --env .env.solana-mainnet.local
+npm run real:env:validate -- --env .env.solana-mainnet.local
 npm run real:deploy:plan
-npm run real:deploy:build -- \
-  --production-rpc-url <mainnet-rpc-url> \
-  --expected-genesis-hash <mainnet-genesis-hash>
+npm run real:deploy:build -- --env .env.solana-mainnet.local
 npm run real:deploy:validate -- .tascverifier/production-deploy-handoff.json
 ```
 
-`real:deploy:build` reads the generated program-id keypair file only to derive the public program id. It does not print key material, does not call RPC, does not send transactions, and stores only the RPC host.
+`real:env:*` checks the ignored `.env.solana-mainnet.local` file without printing the RPC URL, rejects private-key-like entries and devnet/test/local/example RPC hosts, and reports the public mainnet values still needed before preflight. `real:deploy:build` reads the generated program-id keypair file only to derive the public program id. It does not print key material, does not call RPC, does not send transactions, and stores only the RPC host.
 
 Create a live devnet signed intent from the local buyer/verifier keys and generated program id:
 

@@ -12,6 +12,7 @@ const { assertBase58Address, base58Decode, base58Encode } = require("./run-solan
 const ROOT = path.resolve(__dirname, "..");
 const DEFAULT_OUT = ".tascverifier/production-run-packet.json";
 const DEFAULT_TASK_FILE = "examples/summarize_url.tasc";
+const DEFAULT_ENV_FILE = ".env.solana-mainnet.local";
 const DEFAULT_INTENT_DIR = ".tascverifier/production-intent";
 const DEFAULT_PRODUCTION_DEPLOY = ".tascverifier/production-deploy-handoff.json";
 const DEFAULT_PRODUCTION_PAYOUT = ".tascverifier/production-payout-evidence.json";
@@ -21,6 +22,17 @@ const DEFAULT_AMOUNT_BASE_UNITS = "10000000";
 const DEFAULT_TARGET_MS = 60_000;
 const DEFAULT_INPUT = "url=https://docs.cdp.coinbase.com/x402/welcome";
 const PRODUCTION_SUBMITTER_PAGE = "web/production-run.html";
+const PRODUCTION_ENV = {
+  rpcUrl: "SOLANA_MAINNET_RPC_URL",
+  expectedGenesisHash: "SOLANA_MAINNET_EXPECTED_GENESIS_HASH",
+  programId: "GLOBAL_TASC_SOLANA_MAINNET_PROGRAM_ID",
+  tokenMint: "GLOBAL_TASC_SOLANA_MAINNET_USDC_MINT",
+  buyer: "GLOBAL_TASC_SOLANA_MAINNET_BUYER_ADDRESS",
+  worker: "GLOBAL_TASC_SOLANA_MAINNET_WORKER_ADDRESS",
+  verifier: "GLOBAL_TASC_SOLANA_MAINNET_VERIFIER_ADDRESS",
+  buyerUsdc: "GLOBAL_TASC_SOLANA_MAINNET_BUYER_USDC_TOKEN_ACCOUNT",
+  workerUsdc: "GLOBAL_TASC_SOLANA_MAINNET_WORKER_USDC_TOKEN_ACCOUNT",
+};
 
 function usage() {
   console.error([
@@ -31,6 +43,7 @@ function usage() {
     "  node bin/build-production-run-packet.js --self-test",
     "",
     "Options:",
+    "  --env <file>                              production env file; default .env.solana-mainnet.local",
     "  --out <file>                              output packet file; default .tascverifier/production-run-packet.json",
     "  --task-file <file>                        task file; default examples/summarize_url.tasc",
     "  --input name=value                        task input; repeatable",
@@ -66,6 +79,7 @@ function assert(condition, message) {
 function parseArgs(argv) {
   const options = {
     command: "plan",
+    envFile: DEFAULT_ENV_FILE,
     packetFile: "",
     out: DEFAULT_OUT,
     taskFile: DEFAULT_TASK_FILE,
@@ -96,7 +110,8 @@ function parseArgs(argv) {
   if (options.command === "validate" && args[0] && !args[0].startsWith("--")) options.packetFile = args.shift();
   for (let i = 0; i < args.length; i += 1) {
     const arg = args[i];
-    if (arg === "--out") options.out = requireValue(args, ++i, arg);
+    if (arg === "--env") options.envFile = requireValue(args, ++i, arg);
+    else if (arg === "--out") options.out = requireValue(args, ++i, arg);
     else if (arg === "--task-file") options.taskFile = requireValue(args, ++i, arg);
     else if (arg === "--input") {
       const [name, ...valueParts] = String(requireValue(args, ++i, arg)).split("=");
@@ -136,6 +151,19 @@ function requireValue(args, index, label) {
 
 function loadJson(file) {
   return JSON.parse(fs.readFileSync(file, "utf8"));
+}
+
+function loadEnvFile(file) {
+  if (!fs.existsSync(file)) return {};
+  const env = {};
+  for (const line of fs.readFileSync(file, "utf8").split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) continue;
+    const index = line.indexOf("=");
+    if (index === -1) continue;
+    env[line.slice(0, index).trim()] = line.slice(index + 1).trim();
+  }
+  return env;
 }
 
 function writeJson(file, value) {
@@ -715,10 +743,17 @@ function commandSequence(config, artifacts) {
 function buildPacket(options = {}) {
   const missing = [];
   const generatedAt = assertIso(options.now || new Date().toISOString(), "generated_at");
-  const rpcHost = rpcHostOnly(options.productionRpcUrl, missing);
+  const envFile = options.envFile || DEFAULT_ENV_FILE;
+  const fileEnv = loadEnvFile(envFile);
+  const mergedEnv = { ...fileEnv, ...process.env };
+  const envValue = (optionValue, key) => optionValue || mergedEnv[key] || "";
+  const productionRpcUrl = envValue(options.productionRpcUrl, PRODUCTION_ENV.rpcUrl);
+  const rpcHost = rpcHostOnly(productionRpcUrl, missing);
   const paths = intentPaths(options.intentDir || DEFAULT_INTENT_DIR);
   const signedIntentFile = path.resolve(options.signedIntent || paths.signedIntent);
   const config = {
+    env_file: rel(envFile),
+    env_file_exists: fs.existsSync(envFile),
     task_file: options.taskFile || DEFAULT_TASK_FILE,
     inputs: defaultInputs(options.inputs || {}),
     timed_proof_file: options.timedProof ? rel(options.timedProof) : "",
@@ -726,14 +761,16 @@ function buildPacket(options = {}) {
     production_capture_file: rel(options.productionCapture || DEFAULT_PRODUCTION_CAPTURE),
     production_payout_file: rel(options.productionPayout || DEFAULT_PRODUCTION_PAYOUT),
     signed_intent_file: rel(signedIntentFile),
-    expected_genesis_hash: options.expectedGenesisHash || "",
-    program_id: options.programId ? optionalAddress(options.programId, "program_id", missing) : "",
-    token_mint: optionalAddress(options.tokenMint, "token_mint", missing),
-    buyer: optionalAddress(options.buyer, "buyer", missing),
-    worker: optionalAddress(options.worker, "worker", missing),
-    verifier: optionalAddress(options.verifier, "verifier", missing),
-    buyer_usdc_token_account: optionalAddress(options.buyerUsdcTokenAccount, "buyer_usdc_token_account", missing),
-    worker_usdc_token_account: optionalAddress(options.workerUsdcTokenAccount, "worker_usdc_token_account", missing),
+    expected_genesis_hash: envValue(options.expectedGenesisHash, PRODUCTION_ENV.expectedGenesisHash),
+    program_id: envValue(options.programId, PRODUCTION_ENV.programId)
+      ? optionalAddress(envValue(options.programId, PRODUCTION_ENV.programId), "program_id", missing)
+      : "",
+    token_mint: optionalAddress(envValue(options.tokenMint, PRODUCTION_ENV.tokenMint), "token_mint", missing),
+    buyer: optionalAddress(envValue(options.buyer, PRODUCTION_ENV.buyer), "buyer", missing),
+    worker: optionalAddress(envValue(options.worker, PRODUCTION_ENV.worker), "worker", missing),
+    verifier: optionalAddress(envValue(options.verifier, PRODUCTION_ENV.verifier), "verifier", missing),
+    buyer_usdc_token_account: optionalAddress(envValue(options.buyerUsdcTokenAccount, PRODUCTION_ENV.buyerUsdc), "buyer_usdc_token_account", missing),
+    worker_usdc_token_account: optionalAddress(envValue(options.workerUsdcTokenAccount, PRODUCTION_ENV.workerUsdc), "worker_usdc_token_account", missing),
     task_account: options.taskAccount ? optionalAddress(options.taskAccount, "task_account", missing) : "",
     vault_token_account: options.vaultTokenAccount ? optionalAddress(options.vaultTokenAccount, "vault_token_account", missing) : "",
   };
@@ -809,10 +846,11 @@ function buildPacket(options = {}) {
     configured: {
       ...config,
       production_rpc_host: rpcHost,
-      production_rpc_url_set: Boolean(options.productionRpcUrl),
+      production_rpc_url_set: Boolean(productionRpcUrl),
       production_rpc_url_persisted: false,
       task_account_known: Boolean(config.task_account),
       vault_token_account_known: Boolean(config.vault_token_account),
+      env_keys_loaded: Object.values(PRODUCTION_ENV).filter((key) => Boolean(fileEnv[key] || process.env[key])),
     },
     artifacts,
     operator_sequence: commandSequence(config, artifacts),
@@ -1248,6 +1286,19 @@ async function selfTest() {
     now: "2026-01-01T00:00:00.000Z",
     runId: "production_run_packet_self_test",
   };
+  const envFile = path.join(dir, ".env.solana-mainnet.local");
+  fs.writeFileSync(envFile, [
+    `${PRODUCTION_ENV.rpcUrl}=https://mainnet.example.com/sensitive/rpc?credential=do-not-store`,
+    `${PRODUCTION_ENV.expectedGenesisHash}=mainnet-self-test-genesis`,
+    `${PRODUCTION_ENV.programId}=${programId}`,
+    `${PRODUCTION_ENV.tokenMint}=${tokenMint}`,
+    `${PRODUCTION_ENV.buyer}=${signed.buyer}`,
+    `${PRODUCTION_ENV.worker}=${worker}`,
+    `${PRODUCTION_ENV.verifier}=${verifier}`,
+    `${PRODUCTION_ENV.buyerUsdc}=${buyerUsdc}`,
+    `${PRODUCTION_ENV.workerUsdc}=${workerUsdc}`,
+    "",
+  ].join("\n"));
 
   const planResult = plan(options);
   assert(planResult.safety.sends_transactions === false, "plan must not send transactions");
@@ -1267,6 +1318,27 @@ async function selfTest() {
   const validation = validatePacket(packet);
   assert(validation.ok === true, "packet validation should pass");
 
+  const envPacket = buildPacket({
+    ...options,
+    out: path.join(dir, "packet-from-env.json"),
+    envFile,
+    productionRpcUrl: "",
+    expectedGenesisHash: "",
+    programId: "",
+    tokenMint: "",
+    buyer: "",
+    worker: "",
+    verifier: "",
+    buyerUsdcTokenAccount: "",
+    workerUsdcTokenAccount: "",
+  });
+  assert(envPacket.ready_to_attempt_mainnet === true, "env-backed packet should be ready to attempt");
+  assert(envPacket.configured.env_file_exists === true, "env-backed packet should report env file");
+  assert(envPacket.configured.production_rpc_host === "mainnet.example.com", "env-backed packet should keep only RPC host");
+  const envPacketText = JSON.stringify(envPacket);
+  assert(!envPacketText.includes("do-not-store"), "env-backed packet must not store RPC query credential");
+  assert(!envPacketText.includes("/sensitive/rpc"), "env-backed packet must not store full RPC path");
+
   const incomplete = buildPacket({
     ...options,
     signedIntent: path.join(dir, "missing.signature.json"),
@@ -1282,6 +1354,7 @@ async function selfTest() {
     build_packet: true,
     validate_packet: true,
     wallet_submitter_handoffs: true,
+    env_file_config: true,
     ready_to_attempt_when_complete: buildResult.ready_to_attempt_mainnet,
     ready_for_readiness_check: buildResult.ready_for_readiness_check,
     ready_for_goal: buildResult.ready_for_goal,
