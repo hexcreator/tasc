@@ -5,6 +5,7 @@ const path = require("path");
 const crypto = require("crypto");
 const { validate: validateTimedPayout } = require("./validate-timed-payout-proof");
 const { verifySignedSolanaIntent } = require("./tascsolana");
+const { validateHandoff: validateProductionDeployHandoff } = require("./build-production-deploy-handoff");
 const { validateProductionPayout } = require("./validate-real-money-readiness");
 const { assertBase58Address, base58Decode, base58Encode } = require("./run-solana-devnet");
 
@@ -12,6 +13,7 @@ const ROOT = path.resolve(__dirname, "..");
 const DEFAULT_OUT = ".tascverifier/production-run-packet.json";
 const DEFAULT_TASK_FILE = "examples/summarize_url.tasc";
 const DEFAULT_INTENT_DIR = ".tascverifier/production-intent";
+const DEFAULT_PRODUCTION_DEPLOY = ".tascverifier/production-deploy-handoff.json";
 const DEFAULT_PRODUCTION_PAYOUT = ".tascverifier/production-payout-evidence.json";
 const DEFAULT_CLUSTER = "solana-mainnet-beta";
 const DEFAULT_AMOUNT_BASE_UNITS = "10000000";
@@ -31,6 +33,7 @@ function usage() {
     "  --task-file <file>                        task file; default examples/summarize_url.tasc",
     "  --input name=value                        task input; repeatable",
     "  --timed-proof <proof-summary.json>        devnet timed proof from earn:devnet",
+    "  --production-deploy <file>                production deploy handoff file",
     "  --intent-dir <dir>                        production intent artifact dir",
     "  --signed-intent <file>                    signed production intent file",
     "  --production-payout <file>                production payout evidence file",
@@ -65,6 +68,7 @@ function parseArgs(argv) {
     taskFile: DEFAULT_TASK_FILE,
     inputs: {},
     timedProof: "",
+    productionDeploy: DEFAULT_PRODUCTION_DEPLOY,
     intentDir: DEFAULT_INTENT_DIR,
     signedIntent: "",
     productionPayout: DEFAULT_PRODUCTION_PAYOUT,
@@ -95,6 +99,7 @@ function parseArgs(argv) {
       assert(name && valueParts.length > 0, "--input must use name=value");
       options.inputs[name] = valueParts.join("=");
     } else if (arg === "--timed-proof") options.timedProof = requireValue(args, ++i, arg);
+    else if (arg === "--production-deploy") options.productionDeploy = requireValue(args, ++i, arg);
     else if (arg === "--intent-dir") options.intentDir = requireValue(args, ++i, arg);
     else if (arg === "--signed-intent") options.signedIntent = requireValue(args, ++i, arg);
     else if (arg === "--production-payout") options.productionPayout = requireValue(args, ++i, arg);
@@ -279,6 +284,12 @@ function validateTimedProofFile(file) {
   };
 }
 
+function validateProductionDeployFile(file, expected = {}) {
+  const details = validateProductionDeployHandoff(loadJson(file));
+  if (expected.programId) assert(details.program_id === expected.programId, "production deploy handoff program_id mismatch");
+  return details;
+}
+
 function validateProductionPayoutFile(file) {
   return validateProductionPayout(loadJson(file));
 }
@@ -298,6 +309,15 @@ function buildIntentCommand(config) {
     ` --program-id ${commandValue(config.program_id, "<program-id>")}`,
     ` --token-mint ${commandValue(config.token_mint, "<mainnet-usdc-mint>")}`,
     inputs,
+  ].join("");
+}
+
+function buildDeployHandoffCommand(config) {
+  return [
+    "npm run real:deploy:build --",
+    " --production-rpc-url <mainnet-rpc-url>",
+    ` --expected-genesis-hash ${commandValue(config.expected_genesis_hash, "<mainnet-genesis-hash>")}`,
+    ` --program-id ${commandValue(config.program_id, "<program-id>")}`,
   ].join("");
 }
 
@@ -401,6 +421,22 @@ function commandSequence(config, artifacts) {
     },
     {
       step: 2,
+      phase: "build-mainnet-program-deploy-handoff",
+      command: buildDeployHandoffCommand(config),
+      output: artifacts.production_deploy.file,
+      required_for_goal: true,
+      sends_transactions: false,
+    },
+    {
+      step: 3,
+      phase: "deploy-mainnet-program",
+      manual_action: "Deploy the reviewed SBF artifact with the exact command from the production deploy handoff, then capture the deploy signature and executable program account.",
+      required_for_goal: true,
+      sends_transactions: true,
+      network: DEFAULT_CLUSTER,
+    },
+    {
+      step: 4,
       phase: "build-mainnet-buyer-intent",
       command: buildIntentCommand(config),
       output: artifacts.intent.unsigned_intent_file,
@@ -408,14 +444,14 @@ function commandSequence(config, artifacts) {
       sends_transactions: false,
     },
     {
-      step: 3,
+      step: 5,
       phase: "wallet-sign-intent-payload",
       manual_action: `Sign ${artifacts.intent.signing_payload_file} with the buyer wallet and keep the base58 Ed25519 signature.`,
       required_for_goal: true,
       sends_transactions: false,
     },
     {
-      step: 4,
+      step: 6,
       phase: "attach-and-verify-intent-signature",
       command: `npm run real:intent:attach-signature -- --intent ${artifacts.intent.unsigned_intent_file} --signature <base58-wallet-signature>`,
       output: artifacts.intent.signed_intent_file,
@@ -423,7 +459,7 @@ function commandSequence(config, artifacts) {
       sends_transactions: false,
     },
     {
-      step: 5,
+      step: 7,
       phase: "mainnet-preflight",
       command: buildPreflightCommand(config),
       required_for_goal: true,
@@ -432,7 +468,7 @@ function commandSequence(config, artifacts) {
       rpc_url_redacted: true,
     },
     {
-      step: 6,
+      step: 8,
       phase: "build-mainnet-fund-transaction",
       command: buildFundCommand(config, artifacts),
       output: ".tascverifier/production-fund-transaction.json",
@@ -442,7 +478,7 @@ function commandSequence(config, artifacts) {
       rpc_url_redacted: true,
     },
     {
-      step: 7,
+      step: 9,
       phase: "wallet-send-mainnet-fund-transaction",
       manual_action: "Submit .tascverifier/production-fund-transaction.json with the buyer wallet; capture the returned fund signature, task account, and vault token account.",
       required_for_goal: true,
@@ -450,7 +486,7 @@ function commandSequence(config, artifacts) {
       network: DEFAULT_CLUSTER,
     },
     {
-      step: 8,
+      step: 10,
       phase: "build-worker-claim-transaction",
       command: buildLifecycleClaimCommand(config, artifacts),
       output: ".tascverifier/production-lifecycle-claim.json",
@@ -460,7 +496,7 @@ function commandSequence(config, artifacts) {
       rpc_url_redacted: true,
     },
     {
-      step: 9,
+      step: 11,
       phase: "wallet-send-worker-claim-transaction",
       manual_action: "Submit .tascverifier/production-lifecycle-claim.json with the worker wallet; start the payout timer at wallet submission and capture the confirmed claim signature.",
       required_for_goal: true,
@@ -468,7 +504,7 @@ function commandSequence(config, artifacts) {
       network: DEFAULT_CLUSTER,
     },
     {
-      step: 10,
+      step: 12,
       phase: "build-verifier-attest-transaction",
       command: buildLifecycleAttestCommand(config, artifacts),
       output: ".tascverifier/production-lifecycle-attest.json",
@@ -478,7 +514,7 @@ function commandSequence(config, artifacts) {
       rpc_url_redacted: true,
     },
     {
-      step: 11,
+      step: 13,
       phase: "wallet-send-verifier-attest-transaction",
       manual_action: "Submit .tascverifier/production-lifecycle-attest.json with the verifier wallet after checking the result hash; capture the confirmed attest signature.",
       required_for_goal: true,
@@ -486,7 +522,7 @@ function commandSequence(config, artifacts) {
       network: DEFAULT_CLUSTER,
     },
     {
-      step: 12,
+      step: 14,
       phase: "build-worker-release-transaction",
       command: buildLifecycleReleaseCommand(config, artifacts),
       output: ".tascverifier/production-lifecycle-release.json",
@@ -496,7 +532,7 @@ function commandSequence(config, artifacts) {
       rpc_url_redacted: true,
     },
     {
-      step: 13,
+      step: 15,
       phase: "wallet-send-worker-release-transaction",
       manual_action: "Submit .tascverifier/production-lifecycle-release.json with the worker wallet; capture the release signature and confirmation timestamp.",
       required_for_goal: true,
@@ -504,7 +540,7 @@ function commandSequence(config, artifacts) {
       network: DEFAULT_CLUSTER,
     },
     {
-      step: 14,
+      step: 16,
       phase: "build-production-payout-evidence",
       command: buildPayoutCommand(config),
       output: artifacts.production_payout.file,
@@ -514,7 +550,7 @@ function commandSequence(config, artifacts) {
       rpc_url_redacted: true,
     },
     {
-      step: 15,
+      step: 17,
       phase: "validate-real-money-readiness",
       command: buildReadinessCommand(config),
       required_for_goal: true,
@@ -534,9 +570,10 @@ function buildPacket(options = {}) {
     task_file: options.taskFile || DEFAULT_TASK_FILE,
     inputs: defaultInputs(options.inputs || {}),
     timed_proof_file: options.timedProof ? rel(options.timedProof) : "",
+    production_deploy_file: rel(options.productionDeploy || DEFAULT_PRODUCTION_DEPLOY),
     production_payout_file: rel(options.productionPayout || DEFAULT_PRODUCTION_PAYOUT),
     expected_genesis_hash: options.expectedGenesisHash || "",
-    program_id: optionalAddress(options.programId, "program_id", missing),
+    program_id: options.programId ? optionalAddress(options.programId, "program_id", missing) : "",
     token_mint: optionalAddress(options.tokenMint, "token_mint", missing),
     buyer: optionalAddress(options.buyer, "buyer", missing),
     worker: optionalAddress(options.worker, "worker", missing),
@@ -560,24 +597,32 @@ function buildPacket(options = {}) {
         valid: false,
         details: null,
       },
-    intent: {
-      dir: rel(paths.dir),
-      unsigned_intent_file: rel(paths.unsignedIntent),
-      signing_payload_file: rel(paths.signingPayload),
-      signing_payload_base64_file: rel(paths.signingPayloadBase64),
-      signed_intent_file: rel(signedIntentFile),
-      unsigned_intent_exists: fs.existsSync(paths.unsignedIntent),
-      signing_payload_exists: fs.existsSync(paths.signingPayload),
-      signed_intent: fileStatus(signedIntentFile, (file) => validateSignedIntentFile(file, {
-        buyer: config.buyer,
-        verifier: config.verifier,
-        programId: config.program_id,
-        tokenMint: config.token_mint,
-      })),
-    },
-    production_payout: fileStatus(options.productionPayout || DEFAULT_PRODUCTION_PAYOUT, validateProductionPayoutFile),
+    production_deploy: fileStatus(options.productionDeploy || DEFAULT_PRODUCTION_DEPLOY, (file) => validateProductionDeployFile(file, {
+      programId: config.program_id,
+    })),
   };
+  if (!config.program_id && artifacts.production_deploy.valid && artifacts.production_deploy.details.program_id) {
+    config.program_id = artifacts.production_deploy.details.program_id;
+  }
+  if (!config.program_id) missing.push("program_id is required");
+  artifacts.intent = {
+    dir: rel(paths.dir),
+    unsigned_intent_file: rel(paths.unsignedIntent),
+    signing_payload_file: rel(paths.signingPayload),
+    signing_payload_base64_file: rel(paths.signingPayloadBase64),
+    signed_intent_file: rel(signedIntentFile),
+    unsigned_intent_exists: fs.existsSync(paths.unsignedIntent),
+    signing_payload_exists: fs.existsSync(paths.signingPayload),
+    signed_intent: fileStatus(signedIntentFile, (file) => validateSignedIntentFile(file, {
+      buyer: config.buyer,
+      verifier: config.verifier,
+      programId: config.program_id,
+      tokenMint: config.token_mint,
+    })),
+  };
+  artifacts.production_payout = fileStatus(options.productionPayout || DEFAULT_PRODUCTION_PAYOUT, validateProductionPayoutFile);
   if (!artifacts.timed_proof.valid) missing.push("valid timed devnet payout proof is required");
+  if (!artifacts.production_deploy.valid) missing.push("valid production deploy handoff is required before mainnet funding");
   if (!artifacts.intent.signed_intent.valid) missing.push("valid signed production intent is required");
   const attemptBlockers = [...new Set(missing)];
   if (!artifacts.production_payout.valid) missing.push("valid production payout evidence is required before the final readiness check");
@@ -620,6 +665,7 @@ function buildPacket(options = {}) {
     artifacts,
     operator_sequence: commandSequence(config, artifacts),
     live_evidence_to_capture: [
+      "mainnet program deploy transaction signature or preflight proof that the same program id is already executable",
       "fund transaction signature",
       "claim transaction signature",
       "attest transaction signature",
@@ -664,6 +710,8 @@ function validatePacket(packet) {
   assert(Array.isArray(packet.operator_sequence), "operator_sequence must be an array");
   const phases = packet.operator_sequence.map((step) => step.phase);
   [
+    "build-mainnet-program-deploy-handoff",
+    "deploy-mainnet-program",
     "build-mainnet-buyer-intent",
     "mainnet-preflight",
     "build-mainnet-fund-transaction",
@@ -678,6 +726,7 @@ function validatePacket(packet) {
   const packetText = JSON.stringify(packet);
   assert(!packetText.includes("credential="), "packet must not persist RPC query strings");
   assert(!packetText.includes("/sensitive/rpc"), "packet must not persist full RPC paths");
+  assert(packetText.includes("npm run real:deploy:build"), "packet must include deploy handoff command");
   assert(packetText.includes("npm run real:intent:build"), "packet must include intent command");
   assert(packetText.includes("npm run real:preflight"), "packet must include preflight command");
   assert(packetText.includes("npm run real:lifecycle:build"), "packet must include lifecycle transaction command");
@@ -852,6 +901,65 @@ function sampleProductionPayout(file, tokenMint, taskAccount, vaultTokenAccount,
   });
 }
 
+function sampleProductionDeploy(file, programId) {
+  writeJson(file, {
+    ok: true,
+    kind: "tasc.production_deploy.handoff",
+    version: "0.1",
+    generated_at: "2026-01-01T00:00:00.000Z",
+    cluster: DEFAULT_CLUSTER,
+    network_type: "mainnet",
+    program: {
+      id: programId,
+      artifact: {
+        file: "build/solana/global_tasc_solana_program.so",
+        bytes: 17888,
+        sha256: "11".repeat(32),
+        manifest_file: "build/solana-tasc.sbf.json",
+        manifest_sha256: "22".repeat(32),
+        manifest_artifact_sha256: "11".repeat(32),
+        manifest_matches_artifact: true,
+        entrypoint_symbol: {
+          checked: true,
+          ok: true,
+        },
+      },
+      program_keypair_file: "build/solana/global_tasc_solana_program-keypair.json",
+      program_keypair_permissions: {
+        mode_octal: "600",
+        private_to_owner: true,
+      },
+      program_keypair_bytes_printed: false,
+      program_keypair_material_persisted_in_handoff: false,
+    },
+    deploy: {
+      deployer: "<mainnet-deployer-wallet>",
+      command: "solana program deploy build/solana/global_tasc_solana_program.so --program-id build/solana/global_tasc_solana_program-keypair.json --keypair <mainnet-deployer-keypair> --url <mainnet-rpc-url> --output json",
+      expected_genesis_hash: "mainnet-self-test-genesis",
+      production_rpc_host: "mainnet.example.com",
+      production_rpc_url_set: true,
+      production_rpc_url_persisted: false,
+      capture: [
+        "mainnet deploy transaction signature",
+        "deployed executable program account",
+      ],
+      next_preflight_command: `npm run real:preflight -- --production-rpc-url <mainnet-rpc-url> --expected-genesis-hash mainnet-self-test-genesis --program-id ${programId} --usdc-mint <mainnet-usdc-mint> --buyer <buyer-wallet> --worker <worker-wallet> --verifier <verifier-wallet> --buyer-usdc-token-account <buyer-usdc-account> --worker-usdc-token-account <worker-usdc-account>`,
+    },
+    source: {
+      built_by: "bin/build-production-deploy-handoff.js",
+      sends_transactions: false,
+      calls_rpc: false,
+      writes_files: true,
+      accepts_deployer_private_keys: false,
+      reads_program_keypair_file: true,
+      key_material_printed: false,
+      rpc_url_printed: false,
+      full_rpc_url_persisted: false,
+      no_new_dependencies: true,
+    },
+  });
+}
+
 async function sampleSignedIntent(file, input) {
   const {
     buildUnsignedIntent,
@@ -910,6 +1018,8 @@ async function selfTest() {
     programId,
     tokenMint,
   });
+  const productionDeploy = path.join(dir, "production-deploy-handoff.json");
+  sampleProductionDeploy(productionDeploy, programId);
   const productionPayout = path.join(dir, "production-payout-evidence.json");
   sampleProductionPayout(productionPayout, tokenMint, taskAccount, vaultTokenAccount, workerUsdc);
 
@@ -917,6 +1027,7 @@ async function selfTest() {
     out: path.join(dir, "packet.json"),
     taskFile: DEFAULT_TASK_FILE,
     timedProof,
+    productionDeploy,
     intentDir,
     signedIntent,
     productionPayout,

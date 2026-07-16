@@ -1,6 +1,6 @@
 # Solana Deploy V1
 
-This is the handoff from local Solana scanner proof to live devnet settlement.
+This is the handoff from local Solana scanner proof to live devnet settlement, plus the no-send production deploy preparation needed before a real mainnet USDC run.
 
 The repo now has:
 
@@ -9,8 +9,9 @@ The repo now has:
 - a deploy-readiness gate for local Solana tooling
 - a guarded SBF build script that emits a deployable fund-processor artifact and records its hash
 - a finalized Solana devnet deployment and fund transaction that produce live claimable index evidence
+- a sanitized production deploy handoff that verifies the SBF artifact, manifest hash, and program id without sending transactions
 
-It does not have real SPL token custody yet. The current live proof writes the Global Tasc task account as `Funded` and uses the System Program address as a placeholder `token_mint`.
+It does not have a completed mainnet deployment or real USDC payout yet. Devnet SPL custody and release/refund mechanics are live-proven; production deployment is still a reviewed operator action.
 
 ## Commands
 
@@ -37,6 +38,18 @@ Preview the guarded devnet deploy command:
 ```sh
 npm run solana:deploy-plan
 ```
+
+Build the no-send mainnet deploy handoff:
+
+```sh
+npm run real:deploy:plan
+npm run real:deploy:build -- \
+  --production-rpc-url <mainnet-rpc-url> \
+  --expected-genesis-hash <mainnet-genesis-hash>
+npm run real:deploy:validate -- .tascverifier/production-deploy-handoff.json
+```
+
+`real:deploy:build` reads the generated program-id keypair file only to derive the public program id. It does not print key material, does not call RPC, does not send transactions, and stores only the RPC host.
 
 Create a live devnet signed intent from the local buyer/verifier keys and generated program id:
 
