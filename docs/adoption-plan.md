@@ -32,6 +32,7 @@ Done:
 - `npm run beta:claimable:plan` plans a guarded fresh active task publisher that writes `web/feed/claimable-feed.json`
 - `npm run beta:session:plan` plans the guarded fresh active task plus localhost app/verifier session, with the verifier pinned to `web/feed/active.claimable.index.json`
 - `npm run earn:devnet:plan` plans a guarded 60-second devnet release proof whose live output measures claim-to-payout timing for the 10-unit test-token path
+- `npm run real:preflight:plan` and `npm run real:preflight` check mainnet RPC identity, deployed program, role SOL balances, USDC mint, and buyer/worker USDC token accounts before a real run
 - `npm run real:payout:plan` and `npm run real:payout:build` turn mainnet USDC signatures/accounts into the ignored production payout artifact, and `npm run real:readiness` rejects devnet/example evidence or production JSON without live mainnet RPC verification as not real-money ready
 - admitted feed entries carry signed task inputs, input hash, output schema, and verifier rules
 - worker submissions can be captured as hashable proof JSON from the static web task card
@@ -48,7 +49,7 @@ Next:
 
 - live-test the guarded wallet send flow with Phantom or another injected Solana wallet using `GLOBAL_TASC_ALLOW_BETA_CLAIMABLE_PUBLISH=1 npm run beta:session`, export QA evidence, and run `npm run beta:qa -- ~/Downloads/tasc-private-beta-qa.json --solana-rpc-url https://api.devnet.solana.com`; mock-provider coverage exists, but extension-prompt QA is still required
 - run `GLOBAL_TASC_ALLOW_SOLANA_DEVNET_PROOF=1 npm run earn:devnet` to capture timed claim-to-payout evidence for the devnet/test-token release branch
-- use `npm run real:payout:build` to create the first mainnet USDC payout artifact under `.tascverifier/`; do not count the goal complete until `real:readiness` returns `ready_for_goal: true` with non-example evidence, a mainnet RPC URL, and an expected genesis hash
+- use `npm run real:preflight` before touching real funds, then `npm run real:payout:build` to create the first mainnet USDC payout artifact under `.tascverifier/`; do not count the goal complete until `real:readiness` returns `ready_for_goal: true` with non-example evidence, a mainnet RPC URL, and an expected genesis hash
 - use `npm run beta:feed -- --proof-summary examples/solana-devnet/proofs/<run-id>/proof-summary.json` after fresh proof runs to publish static feed artifacts
 - use guarded `npm run beta:claimable` immediately before wallet-extension QA when a real active claimable task is needed
 - use guarded `npm run beta:session` as the preferred just-in-time active inventory plus verifier session path

@@ -450,6 +450,18 @@ npm run validate:timed-payout -- examples/solana-devnet/proofs/<run-id>/proof-su
 Then run the real-money readiness gate:
 
 ```bash
+npm run real:preflight:plan
+npm run real:preflight -- \
+  --production-rpc-url <mainnet-rpc-url> \
+  --expected-genesis-hash <mainnet-genesis-hash> \
+  --program-id <program-id> \
+  --usdc-mint <mainnet-usdc-mint> \
+  --buyer <buyer-wallet> \
+  --worker <worker-wallet> \
+  --verifier <verifier-wallet> \
+  --buyer-usdc-token-account <buyer-usdc-account> \
+  --worker-usdc-token-account <worker-usdc-account>
+
 npm run real:payout:plan
 npm run real:payout:build -- \
   --token-mint <mainnet-usdc-mint> \
@@ -471,7 +483,7 @@ npm run real:readiness -- \
   --expected-genesis-hash <mainnet-genesis-hash>
 ```
 
-`real:payout:build` creates the ignored local production payout artifact from mainnet signatures/accounts and read-only token-account balance checks. It must represent mainnet USDC, not devnet/test-token evidence, and it never accepts private keys or sends transactions. `real:readiness` should still report `ready_for_goal: false` until that artifact is paired with a timed proof, `--production-rpc-url`, and `--expected-genesis-hash`. The live RPC check verifies the genesis hash, fund/claim/attest/release signature confirmations, vault token-account balance, and worker destination token-account balance.
+`real:preflight` is read-only and checks mainnet RPC identity, deployed program account, role SOL balances, the verified USDC mint, buyer USDC funding capacity, and worker USDC destination readiness before a real run. `real:payout:build` creates the ignored local production payout artifact from mainnet signatures/accounts and read-only token-account balance checks. It must represent mainnet USDC, not devnet/test-token evidence, and neither command accepts private keys or sends transactions. `real:readiness` should still report `ready_for_goal: false` until that artifact is paired with a timed proof, `--production-rpc-url`, and `--expected-genesis-hash`. The live RPC check verifies the genesis hash, fund/claim/attest/release signature confirmations, vault token-account balance, and worker destination token-account balance.
 
 The next real implementation steps are:
 
