@@ -22,6 +22,7 @@
   const BASE58_ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
   const CLOCK_SYSVAR_ID = "SysvarC1ock11111111111111111111111111111111";
   const TOKEN_PROGRAM_ID = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
+  const ASSOCIATED_TOKEN_PROGRAM_ID = "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL";
   const PRODUCTION_SOLANA_CLUSTER = "solana-mainnet-beta";
   const PRODUCTION_USDC_BASE_UNITS = "10000000";
   const PRODUCTION_USDC_DECIMALS = 6;
@@ -952,16 +953,21 @@
   function assertProductionBaseArtifact(artifact) {
     assert(artifact && typeof artifact === "object", "production transaction artifact is required");
     assert(
-      artifact.kind === "tasc.production_fund_transaction" || artifact.kind === "tasc.production_lifecycle_transaction",
-      "artifact kind must be production fund or lifecycle transaction",
+      artifact.kind === "tasc.production_fund_transaction"
+        || artifact.kind === "tasc.production_lifecycle_transaction"
+        || artifact.kind === "tasc.production_token_account_setup_transaction",
+      "artifact kind must be production fund, lifecycle, or token-account setup transaction",
     );
     assert(artifact.version === "0.1", "artifact version must be 0.1");
     assert(artifact.cluster === PRODUCTION_SOLANA_CLUSTER, "artifact cluster must be solana-mainnet-beta");
     assert(artifact.network_type === "mainnet", "artifact network_type must be mainnet");
-    assert(artifact.amount && artifact.amount.base_units === PRODUCTION_USDC_BASE_UNITS, "artifact amount must be exactly 10000000");
+    const amount = artifact.amount || artifact.production_goal_amount;
+    assert(amount && amount.base_units === PRODUCTION_USDC_BASE_UNITS, "artifact goal amount must be exactly 10000000");
     assert(artifact.token && artifact.token.decimals === PRODUCTION_USDC_DECIMALS, "artifact token decimals must be 6");
     assert(artifact.token.production_asset === true, "artifact token must be marked as production asset");
-    assertSolanaAddress(artifact.program_id, "program_id");
+    if (artifact.kind !== "tasc.production_token_account_setup_transaction") {
+      assertSolanaAddress(artifact.program_id, "program_id");
+    }
     assertSolanaAddress(artifact.token.mint, "token.mint");
   }
 
@@ -991,6 +997,11 @@
   }
 
   function normalizeProductionPhase(artifact) {
+    if (artifact.kind === "tasc.production_token_account_setup_transaction") {
+      const role = String(artifact.role || "").toLowerCase().replace(/[_\s]+/g, "-");
+      assert(["buyer", "worker"].includes(role), "setup role must be buyer or worker");
+      return `setup-${role}-usdc-ata`;
+    }
     if (artifact.kind === "tasc.production_fund_transaction") return "fund";
     const action = String(artifact.action || "").toLowerCase().replace(/[_\s]+/g, "-");
     assert(["claim", "attest", "release"].includes(action), "production lifecycle action must be claim, attest, or release");
@@ -998,6 +1009,9 @@
   }
 
   function productionCaptureCommand(phase, artifactFile, signature) {
+    if (String(phase || "").startsWith("setup-")) {
+      return "npm run real:preflight -- --env .env.solana-mainnet.local";
+    }
     const file = artifactFile || "<transaction-artifact.json>";
     const sig = signature || `<${phase}-sig>`;
     const parts = [
@@ -1017,24 +1031,46 @@
     const settings = options || {};
     assertProductionBaseArtifact(artifact);
     const phase = normalizeProductionPhase(artifact);
-    assertSolanaAddress(artifact.buyer, "buyer");
-    assertSolanaAddress(artifact.verifier, "verifier");
-    assertSolanaAddress(artifact.task_account, "task_account");
+    const isSetup = String(phase).startsWith("setup-");
+    if (isSetup) {
+      if (artifact.buyer) assertSolanaAddress(artifact.buyer, "buyer");
+      if (artifact.verifier) assertSolanaAddress(artifact.verifier, "verifier");
+    } else {
+      assertSolanaAddress(artifact.buyer, "buyer");
+      assertSolanaAddress(artifact.verifier, "verifier");
+    }
     assertSolanaAddress(artifact.recent_blockhash, "recent_blockhash");
 
     let signer = artifact.signer;
     let signerRole = artifact.signer_role;
+    let owner = "";
+    let associatedTokenAccount = "";
     let vaultTokenAccount = "";
     let destinationTokenAccount = "";
     let resultHash = "";
 
-    if (phase === "fund") {
+    if (isSetup) {
+      signer = assertSolanaAddress(artifact.signer, "signer");
+      signerRole = String(artifact.signer_role || "");
+      assert(["buyer", "worker", "verifier", "payer"].includes(signerRole), "setup signer_role must be buyer, worker, verifier, or payer");
+      owner = assertSolanaAddress(artifact.owner, "owner");
+      associatedTokenAccount = assertSolanaAddress(artifact.associated_token_account, "associated_token_account");
+      assert(artifact.payer === signer, "setup payer must match signer");
+      assert(artifact.token_program_id === TOKEN_PROGRAM_ID, "setup token program mismatch");
+      assert(artifact.associated_token_program_id === ASSOCIATED_TOKEN_PROGRAM_ID, "setup associated token program mismatch");
+      const instruction = artifact.instruction || {};
+      assert(instruction.name === "associated_token.create_idempotent", "setup instruction mismatch");
+      assert(instruction.program_id === ASSOCIATED_TOKEN_PROGRAM_ID, "setup instruction program mismatch");
+      assert(instruction.data_hex === "0x01", "setup instruction data mismatch");
+    } else if (phase === "fund") {
+      assertSolanaAddress(artifact.task_account, "task_account");
       signer = artifact.buyer;
       signerRole = "buyer";
       assertSolanaAddress(artifact.buyer_usdc_token_account, "buyer_usdc_token_account");
       vaultTokenAccount = assertSolanaAddress(artifact.vault_token_account, "vault_token_account");
       assert(Array.isArray(artifact.instructions) && artifact.instructions.length === 5, "fund artifact must contain five instructions");
     } else {
+      assertSolanaAddress(artifact.task_account, "task_account");
       assertSolanaAddress(signer, "signer");
       assert(["worker", "verifier"].includes(signerRole), "lifecycle signer_role must be worker or verifier");
       if (phase === "claim") assert(signerRole === "worker", "claim signer role must be worker");
@@ -1071,12 +1107,14 @@
       network_type: artifact.network_type,
       signer,
       signer_role: signerRole,
-      buyer: artifact.buyer,
-      verifier: artifact.verifier,
-      program_id: artifact.program_id,
+      buyer: artifact.buyer || null,
+      verifier: artifact.verifier || null,
+      program_id: artifact.program_id || null,
       token_mint: artifact.token.mint,
-      amount_base_units: artifact.amount.base_units,
-      task_account: artifact.task_account,
+      amount_base_units: (artifact.amount || artifact.production_goal_amount).base_units,
+      task_account: artifact.task_account || null,
+      owner: owner || null,
+      associated_token_account: associatedTokenAccount || null,
       vault_token_account: vaultTokenAccount || null,
       destination_token_account: destinationTokenAccount || null,
       result_hash: resultHash || null,
@@ -1212,6 +1250,7 @@
     DEFAULT_CHUNK_SIZE,
     DEFAULT_CONFIRMATIONS,
     DEFAULT_SOLANA_RPC_URL,
+    ASSOCIATED_TOKEN_PROGRAM_ID,
     CLOCK_SYSVAR_ID,
     FUNDED_TOPIC,
     TOKEN_PROGRAM_ID,

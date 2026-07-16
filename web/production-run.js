@@ -129,6 +129,8 @@
       ["Phase", summary.phase],
       ["Signer role", summary.signer_role],
       ["Signer", summary.signer],
+      ["Owner", summary.owner],
+      ["USDC ATA", summary.associated_token_account],
       ["Task account", summary.task_account],
       ["Vault token", summary.vault_token_account],
       ["Destination", summary.destination_token_account],
@@ -161,7 +163,7 @@
 
   function artifactPathFromFileName(name) {
     const fileName = String(name || "");
-    if (/^production-(fund-transaction|lifecycle-(claim|attest|release))\.json$/.test(fileName)) {
+    if (/^production-(fund-transaction|lifecycle-(claim|attest|release)|token-account-setup-(buyer|worker))\.json$/.test(fileName)) {
       return `.tascverifier/${fileName}`;
     }
     return fileName;

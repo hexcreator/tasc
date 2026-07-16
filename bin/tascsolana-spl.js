@@ -6,10 +6,12 @@ const crypto = require("crypto");
 const { base58Decode, base58Encode } = require("./run-solana-devnet");
 const { createWithSeedAddress } = require("./tascsolana");
 
+const SYSTEM_PROGRAM_ID = "11111111111111111111111111111111";
 const TOKEN_PROGRAM_ID = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
 const ASSOCIATED_TOKEN_PROGRAM_ID = "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL";
 const MINT_ACCOUNT_SIZE = 82;
 const TOKEN_ACCOUNT_SIZE = 165;
+const CREATE_ASSOCIATED_TOKEN_ACCOUNT_IDEMPOTENT_TAG = 1;
 const TRANSFER_CHECKED_TAG = 12;
 const INITIALIZE_ACCOUNT3_TAG = 18;
 const INITIALIZE_MINT2_TAG = 20;
@@ -31,6 +33,7 @@ function usage() {
     "  node bin/tascsolana-spl.js decode-mint-account <account.json>",
     "  node bin/tascsolana-spl.js decode-token-account <account.json>",
     "  node bin/tascsolana-spl.js derive-associated-token-account <owner> <mint>",
+    "  node bin/tascsolana-spl.js create-associated-token-account-idempotent <payer> <owner> <mint>",
     "",
     "This helper is dependencyless and only handles the SPL Token v1 account/TransferChecked boundary.",
   ].join("\n"));
@@ -337,6 +340,32 @@ function transferCheckedInstruction(input) {
   };
 }
 
+function createAssociatedTokenAccountIdempotentInstruction(input) {
+  const tokenProgramId = input.tokenProgramId || TOKEN_PROGRAM_ID;
+  const associatedProgramId = input.associatedProgramId || ASSOCIATED_TOKEN_PROGRAM_ID;
+  const payer = input.payer || input.owner;
+  const owner = input.owner;
+  const mint = input.mint;
+  const account = input.account || associatedTokenAddress(owner, mint, tokenProgramId, associatedProgramId);
+  pubkeyBytes(payer, "associated token account payer");
+  pubkeyBytes(owner, "associated token account owner");
+  pubkeyBytes(mint, "associated token account mint");
+  pubkeyBytes(account, "associated token account");
+  return {
+    name: "associated_token.create_idempotent",
+    programId: associatedProgramId,
+    accounts: [
+      accountMeta(payer, true, true),
+      accountMeta(account, false, true),
+      accountMeta(owner, false, false),
+      accountMeta(mint, false, false),
+      accountMeta(SYSTEM_PROGRAM_ID, false, false),
+      accountMeta(tokenProgramId, false, false),
+    ],
+    data: Buffer.from([CREATE_ASSOCIATED_TOKEN_ACCOUNT_IDEMPOTENT_TAG]),
+  };
+}
+
 function initializeMint2Instruction(input) {
   return {
     name: "spl_token.initialize_mint2",
@@ -499,6 +528,29 @@ function main() {
     }, null, 2)}\n`);
     return;
   }
+  if (command === "create-associated-token-account-idempotent" && file && rest.length === 2) {
+    const payer = file;
+    const owner = rest[0];
+    const mint = rest[1];
+    const instruction = createAssociatedTokenAccountIdempotentInstruction({ payer, owner, mint });
+    process.stdout.write(`${JSON.stringify({
+      kind: "tasc.solana.associated_token_account.create_idempotent_instruction",
+      version: "0.1",
+      payer,
+      owner,
+      mint,
+      associated_token_account: instruction.accounts[1].pubkey,
+      token_program_id: TOKEN_PROGRAM_ID,
+      associated_token_program_id: ASSOCIATED_TOKEN_PROGRAM_ID,
+      instruction: {
+        name: instruction.name,
+        program_id: instruction.programId,
+        accounts: instruction.accounts,
+        data_hex: `0x${instruction.data.toString("hex")}`,
+      },
+    }, null, 2)}\n`);
+    return;
+  }
   usage();
 }
 
@@ -514,14 +566,17 @@ if (require.main === module) {
 module.exports = {
   ACCOUNT_STATE_INITIALIZED,
   ASSOCIATED_TOKEN_PROGRAM_ID,
+  CREATE_ASSOCIATED_TOKEN_ACCOUNT_IDEMPOTENT_TAG,
   INITIALIZE_ACCOUNT3_TAG,
   INITIALIZE_MINT2_TAG,
   MINT_ACCOUNT_SIZE,
   MINT_TO_CHECKED_TAG,
+  SYSTEM_PROGRAM_ID,
   TOKEN_ACCOUNT_SIZE,
   TOKEN_PROGRAM_ID,
   TRANSFER_CHECKED_TAG,
   associatedTokenAddress,
+  createAssociatedTokenAccountIdempotentInstruction,
   createProgramAddress,
   custodyEvidenceFromVault,
   decodeInitializeAccount3Data,

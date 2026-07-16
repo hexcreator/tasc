@@ -198,6 +198,47 @@ function assertProductionTransactionArtifactSummary() {
   assert(releaseSummary.capture_command.includes("--release-confirmed-at <iso-release-confirmed>"), "production release capture timestamp missing");
   assert(releaseSummary.capture_command.includes("--completed-indexed-at <iso-completed-indexed>"), "production release index timestamp missing");
 
+  const setup = {
+    ok: true,
+    kind: "tasc.production_token_account_setup_transaction",
+    version: "0.1",
+    role: "worker",
+    owner_role: "worker",
+    signer: sampleSolanaAddress(13),
+    signer_role: "worker",
+    payer: sampleSolanaAddress(13),
+    owner: sampleSolanaAddress(13),
+    cluster: "solana-mainnet-beta",
+    network_type: "mainnet",
+    production_goal_amount: {
+      display: "10 USDC",
+      base_units: "10000000",
+    },
+    token: {
+      symbol: "USDC",
+      mint: sampleSolanaAddress(3),
+      decimals: 6,
+      production_asset: true,
+    },
+    associated_token_account: sampleSolanaAddress(14),
+    token_program_id: core.TOKEN_PROGRAM_ID,
+    associated_token_program_id: core.ASSOCIATED_TOKEN_PROGRAM_ID,
+    recent_blockhash: DUMMY_BLOCKHASH,
+    instruction: {
+      name: "associated_token.create_idempotent",
+      program_id: core.ASSOCIATED_TOKEN_PROGRAM_ID,
+      data_hex: "0x01",
+    },
+    wallet_payload: productionWalletPayload(sampleSolanaAddress(13), "worker", base.recent_blockhash),
+  };
+  const setupSummary = core.summarizeProductionTransactionArtifact(setup, {
+    artifactFile: ".tascverifier/production-token-account-setup-worker.json",
+  });
+  assert(setupSummary.phase === "setup-worker-usdc-ata", "production token account setup phase mismatch");
+  assert(setupSummary.owner === setup.owner, "production token account setup owner mismatch");
+  assert(setupSummary.associated_token_account === setup.associated_token_account, "production token account setup ATA mismatch");
+  assert(setupSummary.capture_command.includes("real:preflight"), "production token account setup should rerun preflight");
+
   let rejectedDevnet = false;
   try {
     core.summarizeProductionTransactionArtifact({ ...fund, cluster: "solana-devnet" });
@@ -613,7 +654,7 @@ async function main() {
     solana_wallet_submission_adapter: ["signAndSendTransaction", "signTransaction+rpc.sendTransaction"],
     solana_wallet_transaction_builds: ["claim", "attest", "release", "refund", "timeout-refund"],
     production_wallet_submitter: "web/production-run.html",
-    production_artifact_summary: ["fund", "release", "mainnet-only"],
+    production_artifact_summary: ["setup-worker-usdc-ata", "fund", "release", "mainnet-only"],
     external_runtime_dependencies: 0,
     next: "Open web/index.html or deploy web/ as static files.",
   }, null, 2)}\n`);

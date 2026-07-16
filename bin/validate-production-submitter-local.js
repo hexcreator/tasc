@@ -36,6 +36,7 @@ async function main() {
     const core = await text(`${baseUrl}/web/tasc-web-core.js`);
     assert(core.response.status === 200, "tasc-web-core.js should be served");
     assert(core.body.includes("summarizeProductionTransactionArtifact"), "core production artifact summarizer missing");
+    assert(core.body.includes("tasc.production_token_account_setup_transaction"), "core token-account setup artifact support missing");
 
     const cssHead = await fetch(`${baseUrl}/web/styles.css`, { method: "HEAD" });
     assert(cssHead.status === 200, "styles.css HEAD should be served");
