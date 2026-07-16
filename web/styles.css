@@ -487,6 +487,11 @@ button:disabled {
   gap: 10px;
 }
 
+.verifier-proof .meta-item {
+  border-color: #abefc6;
+  background: #ecfdf3;
+}
+
 .submission-json {
   min-height: 150px;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;

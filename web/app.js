@@ -18,6 +18,8 @@
     attestResultHash: document.querySelector("#attest-result-hash"),
     enableSolanaSubmit: document.querySelector("#enable-solana-submit"),
     solanaWallet: document.querySelector("#solana-wallet"),
+    verifierApiUrl: document.querySelector("#verifier-api-url"),
+    verifierApiToken: document.querySelector("#verifier-api-token"),
     walletRole: document.querySelector("#wallet-role"),
     rpcUrl: document.querySelector("#rpc-url"),
     escrow: document.querySelector("#escrow"),
@@ -61,6 +63,8 @@
     el.attestVerdict.value = solana.attestVerdict || "pass";
     el.attestResultHash.value = solana.attestResultHash || defaultAttestResultHash;
     el.enableSolanaSubmit.checked = Boolean(solana.enableSubmit);
+    el.verifierApiUrl.value = (state.verifier && state.verifier.apiUrl) || "";
+    el.verifierApiToken.value = (state.verifier && state.verifier.token) || "";
     el.rpcUrl.value = config.rpcUrl || "";
     el.escrow.value = config.escrow || "";
     el.chainId.value = config.chainId || String(core.DEFAULT_CHAIN_ID);
@@ -86,6 +90,13 @@
       attestVerdict: el.attestVerdict.value,
       attestResultHash: el.attestResultHash.value.trim() || defaultAttestResultHash,
       enableSubmit: el.enableSolanaSubmit.checked,
+    };
+  }
+
+  function readVerifierConfig() {
+    return {
+      apiUrl: el.verifierApiUrl.value.trim(),
+      token: el.verifierApiToken.value.trim(),
     };
   }
 
@@ -234,6 +245,11 @@
   function workerSubmissionForEntry(state, entry) {
     const submissions = state.workerSubmissions || {};
     return submissions[workerSubmissionKey(entry)] || null;
+  }
+
+  function verifierIngestionForEntry(state, entry) {
+    const ingestions = state.verifierIngestions || {};
+    return ingestions[workerSubmissionKey(entry)] || null;
   }
 
   function displayReward(entry, custody) {
@@ -397,9 +413,109 @@
     }
   }
 
+  function verifierIngestUrl(apiUrl) {
+    if (!apiUrl) throw new Error("Verifier API URL is required");
+    const url = new URL(apiUrl, window.location.href);
+    if (url.protocol !== "http:" && url.protocol !== "https:") throw new Error("Verifier API URL must be http(s)");
+    const basePath = url.pathname.replace(/\/$/, "");
+    url.pathname = basePath.endsWith("/v1/ingest") ? basePath : `${basePath}/v1/ingest`;
+    url.search = "";
+    url.hash = "";
+    return url.toString();
+  }
+
+  function resultHashBytes32FromSha256(resultHash) {
+    const value = String(resultHash || "");
+    const match = value.match(/^sha256:([a-fA-F0-9]{64})$/);
+    if (!match) throw new Error("Verifier response result_hash must be sha256:<hex>");
+    return `0x${match[1].toLowerCase()}`;
+  }
+
+  function normalizeVerifierIngestion(payload, submission) {
+    if (!payload || payload.kind !== "tasc.verifier.ingestion") {
+      throw new Error(payload && payload.error ? payload.error : "Verifier response must be tasc.verifier.ingestion");
+    }
+    const attestation = payload.attestation || {};
+    const settlement = payload.settlement || {};
+    const attest = settlement.attest || {};
+    const verdict = attest.verdict || attestation.verdict;
+    if (verdict !== "pass" && verdict !== "fail") throw new Error("Verifier response verdict must be pass or fail");
+    const resultHash = attestation.result_hash || attest.result_hash;
+    if (resultHash !== submission.result_hash) throw new Error("Verifier response result_hash does not match submission");
+    const resultHashBytes32 = attest.result_hash_bytes32 || resultHashBytes32FromSha256(resultHash);
+    if (!/^0x[a-fA-F0-9]{64}$/.test(resultHashBytes32)) throw new Error("Verifier response result_hash_bytes32 is invalid");
+    return {
+      ...payload,
+      settlement: {
+        ...settlement,
+        attest: {
+          ...attest,
+          verdict,
+          result_hash: resultHash,
+          result_hash_bytes32: resultHashBytes32.toLowerCase(),
+        },
+      },
+    };
+  }
+
+  async function submitVerifierIngestion(apiUrl, token, submission) {
+    const headers = { "content-type": "application/json" };
+    if (token) headers.authorization = `Bearer ${token}`;
+    const response = await fetch(verifierIngestUrl(apiUrl), {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ submission }),
+    });
+    let payload = null;
+    try {
+      payload = await response.json();
+    } catch (_error) {
+      throw new Error(`Verifier HTTP ${response.status}`);
+    }
+    if (!response.ok && (!payload || payload.kind !== "tasc.verifier.ingestion")) {
+      throw new Error(payload && payload.error ? payload.error : `Verifier HTTP ${response.status}`);
+    }
+    return normalizeVerifierIngestion(payload, submission);
+  }
+
+  async function onSubmitWorkerSubmissionToVerifier(entry, button) {
+    try {
+      if (button) button.disabled = true;
+      const state = readState();
+      const submission = workerSubmissionForEntry(state, entry);
+      if (!submission) throw new Error("Capture a submission first");
+      const verifier = readVerifierConfig();
+      setStatus("Submitting proof to verifier", "neutral");
+      const ingestion = await submitVerifierIngestion(verifier.apiUrl, verifier.token, submission);
+      const attest = ingestion.settlement.attest;
+      const nextState = readState();
+      nextState.verifier = verifier;
+      nextState.verifierIngestions = {
+        ...(nextState.verifierIngestions || {}),
+        [workerSubmissionKey(entry)]: ingestion,
+      };
+      nextState.solana = {
+        ...(nextState.solana || {}),
+        ...readSolanaConfig(),
+        attestVerdict: attest.verdict,
+        attestResultHash: attest.result_hash_bytes32,
+      };
+      writeState(nextState);
+      setFormFromState(nextState);
+      render();
+      const prefix = ingestion.accepted ? "Verifier accepted" : "Verifier rejected";
+      setStatus(`${prefix}: ${attest.verdict} ${shortHash(attest.result_hash_bytes32)}`, ingestion.accepted ? "success" : "error");
+    } catch (error) {
+      setStatus(error.message, "error");
+    } finally {
+      if (button) button.disabled = false;
+    }
+  }
+
   function renderWorkerSubmission(entry, state) {
     if (entry.completed_status || entry.status === "completed") return null;
     const latest = workerSubmissionForEntry(state, entry);
+    const latestIngestion = verifierIngestionForEntry(state, entry);
     const panel = document.createElement("div");
     panel.className = "worker-submission";
 
@@ -426,6 +542,11 @@
       copy.textContent = "Copy Proof";
       copy.addEventListener("click", () => onCopyWorkerSubmission(entry));
       actions.append(copy);
+      const verify = document.createElement("button");
+      verify.type = "button";
+      verify.textContent = "Submit to Verifier";
+      verify.addEventListener("click", () => onSubmitWorkerSubmissionToVerifier(entry, verify));
+      actions.append(verify);
     }
 
     panel.append(label, textarea, actions);
@@ -438,11 +559,22 @@
         metaItem("Signature", latest.signature ? "signed" : "unsigned"),
       );
       panel.append(proof);
+      if (latestIngestion) {
+        const attest = latestIngestion.settlement && latestIngestion.settlement.attest ? latestIngestion.settlement.attest : {};
+        const verifierProof = document.createElement("div");
+        verifierProof.className = "submission-proof verifier-proof";
+        verifierProof.append(
+          metaItem("Verifier", latestIngestion.accepted ? "accepted" : "rejected"),
+          metaItem("Attest", attest.verdict || "unknown"),
+          metaItem("Attest hash", attest.result_hash_bytes32 ? shortHash(attest.result_hash_bytes32) : ""),
+        );
+        panel.append(verifierProof);
+      }
       const proofJson = document.createElement("textarea");
       proofJson.className = "submission-json";
       proofJson.readOnly = true;
       proofJson.spellcheck = false;
-      proofJson.value = JSON.stringify(latest, null, 2);
+      proofJson.value = JSON.stringify(latestIngestion || latest, null, 2);
       panel.append(proofJson);
     }
     return panel;
@@ -636,6 +768,12 @@
   function saveConfig(config) {
     const state = readState();
     state.config = config;
+    writeState(state);
+  }
+
+  function saveVerifierConfig() {
+    const state = readState();
+    state.verifier = readVerifierConfig();
     writeState(state);
   }
 
@@ -1011,6 +1149,8 @@
       writeState(state);
       render();
     });
+    el.verifierApiUrl.addEventListener("change", saveVerifierConfig);
+    el.verifierApiToken.addEventListener("change", saveVerifierConfig);
     el.scan.addEventListener("click", onScan);
     el.importHandoff.addEventListener("click", onImportHandoff);
     el.clear.addEventListener("click", onClear);

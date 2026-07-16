@@ -32,6 +32,7 @@ Done:
 - worker submissions can be captured as hashable proof JSON from the static web task card
 - captured worker proofs can be ingested into `tasc.attestation` output with Solana-ready attest hashes
 - verifier ingestion is exposed as a dependencyless HTTP API with bearer auth, durable artifacts, persistent duplicate ledger, health, and proof-ingest routes
+- the static web flow can submit captured proof JSON to the verifier API and fill Solana attest controls from the response
 
 Next:
 
@@ -79,7 +80,7 @@ The current static web proof should become the main public demo:
 - show task title, reward, 60-second window, signed input URL, output schema, verifier rules, status, chain, vault, and proof coordinates
 - capture markdown output and derive the result hash the verifier will attest
 - ingest captured proof JSON into `tasc.attestation` plus the Solana-ready result hash for `attest`
-- call the verifier API from the static web flow once deployment/auth are available
+- call a local or deployed verifier API from the static web flow
 - connect a Solana wallet and show live task-account status plus guarded role/action sends
 - link to docs explaining what is real and what is simulated
 
@@ -133,5 +134,6 @@ Early users are actually using Tasc when:
 - a worker can capture output and produce a verifier-compatible result hash
 - a verifier can ingest the worker proof and produce an attestable `tasc.attestation`
 - a verifier API can accept the same proof over HTTP and reject duplicates/tampering
+- the static app can call that verifier API and prepare the corresponding Solana attest fields
 - someone can connect a wallet and submit the correct guarded live role/action transaction
 - a worker can complete a devnet task and see token release proof

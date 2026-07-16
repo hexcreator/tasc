@@ -44,8 +44,15 @@ function assertNoExternalRuntimeDependencies() {
   assert(html.includes("attest-result-hash"), "index should expose Solana attest result hash");
   assert(html.includes("feed-import"), "index should expose feed JSON import");
   assert(html.includes("feed-files"), "index should expose feed file import");
-  assert(read(path.join(WEB_DIR, "app.js")).includes("worker-output"), "app should expose worker output capture");
-  assert(read(path.join(WEB_DIR, "app.js")).includes("submission-json"), "app should expose submission proof JSON");
+  assert(html.includes("verifier-api-url"), "index should expose verifier API URL");
+  assert(html.includes("verifier-api-token"), "index should expose verifier API token");
+  const app = read(path.join(WEB_DIR, "app.js"));
+  assert(app.includes("worker-output"), "app should expose worker output capture");
+  assert(app.includes("submission-json"), "app should expose submission proof JSON");
+  assert(app.includes("Submit to Verifier"), "app should expose verifier submission action");
+  assert(app.includes("verifierIngestions"), "app should persist verifier ingestion output");
+  assert(app.includes("authorization = `Bearer ${token}`"), "app should send verifier bearer auth when configured");
+  assert(app.includes("JSON.stringify({ submission })"), "app should submit captured worker proof JSON");
 
   for (const file of ["app.js", "demo-index.js", "tasc-web-core.js"]) {
     const source = read(path.join(WEB_DIR, file));
@@ -167,6 +174,16 @@ async function assertWorkerSubmissionCapture() {
     rejected = true;
   }
   assert(rejected, "empty worker submission should be rejected");
+}
+
+function assertVerifierApiBrowserFlowSurface() {
+  const app = read(path.join(WEB_DIR, "app.js"));
+  assert(app.includes("normalizeVerifierIngestion"), "app should normalize verifier ingestion responses");
+  assert(app.includes("tasc.verifier.ingestion"), "app should require verifier ingestion kind");
+  assert(app.includes("attestResultHash: attest.result_hash_bytes32"), "app should fill Solana attest hash from verifier");
+  assert(app.includes("attestVerdict: attest.verdict"), "app should fill Solana attest verdict from verifier");
+  assert(app.includes("Verifier accepted"), "app should show accepted verifier status");
+  assert(app.includes("Verifier rejected"), "app should show rejected verifier status");
 }
 
 function entryFromFunding(funding) {
@@ -346,6 +363,7 @@ async function main() {
   assertSolanaTaskAccountDecode();
   assertFeedImportPayloads();
   await assertWorkerSubmissionCapture();
+  assertVerifierApiBrowserFlowSurface();
   await assertSolanaLifecycleTransactionBuilds();
 
   process.stdout.write(`${JSON.stringify({
@@ -357,6 +375,7 @@ async function main() {
     solana_task_account_fixture: SOLANA_LIFECYCLE_ACCOUNT,
     feed_import_shapes: ["tasc.index", "tasc.index.entry[]", "tasc.solana-devnet.proof"],
     worker_submission_capture: "tasc.worker.submission",
+    verifier_api_browser_flow: "tasc.verifier.ingestion",
     solana_wallet_transaction_builds: ["claim", "attest", "release", "refund", "timeout-refund"],
     external_runtime_dependencies: 0,
     next: "Open web/index.html or deploy web/ as static files.",

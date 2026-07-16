@@ -21,7 +21,7 @@ EVM:     browser -> RPC eth_blockNumber -> confirmed range -> RPC eth_getLogs ->
 Solana:  browser -> RPC getAccountInfo(task_pda) -> decode 276-byte task account -> role/action readiness
 Solana:  browser -> wallet sign -> RPC sendTransaction -> refreshed task-account status
 Import:  paste/select tasc.index JSON -> merge entries -> refresh live Solana status
-Submit:  markdown output -> tasc.worker.submission proof -> verifier ingestion -> tasc.attestation -> attest hash
+Submit:  markdown output -> tasc.worker.submission proof -> POST /v1/ingest -> tasc.verifier.ingestion -> attest controls
 ```
 
 The browser reads only `TascEscrow.Funded` logs. It decodes the same event shape used by the CLI scanner:
@@ -37,6 +37,7 @@ The local cache uses browser storage. It stores:
 - connected Solana wallet address
 - decoded Solana task account snapshots
 - imported index entries and feed source metadata
+- verifier API URL/token and returned verifier ingestion records
 - the next block cursor
 - the last observed head block
 
@@ -66,7 +67,7 @@ The task card can capture markdown output and build a `tasc.worker.submission` p
 - local preview checks for deterministic rules
 - optional Solana `signMessage` signature when the wallet supports it
 
-The captured hash is written into the Solana operator result-hash field, so a verifier can attest the same output hash without recomputing it by hand.
+The captured hash is written into the Solana operator result-hash field, so a verifier can attest the same output hash without recomputing it by hand. When a Verifier API URL is configured, the same card exposes `Submit to Verifier`; a successful response stores the returned `tasc.verifier.ingestion`, shows accepted/rejected verifier status, and fills the Solana attest verdict/result-hash controls from `settlement.attest`.
 
 ## Verifier Ingestion
 
@@ -89,7 +90,7 @@ The output includes:
 - the verifier wallet address that should submit the on-chain `attest`
 - rejection of tampered result hashes, task hashes, and inputs
 
-The same ingestion path is exposed by a dependencyless HTTP wrapper:
+The same ingestion path is exposed by a dependencyless HTTP wrapper that the static app can call directly:
 
 ```sh
 TASC_VERIFIER_API_TOKEN=dev-token \
@@ -182,6 +183,7 @@ The validator checks that:
 - verifier ingestion converts a captured proof into a `tasc.attestation` and Solana-ready attest hash
 - verifier ingestion rejects duplicate, tampered-hash, tampered-task, and tampered-input cases
 - the verifier API serves `/health`, accepts proof ingestion over HTTP with bearer auth, writes durable artifacts, persists the duplicate ledger across restart, and rejects invalid JSON, wrong methods, oversized bodies, duplicate proofs, and tampered inputs
+- the browser can submit captured proof JSON to the verifier API, persist `tasc.verifier.ingestion`, and fill the Solana attest verdict/hash from the response
 - the browser can build wallet transaction payloads for Solana `claim`, `attest`, `release`, `refund`, and `timeout-refund`
 
 ## Limits

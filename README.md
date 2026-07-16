@@ -32,7 +32,7 @@ Tasc currently proves the hard protocol boundary: a task can be compiled, signed
 | Static discovery | Browser-side scanner/feed proof with JSON index import, signed task inputs, and no hosted backend requirement. |
 | Worker proof | Browser-side markdown submission capture derives verifier-compatible result hashes and proof JSON. |
 | Verifier bridge | Captured worker proof JSON ingests into `tasc.attestation` plus Solana-ready attest hashes. |
-| Verifier API | Dependencyless HTTP wrapper exposes proof ingestion at `/v1/ingest` for beta verifier operation. |
+| Verifier API | Dependencyless HTTP wrapper exposes proof ingestion at `/v1/ingest`, and the static app can submit captured proofs to it. |
 | Wallet operator | Browser-side Solana claim/attest/release/refund/timeout-refund transaction construction behind an explicit send guard. |
 
 Current live Solana SPL proof:
@@ -161,14 +161,14 @@ The current Solana program and CLI support program-signed SPL Token `TransferChe
 
 The timeout-aware Solana artifact also enforces Clock-backed claim deadlines and timeout refund eligibility for `Funded` or `Claimed` tasks. A live devnet timeout refund proof now refunds an overdue funded task back to the buyer without a worker claim or verifier failure.
 
-The static browser operator console can now import index/proof artifacts, show the signed input URL plus verifier rules for each task, capture markdown output as `tasc.worker.submission` proof JSON, derive the verifier-compatible result hash, feed that proof through verifier ingestion into `tasc.attestation`, build the same Solana lifecycle transaction payloads without runtime dependencies, and submit them through an injected wallet provider. The verifier ingestion path also has a dependencyless HTTP API wrapper:
+The static browser operator console can now import index/proof artifacts, show the signed input URL plus verifier rules for each task, capture markdown output as `tasc.worker.submission` proof JSON, derive the verifier-compatible result hash, submit that proof to the verifier API, persist the returned `tasc.verifier.ingestion`, fill the Solana attest verdict/hash controls, build the same Solana lifecycle transaction payloads without runtime dependencies, and submit them through an injected wallet provider. The verifier ingestion path has a dependencyless HTTP API wrapper:
 
 ```bash
 TASC_VERIFIER_API_TOKEN=dev-token \
 npm run verifier:api
 ```
 
-That starts the verifier with bearer-token auth, a persistent duplicate ledger at `.tascverifier/ledger.json`, and durable ingestion artifacts under `.tascverifier/artifacts/`.
+That starts the verifier with bearer-token auth, a persistent duplicate ledger at `.tascverifier/ledger.json`, and durable ingestion artifacts under `.tascverifier/artifacts/`. Enter the API URL and bearer token in the static app's Verifier API panel, capture a worker proof, then use `Submit to Verifier` to call `POST /v1/ingest` from the browser.
 
 Headless validation covers the bytes, API auth/persistence behavior, and guarded UI; a real wallet-extension QA pass is still required before treating this as beta-ready UX.
 
