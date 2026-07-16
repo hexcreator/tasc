@@ -1,0 +1,124 @@
+{
+  "kind": "tasc.private_beta.qa_evidence",
+  "version": "0.1",
+  "generated_at": "2026-01-01T00:00:02.000Z",
+  "app": {
+    "url": "http://127.0.0.1:8767/web/index.html",
+    "storage_key": "global-tasc.web.feed.v1"
+  },
+  "redactions": [
+    "verifier.token"
+  ],
+  "feed_source": {
+    "label": "Bundled devnet proof",
+    "count": 1,
+    "importedAt": "2026-01-01T00:00:00.000Z"
+  },
+  "verifier": {
+    "apiUrl": "http://127.0.0.1:8790",
+    "source": "local-beta",
+    "token": "<redacted>",
+    "token_present": true
+  },
+  "solana": {
+    "rpc_url": "https://api.devnet.solana.com",
+    "wallet_address": "BfRmLmH7ksPRCRxNBi7c8SspN7zKoyuAPKrJMDL5uQCJ",
+    "refreshed_at": "2026-01-01T00:00:02.000Z",
+    "account_count": 1,
+    "wallet_submission_count": 1
+  },
+  "counts": {
+    "claimable_entries": 1,
+    "evm_entries": 0,
+    "worker_submissions": 1,
+    "verifier_ingestions": 1,
+    "wallet_submissions": 1
+  },
+  "entries": [
+    {
+      "task_hash": "0x103317ad603569805133b51ddd3447461a5ff998e8bca2642728205f7f7db65e",
+      "task_name": "summarize_url_spl",
+      "status": "claimable",
+      "reward": {
+        "amount": "10",
+        "currency": "USDC"
+      },
+      "input_hash": "0xad2e20b1f70ba6bf13c6ed2d8f246284beabb0ac70d9548f8691c730c0af4537",
+      "settlement": {
+        "chain": "solana",
+        "cluster": "devnet",
+        "program_id": "FAqKhKke5pZr4TK6kXq9aKR98hWFy19SMQG9eGfXQrRM",
+        "task_pda": "37hA4KUeR6eLPP1g1mBoTMYHKCPq7LECpLryQc61TmRi",
+        "vault": "ChfKa5tEUjeSdaEhmjiDCWQE1Q6YT1oVaZt62HHR43b4"
+      },
+      "funding_signature": "zhrqMMYfXQAK37hLVkuvmqNwb2VzkdM4ZyHZMhpBhci97j3L38A7dswKhA9PsjimMPEFczf9NoWu5pR4jnudsm1",
+      "live_account": {
+        "status": "Released",
+        "worker": "BfRmLmH7ksPRCRxNBi7c8SspN7zKoyuAPKrJMDL5uQCJ",
+        "result_hash": "0x0bdfacb7e0ec2c3241da82c7b812b1a0fa28945b47c7f8a6b113b4de3779776f",
+        "updated_slot": "0"
+      },
+      "worker_submission": {
+        "result_hash": "sha256:0bdfacb7e0ec2c3241da82c7b812b1a0fa28945b47c7f8a6b113b4de3779776f",
+        "result_hash_bytes32": "0x0bdfacb7e0ec2c3241da82c7b812b1a0fa28945b47c7f8a6b113b4de3779776f",
+        "local_verdict": "needs_verifier",
+        "signed": false
+      },
+      "verifier_ingestion": {
+        "accepted": true,
+        "verdict": "pass",
+        "result_hash": "sha256:0bdfacb7e0ec2c3241da82c7b812b1a0fa28945b47c7f8a6b113b4de3779776f"
+      }
+    }
+  ],
+  "wallet_submissions": {
+    "37hA4KUeR6eLPP1g1mBoTMYHKCPq7LECpLryQc61TmRi:release": {
+      "action": "release",
+      "signature": "2dG66jTY9KTxzZhXFDLmiLcP6bM4mFEdtwb1FV28Zf3pNEr2Qxf4w7tc7P8E3NY4EWiLcCVX71B1nRaTVcPCEX3V",
+      "transport": "signAndSendTransaction",
+      "confirmationStatus": "confirmed",
+      "submittedAt": "2026-01-01T00:00:02.000Z"
+    }
+  },
+  "worker_submissions": {
+    "37hA4KUeR6eLPP1g1mBoTMYHKCPq7LECpLryQc61TmRi": {
+      "kind": "tasc.worker.submission",
+      "version": "0.1",
+      "task_hash": "0x103317ad603569805133b51ddd3447461a5ff998e8bca2642728205f7f7db65e",
+      "intent_hash": "sha256:15fe6d73bcedf28ad18646044e61c743f764493e66be52ebe035661ddc5a02b4",
+      "input_hash": "0xad2e20b1f70ba6bf13c6ed2d8f246284beabb0ac70d9548f8691c730c0af4537",
+      "task_name": "summarize_url_spl",
+      "worker": "BfRmLmH7ksPRCRxNBi7c8SspN7zKoyuAPKrJMDL5uQCJ",
+      "submitted_at": "2026-01-01T00:00:00.000Z",
+      "result_hash": "sha256:0bdfacb7e0ec2c3241da82c7b812b1a0fa28945b47c7f8a6b113b4de3779776f",
+      "result_hash_bytes32": "0x0bdfacb7e0ec2c3241da82c7b812b1a0fa28945b47c7f8a6b113b4de3779776f"
+    }
+  },
+  "verifier_ingestions": {
+    "37hA4KUeR6eLPP1g1mBoTMYHKCPq7LECpLryQc61TmRi": {
+      "kind": "tasc.verifier.ingestion",
+      "version": "0.1",
+      "accepted": true,
+      "received_at": "2026-01-01T00:00:01.000Z",
+      "attestation": {
+        "kind": "tasc.attestation",
+        "version": "0.1",
+        "task_hash": "0x103317ad603569805133b51ddd3447461a5ff998e8bca2642728205f7f7db65e",
+        "result_hash": "sha256:0bdfacb7e0ec2c3241da82c7b812b1a0fa28945b47c7f8a6b113b4de3779776f",
+        "verdict": "pass"
+      },
+      "settlement": {
+        "chain": "solana",
+        "cluster": "devnet",
+        "program_id": "FAqKhKke5pZr4TK6kXq9aKR98hWFy19SMQG9eGfXQrRM",
+        "task_pda": "37hA4KUeR6eLPP1g1mBoTMYHKCPq7LECpLryQc61TmRi",
+        "attest": {
+          "verdict": "pass",
+          "result_hash": "sha256:0bdfacb7e0ec2c3241da82c7b812b1a0fa28945b47c7f8a6b113b4de3779776f",
+          "result_hash_bytes32": "0x0bdfacb7e0ec2c3241da82c7b812b1a0fa28945b47c7f8a6b113b4de3779776f"
+        }
+      }
+    }
+  },
+  "cursor": null
+}

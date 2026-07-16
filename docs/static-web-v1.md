@@ -126,6 +126,16 @@ The static app fetches `./tasc-local-config.json` on load. When that local-only 
 
 After a live wallet-extension run, `Export QA Evidence` downloads a redacted `tasc.private_beta.qa_evidence` bundle. It includes feed source, wallet address, task summaries, worker proof hashes, verifier ingestion results, wallet transaction signatures, and local cursor state. It does not include the verifier bearer token; the bundle records that value as `"<redacted>"` and declares `redactions: ["verifier.token"]`.
 
+Validate the exported file before treating it as a private-beta wallet QA pass:
+
+```sh
+node bin/validate-private-beta-qa-evidence.js ~/Downloads/tasc-private-beta-qa.json \
+  --require-wallet-send \
+  --require-verifier-ingestion \
+  --require-worker-submission \
+  --require-live-account
+```
+
 The static file server intentionally exposes only `web/`, `examples/`, `assets/`, and `docs/`, so local env files and package metadata are not served.
 
 ## Solana Operator Console
@@ -192,6 +202,7 @@ npm run validate:web
 npm run validate:verifier-ingest
 npm run validate:verifier-api
 npm run validate:private-beta-local
+npm run validate:private-beta-qa-evidence
 ```
 
 The validator checks that:
@@ -211,6 +222,7 @@ The validator checks that:
 - the browser can submit captured proof JSON to the verifier API, persist `tasc.verifier.ingestion`, and fill the Solana attest verdict/hash from the response
 - the browser can auto-load same-origin local beta verifier config when served by `beta:local`
 - the browser exposes a redacted `tasc.private_beta.qa_evidence` export for private-beta wallet-extension runs
+- the exported QA evidence schema validator accepts the safe example fixture and rejects leaked verifier tokens, missing required wallet-send evidence, and mismatched counts
 - the browser can build wallet transaction payloads for Solana `claim`, `attest`, `release`, `refund`, and `timeout-refund`
 - the browser wallet submission adapter accepts mock `signAndSendTransaction` and `signTransaction` providers, serializes the signed transaction bytes for RPC fallback, and rejects unsupported providers or missing signatures
 - the local private-beta launcher serves the static app and verifier API together, restricts static paths, enforces bearer auth, writes verifier artifacts/ledger, and accepts a bundled worker proof

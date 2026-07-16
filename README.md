@@ -179,7 +179,17 @@ npm run beta:local
 
 `beta:local` serves the static app and verifier API together on localhost, prints the app URL, verifier URL, local config URL, and bearer token, writes verifier artifacts under `.tascverifier/`, and lets the app auto-fill the Verifier API panel from same-origin local config. After a wallet-extension run, use `Export QA Evidence` to download a redacted `tasc.private_beta.qa_evidence` bundle with feed state, verifier results, and wallet transaction signatures.
 
-Headless validation covers the bytes, API auth/persistence behavior, guarded UI, mock wallet-provider submission transports, local verifier auto-fill, QA evidence export wiring, and the local beta launcher; a real wallet-extension QA pass is still required before treating this as beta-ready UX.
+Validate a real exported bundle with:
+
+```bash
+node bin/validate-private-beta-qa-evidence.js ~/Downloads/tasc-private-beta-qa.json \
+  --require-wallet-send \
+  --require-verifier-ingestion \
+  --require-worker-submission \
+  --require-live-account
+```
+
+Headless validation covers the bytes, API auth/persistence behavior, guarded UI, mock wallet-provider submission transports, local verifier auto-fill, QA evidence export wiring, QA evidence redaction checks, and the local beta launcher; a real wallet-extension QA pass is still required before treating this as beta-ready UX.
 
 ## Repository Map
 

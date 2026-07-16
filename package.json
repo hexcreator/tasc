@@ -6,7 +6,7 @@
   "license": "Apache-2.0",
   "description": "Seed prototype for a decentralized instant micro-work task protocol.",
   "scripts": {
-    "demo": "npm run compile:example && npm run verify:example && npm run demo:market && npm run validate:indexer && npm run validate:web && npm run validate:verifier-ingest && npm run validate:verifier-api && npm run validate:private-beta-local && npm run validate:solana-spl-escrow && npm run validate:solana-lifecycle-tx && npm run validate:solana-spl-settlement && npm run validate:solana-settlement-scan && npm run validate:solana-proof-runner",
+    "demo": "npm run compile:example && npm run verify:example && npm run demo:market && npm run validate:indexer && npm run validate:web && npm run validate:verifier-ingest && npm run validate:verifier-api && npm run validate:private-beta-local && npm run validate:private-beta-qa-evidence && npm run validate:solana-spl-escrow && npm run validate:solana-lifecycle-tx && npm run validate:solana-spl-settlement && npm run validate:solana-settlement-scan && npm run validate:solana-proof-runner",
     "beta:plan": "node bin/run-private-beta-local.js plan",
     "beta:local": "node bin/run-private-beta-local.js serve",
     "devnet:proof": "npm run solana:fund-spl-plan:live && npm run index:admit-solana-spl-live",
@@ -100,6 +100,7 @@
     "verifier:api": "node bin/tascverifier-api.js serve --entry examples/index/solana.spl.live.index.json --ledger examples/ledger.json --ledger-out .tascverifier/ledger.json --artifact-dir .tascverifier/artifacts --auth-token-env TASC_VERIFIER_API_TOKEN",
     "validate:verifier-api": "node bin/validate-verifier-api.js",
     "validate:private-beta-local": "node bin/validate-private-beta-local.js",
+    "validate:private-beta-qa-evidence": "node bin/validate-private-beta-qa-evidence.js --self-test",
     "index:admit": "node bin/tascindex.js admit examples/signatures/summarize_url.signature.json examples/funding/summarize_url.from-log.json --out examples/index/summarize_url.index.json",
     "index:admit-batch": "node bin/tascindex.js admit-batch examples/signatures examples/scan/funded.batch.json --out examples/index/funded.batch.index.json",
     "index:admit-solana": "node bin/tascindex.js admit examples/solana/summarize_url.signature.json examples/solana/summarize_url.funding.json --out examples/index/solana.summarize_url.index.json",
