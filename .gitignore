@@ -7,3 +7,4 @@ target/
 programs/*/target/
 build/solana/*-keypair.json
 examples/solana-devnet/proofs/
+examples/solana-devnet/claimable/

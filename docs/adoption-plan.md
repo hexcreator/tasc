@@ -29,6 +29,7 @@ Done:
 - guarded Solana wallet transaction construction exists in the static operator console
 - static feed import exists for `tasc.index`, raw entry arrays, and hosted proof-summary indexes
 - `npm run beta:feed` builds a same-origin `web/feed/proof-feed.json` bundle for free static hosting
+- `npm run beta:claimable:plan` plans a guarded fresh active task publisher that writes `web/feed/claimable-feed.json`
 - admitted feed entries carry signed task inputs, input hash, output schema, and verifier rules
 - worker submissions can be captured as hashable proof JSON from the static web task card
 - captured worker proofs can be ingested into `tasc.attestation` output with Solana-ready attest hashes
@@ -44,6 +45,7 @@ Next:
 
 - live-test the guarded wallet send flow with Phantom or another injected Solana wallet using `npm run beta:local`, export QA evidence, and run `npm run beta:qa -- ~/Downloads/tasc-private-beta-qa.json --solana-rpc-url https://api.devnet.solana.com`; mock-provider coverage exists, but extension-prompt QA is still required
 - use `npm run beta:feed -- --proof-summary examples/solana-devnet/proofs/<run-id>/proof-summary.json` after fresh proof runs to publish static feed artifacts
+- use guarded `npm run beta:claimable` immediately before wallet-extension QA when a real active claimable task is needed
 - deploy the verifier API and connect durable artifacts back into hosted feed/index publication
 - add a short demo video or GIF
 - keep starter issues updated as protocol milestones land
@@ -70,6 +72,7 @@ npm run validate:verifier-ingest
 npm run validate:verifier-api
 npm run validate:private-beta-local
 npm run validate:private-beta-qa-runner
+npm run validate:beta-claimable-publisher
 npm run validate:solana-lifecycle-tx
 npm run validate:solana-spl-settlement
 ```
@@ -79,6 +82,7 @@ Next:
 - keep improving the `demo` script so it is the default first-run path
 - use `beta:local` as the default operator session for wallet-extension QA
 - use `beta:feed` as the default static artifact publication path
+- use `beta:claimable` as the just-in-time active inventory publication path
 - keep improving the `devnet:proof` script so it reads existing public artifacts without sending transactions
 - keep live sending commands behind guard env vars
 
@@ -87,6 +91,7 @@ Next:
 The current static web proof should become the main public demo:
 
 - load `examples/index/solana.spl.live.index.json`
+- load `web/feed/claimable-feed.json` first when active inventory has been published, with `web/feed/proof-feed.json` as the public proof fallback
 - import fresh proof/index artifacts without editing bundled demo code
 - show task title, reward, 60-second window, signed input URL, output schema, verifier rules, status, chain, vault, and proof coordinates
 - capture markdown output and derive the result hash the verifier will attest

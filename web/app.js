@@ -4,7 +4,7 @@
   const core = window.TascWebCore;
   const demoIndex = window.TascDemoIndex;
   const storageKey = "global-tasc.web.feed.v1";
-  const hostedFeedPath = "./feed/proof-feed.json";
+  const hostedFeedPaths = ["./feed/claimable-feed.json", "./feed/proof-feed.json"];
   const defaultAttestResultHash = "0x0bdfacb7e0ec2c3241da82c7b812b1a0fa28945b47c7f8a6b113b4de3779776f";
 
   const el = {
@@ -1097,8 +1097,21 @@
   async function onLoadHostedFeed() {
     el.loadHostedFeed.disabled = true;
     try {
-      const payload = await fetchImportJson(hostedFeedPath);
-      const importedCount = await importFeedPayloads([payload], "Hosted static feed");
+      let payload = null;
+      let selectedPath = "";
+      const errors = [];
+      for (const path of hostedFeedPaths) {
+        try {
+          payload = await fetchImportJson(path);
+          selectedPath = path;
+          break;
+        } catch (error) {
+          errors.push(`${path}: ${error.message}`);
+        }
+      }
+      if (!payload) throw new Error(`No hosted feed found. ${errors.join("; ")}`);
+      const label = selectedPath.includes("claimable") ? "Hosted claimable feed" : "Hosted proof feed";
+      const importedCount = await importFeedPayloads([payload], label);
       setStatus(`Loaded ${importedCount} hosted feed task(s)`, "success");
     } catch (error) {
       setStatus(error.message, "error");

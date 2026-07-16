@@ -58,7 +58,8 @@ function assertNoExternalRuntimeDependencies() {
   assert(app.includes("authorization = `Bearer ${token}`"), "app should send verifier bearer auth when configured");
   assert(app.includes("JSON.stringify({ submission })"), "app should submit captured worker proof JSON");
   assert(app.includes("loadLocalBetaConfig"), "app should load local beta verifier config when served");
-  assert(app.includes("./feed/proof-feed.json"), "app should load same-origin hosted proof feed");
+  assert(app.includes("./feed/claimable-feed.json"), "app should prefer same-origin hosted claimable feed");
+  assert(app.includes("./feed/proof-feed.json"), "app should fall back to same-origin hosted proof feed");
   assert(app.includes("./tasc-local-config.json"), "app should look for same-origin local beta config");
   assert(app.includes("tasc.private_beta.local_config"), "app should require local beta config kind");
   assert(app.includes("source: \"local-beta\""), "app should tag auto-filled local beta verifier config");

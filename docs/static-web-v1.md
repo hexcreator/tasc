@@ -22,7 +22,7 @@ EVM:     browser -> RPC eth_blockNumber -> confirmed range -> RPC eth_getLogs ->
 Solana:  browser -> RPC getAccountInfo(task_pda) -> decode 276-byte task account -> role/action readiness
 Solana:  browser -> wallet sign -> RPC sendTransaction -> refreshed task-account status
 Import:  paste/select tasc.index JSON -> merge entries -> refresh live Solana status
-Hosted:  click Load Hosted Feed -> fetch same-origin proof summary -> fetch referenced feed indexes
+Hosted:  click Load Hosted Feed -> fetch same-origin claimable/proof summary -> fetch referenced feed indexes
 Submit:  markdown output -> tasc.worker.submission proof -> POST /v1/ingest -> tasc.verifier.ingestion -> attest controls
 ```
 
@@ -58,6 +58,8 @@ Supported import payloads:
 ```sh
 npm run beta:feed -- --proof-summary examples/solana-devnet/proofs/<run-id>/proof-summary.json
 ```
+
+For live active inventory, `npm run beta:claimable:plan` shows the guarded publish path. `GLOBAL_TASC_ALLOW_BETA_CLAIMABLE_PUBLISH=1 npm run beta:claimable` creates a fresh devnet SPL-funded 60-second task, scans the live task account into funding evidence, admits it as a claimable index, and writes `web/feed/claimable-feed.json`. The hosted loader tries `./feed/claimable-feed.json` before falling back to the completed proof feed.
 
 Completed index entries replace older claimable entries for the same Solana task account, so proof bundles can show the final `Released` or `Refunded` state instead of duplicating the same task.
 
@@ -214,6 +216,7 @@ npm run validate:verifier-ingest
 npm run validate:verifier-api
 npm run validate:private-beta-local
 npm run validate:private-beta-qa-evidence
+npm run validate:beta-claimable-publisher
 ```
 
 The validator checks that:
@@ -226,6 +229,7 @@ The validator checks that:
 - the browser Solana task-account decoder matches a committed live Solana lifecycle account fixture
 - the browser accepts `tasc.index`, raw entry arrays, and proof-summary import shapes
 - the same-origin hosted feed bundle references six public branch index files and merges to the release/refund/timeout completed proof entries
+- the guarded claimable publisher plans a fresh 60-second funded task and refuses live sends without its top-level env guard
 - the bundled Solana feed exposes signed task input metadata and input hash
 - browser worker submission capture matches the CLI verifier result hash format
 - verifier ingestion converts a captured proof into a `tasc.attestation` and Solana-ready attest hash
