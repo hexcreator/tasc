@@ -450,11 +450,28 @@ npm run validate:timed-payout -- examples/solana-devnet/proofs/<run-id>/proof-su
 Then run the real-money readiness gate:
 
 ```bash
+npm run real:payout:plan
+npm run real:payout:build -- \
+  --token-mint <mainnet-usdc-mint> \
+  --task-account <task-account> \
+  --vault-token-account <vault-token-account> \
+  --destination-token-account <worker-token-account> \
+  --fund-signature <sig> \
+  --claim-signature <sig> \
+  --attest-signature <sig> \
+  --release-signature <sig> \
+  --claim-to-release-ms <ms> \
+  --claim-to-completed-index-ms <ms> \
+  --production-rpc-url <mainnet-rpc-url>
+
 npm run real:readiness -- \
-  --timed-proof examples/solana-devnet/proofs/<run-id>/proof-summary.json
+  --timed-proof examples/solana-devnet/proofs/<run-id>/proof-summary.json \
+  --production-payout .tascverifier/production-payout-evidence.json \
+  --production-rpc-url <mainnet-rpc-url> \
+  --expected-genesis-hash <mainnet-genesis-hash>
 ```
 
-That command should still report `ready_for_goal: false` until a non-example production payout artifact is supplied with `--production-payout` and verified through `--production-rpc-url` plus `--expected-genesis-hash`. The required artifact shape is `examples/private-beta/production-payout-evidence.example.json`; it must represent mainnet USDC, not devnet/test-token evidence. The live RPC check verifies the genesis hash, fund/claim/attest/release signature confirmations, vault token-account balance, and worker destination token-account balance.
+`real:payout:build` creates the ignored local production payout artifact from mainnet signatures/accounts and read-only token-account balance checks. It must represent mainnet USDC, not devnet/test-token evidence, and it never accepts private keys or sends transactions. `real:readiness` should still report `ready_for_goal: false` until that artifact is paired with a timed proof, `--production-rpc-url`, and `--expected-genesis-hash`. The live RPC check verifies the genesis hash, fund/claim/attest/release signature confirmations, vault token-account balance, and worker destination token-account balance.
 
 The next real implementation steps are:
 

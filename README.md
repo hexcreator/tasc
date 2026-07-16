@@ -272,15 +272,29 @@ npm run validate:timed-payout -- examples/solana-devnet/proofs/<run-id>/proof-su
 Check whether the real `$10 in less than a minute` goal is actually ready:
 
 ```bash
+npm run real:payout:plan
+npm run real:payout:build -- \
+  --token-mint <mainnet-usdc-mint> \
+  --task-account <task-account> \
+  --vault-token-account <vault-token-account> \
+  --destination-token-account <worker-token-account> \
+  --fund-signature <sig> \
+  --claim-signature <sig> \
+  --attest-signature <sig> \
+  --release-signature <sig> \
+  --claim-to-release-ms <ms> \
+  --claim-to-completed-index-ms <ms> \
+  --production-rpc-url <mainnet-rpc-url>
+
 npm run real:readiness:plan
 npm run real:readiness -- \
   --timed-proof examples/solana-devnet/proofs/<run-id>/proof-summary.json \
-  --production-payout <production-payout-evidence.json> \
+  --production-payout .tascverifier/production-payout-evidence.json \
   --production-rpc-url <mainnet-rpc-url> \
   --expected-genesis-hash <mainnet-genesis-hash>
 ```
 
-`real:readiness` accepts the devnet timed proof as a prerequisite, but it refuses to mark the goal ready until a non-example mainnet USDC payout artifact proves funding, claim, attest, release, post-release balances, under-60-second timing, and live RPC verification. The live check verifies the RPC genesis hash, transaction confirmations, and SPL token-account balances without printing the full RPC URL. The schema example lives at `examples/private-beta/production-payout-evidence.example.json`.
+`real:payout:build` creates the ignored local production payout artifact from mainnet signatures/accounts and optionally reads final token balances from RPC. It never accepts private keys, never sends transactions, and never writes the full RPC URL into the artifact. `real:readiness` accepts the devnet timed proof as a prerequisite, but it refuses to mark the goal ready until the non-example mainnet USDC payout artifact proves funding, claim, attest, release, post-release balances, under-60-second timing, and live RPC verification. The live check verifies the RPC genesis hash, transaction confirmations, and SPL token-account balances without printing the full RPC URL. The schema example lives at `examples/private-beta/production-payout-evidence.example.json`.
 
 ## Why Tasc Might Work
 
