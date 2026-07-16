@@ -35,7 +35,7 @@ The protocol must make these facts explicit:
 
 1. Buyer writes a TascLang task.
 2. Compiler emits canonical task JSON and `task_hash`.
-3. Buyer signs `task_hash` and funds escrow.
+3. Buyer signs `task_hash`, `input_hash`, and settlement terms, then funds escrow.
 4. Indexers publish the task as claimable.
 5. Worker claims the task with a bonded identity or reputation key.
 6. Worker submits output before deadline.
@@ -75,6 +75,8 @@ The compiler must produce a deterministic SHA-256 hash over canonical JSON. The 
 - verifier attestations
 - dispute records
 - reputation events
+
+Concrete task input values are separately canonicalized into `input_hash`. The signed intent binds both hashes: `task_hash` identifies the rules, while `input_hash` identifies the exact work target shown to the worker.
 
 ## Escrow Contract Shape
 

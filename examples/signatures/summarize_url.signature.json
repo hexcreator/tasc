@@ -1,12 +1,31 @@
 {
   "kind": "tasc.intent.signature.eip712",
   "version": "0.1",
-  "intent_hash": "sha256:4ccb1f9069e875a065958b5618c23000b0477abbb3abb010c06bb0925e7515ed",
+  "intent_hash": "sha256:c923f0bdc461b6577c0dff9a1c8ecb7c2d94ace68bd69ebb1015592898c1b4e2",
+  "task_file": "examples/summarize_url.tasc",
+  "task_name": "summarize_url",
+  "display_reward": {
+    "amount": "10",
+    "currency": "USDC"
+  },
+  "chain_reward": {
+    "amount": "10000000",
+    "decimals": 6,
+    "token": "0x3333333333333333333333333333333333333333"
+  },
+  "relative_deadline": {
+    "raw": "60s",
+    "seconds": 60
+  },
+  "inputs": {
+    "url": "https://docs.cdp.coinbase.com/x402/welcome"
+  },
+  "input_hash": "0xad2e20b1f70ba6bf13c6ed2d8f246284beabb0ac70d9548f8691c730c0af4537",
   "signer": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
   "buyer": "0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266",
   "recovered": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
   "valid": true,
-  "signature": "0xbcf62ca2fa9784d96738bded7b4b7a9a88d17e102b01f12908707efcf2ed9b022b1ba45169a8fed348c81a70bd2d42050a161934a9001c163a4adfe79e9a71891c",
+  "signature": "0xd76b22b0ec3b6ba83a72c00fee89f56a9a594dedaf6a18671fccd414ea3ec719190bcd92c66b224daa9caddd9a27434ddfb1c2b67159963dc8459e04bf68b01c1b",
   "key_source": "test:hardhat0",
   "note": "Public Hardhat/Anvil test key. Never use on mainnet or with real funds.",
   "typed_data": {
@@ -36,6 +55,10 @@
         },
         {
           "name": "taskHash",
+          "type": "bytes32"
+        },
+        {
+          "name": "inputHash",
           "type": "bytes32"
         },
         {
@@ -74,6 +97,7 @@
     "message": {
       "buyer": "0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266",
       "taskHash": "0x28443f131686bc717c485b52cdb05c70fd4b959ee784357537bc1ef92fccbb45",
+      "inputHash": "0xad2e20b1f70ba6bf13c6ed2d8f246284beabb0ac70d9548f8691c730c0af4537",
       "escrow": "0x2222222222222222222222222222222222222222",
       "token": "0x3333333333333333333333333333333333333333",
       "amount": "10000000",

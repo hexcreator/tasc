@@ -37,6 +37,10 @@ function main() {
   assert(batchAdmitted.ok === true, "good funding batch was not admitted");
   assert(entry.status === "claimable", "entry must be claimable");
   assert(entry.amount === "10000000", "entry amount mismatch");
+  assert(entry.task_name === "summarize_url", "entry task name mismatch");
+  assert(entry.inputs.url === "https://docs.cdp.coinbase.com/x402/welcome", "entry input URL mismatch");
+  assert(/^0x[a-fA-F0-9]{64}$/.test(entry.input_hash), "entry input hash missing");
+  assert(entry.task.outputs[0].name === "markdown", "entry task output metadata mismatch");
   assert(entry.task_hash === "0x28443f131686bc717c485b52cdb05c70fd4b959ee784357537bc1ef92fccbb45", "task hash mismatch");
   assert(entry.funding.status === "Funded", "funding status mismatch");
   assert(entry.signature.valid === true, "signature should be valid");
@@ -57,6 +61,8 @@ function main() {
       intent_hash: entry.intent_hash,
       task_hash: entry.task_hash,
       status: entry.status,
+      task_name: entry.task_name,
+      input_hash: entry.input_hash,
       amount: entry.amount,
       funding_tx: entry.funding.tx_hash,
     },

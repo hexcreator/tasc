@@ -13,6 +13,8 @@ Admission takes two objects:
 
 The signed intent proves who authorized the task. The funding evidence proves the exact escrow slot or Solana task/vault state was funded.
 
+Signed intents may also carry worker-facing metadata: task name, display reward, relative deadline, concrete input values, input hash, and a compiled task summary. Admission preserves those fields in the index entry after verifying the task file hash matches the signed task hash when the source file is available locally.
+
 Batch admission takes:
 
 - a signed intent catalog: one JSON file or a directory of signed intent JSON files
@@ -126,7 +128,7 @@ examples/index/solana.program-account.index.json
 examples/index/solana.spl.live.index.json
 ```
 
-Each entry carries the signed intent hash, task hash, settlement tuple, funding event coordinates, signature recovery result, and signed intent source. Solana entries may also carry SPL custody fields when the scanner proves the vault token account balance. This is the object a worker-facing marketplace can serve as claimable inventory.
+Each entry carries the signed intent hash, task hash, input hash, task input values, task summary, settlement tuple, funding event coordinates, signature recovery result, and signed intent source. Solana entries may also carry SPL custody fields when the scanner proves the vault token account balance. This is the object a worker-facing marketplace can serve as claimable inventory.
 
 If a scanner entry cannot be admitted, batch output records it under `rejected_entries` with the task hash, funding event coordinates, and reason. Missing signed intents are rejected instead of silently dropped.
 

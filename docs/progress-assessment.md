@@ -8,7 +8,7 @@ This repo is now a credible protocol prototype, not yet a product.
 | --- | ---: | --- |
 | MVP mechanics | 100% | The protocol mechanics now cover signed funded inventory, worker claim before deadline, verifier pass/fail, release, failure refund, timeout refund after deadline while Funded/Claimed, custody scans, and completed settlement index admission. All of those paths are implemented, validated, SBF-built, and live-proven on Solana devnet. |
 | Testnet MVP mechanics | 100% | Solana devnet now has finalized CPI-enabled program deploys, finalized token-backed fund transactions admitted with live vault custody, confirmed live claim/attest transactions, confirmed program-signed SPL release, failure-refund, and timeout-refund transactions, and completed-settlement evidence admitted as `completed` index entries. Product wallet flows are still outside protocol mechanics. |
-| Private beta product | 50% | Protocol mechanics are live-proven, packaged behind a one-command devnet proof runner, and visible in a static browser operator console with feed import, Solana wallet connection, live task-account refresh, role detection, next-action readiness, and guarded wallet transaction construction/submission for claim, attest, release, refund, and timeout-refund. Missing live wallet QA, hosted fresh inventory, verifier service, reputation, disputes, and durable metadata. |
+| Private beta product | 53% | Protocol mechanics are live-proven, packaged behind a one-command devnet proof runner, and visible in a static browser operator console with feed import, signed task inputs, Solana wallet connection, live task-account refresh, role detection, next-action readiness, and guarded wallet transaction construction/submission for claim, attest, release, refund, and timeout-refund. Missing live wallet QA, signed worker submission capture, hosted fresh inventory, verifier service, reputation, disputes, and durable metadata. |
 | Production decentralized marketplace | 10% | Missing decentralization, economic security, audits, abuse controls, governance, and real liquidity/demand. |
 
 ## What Is Proven
@@ -16,6 +16,7 @@ This repo is now a credible protocol prototype, not yet a product.
 - A task can be compiled to canonical JSON and a stable hash.
 - A buyer intent can bind that task hash to chain, escrow, token, amount, deadline, verifier, and nonce.
 - A buyer signature can be recovered and checked.
+- Buyer intents now bind concrete task input values through an `input_hash`, and index admission preserves task name, display reward, 60-second work window, input URL, output schema, and verifier rules for worker-facing feeds.
 - Escrow contract artifacts compile and map the lifecycle to ERC-20 settlement.
 - A `Funded` event can be decoded into funding evidence.
 - Funding evidence can be matched against the signed intent before indexing.
@@ -24,7 +25,7 @@ This repo is now a credible protocol prototype, not yet a product.
 - A static browser app can decode `Funded` logs directly from RPC with no backend, no database, and no runtime dependencies.
 - The same static browser app can connect to an injected Solana wallet provider, refresh live Solana task accounts from RPC, decode the 276-byte task-account layout, classify the connected wallet role, and show the next valid protocol action.
 - The static browser app can now build dependencyless Solana wallet transaction payloads for claim, attest, release, refund, and timeout-refund. The builder derives SPL destination token accounts and the vault-authority PDA in-browser, compiles a legacy Solana message with a fresh blockhash, and routes submission through an injected wallet provider behind an explicit send-enable toggle.
-- The static browser app can import `tasc.index` JSON, raw `tasc.index.entry` arrays, and proof-summary objects whose referenced index files are hosted with the app. Completed entries replace older claimable entries for the same Solana task account.
+- The static browser app can import `tasc.index` JSON, raw `tasc.index.entry` arrays, and proof-summary objects whose referenced index files are hosted with the app. Completed entries replace older claimable entries for the same Solana task account, and signed task metadata renders directly on the claimable card.
 - A scanner funding batch can be admitted against a signed intent catalog and written as a claimable task index with explicit rejected entries.
 - Solana devnet keys can be generated locally without dependencies, the harness can request airdrops/read balances through raw JSON-RPC, and one funded devnet wallet can transfer SOL to the other roles with a locally signed System Program transfer.
 - A Solana-style buyer intent can be signed and verified with Ed25519, mapped to task/vault addresses, simulated through `funded -> claimed -> passed -> released`, emitted as `tasc.funding.solana`, and admitted into the same indexer boundary as EVM funding.
@@ -55,7 +56,7 @@ This repo is now a credible protocol prototype, not yet a product.
 1. Verifier service: deterministic verifier runners, artifact storage, result attestations, and paid verifier incentives.
 2. Reputation and abuse controls: worker/buyer/verifier histories, duplicate detection, bonds, rate limits, and spam economics.
 3. Dispute path: reviewer selection, evidence packaging, deadlines, and appeal/ruling settlement.
-4. Product surfaces: buyer task creation, hosted fresh inventory publishing, live wallet QA, notifications, and support tooling.
+4. Product surfaces: buyer task creation, signed worker submission capture, hosted fresh inventory publishing, live wallet QA, notifications, and support tooling.
 5. Decentralization: multiple indexers, gossip or replication, slashing/attestation rules, and censorship resistance.
 6. Security hardening: contract tests, fuzzing, external audit, key management, dependency pinning policy, and incident response.
 7. Reproducibility hardening: the guarded proof runner exists; remaining work is CI-safe replay, finality windows, and duplicate-task suppression around repeated public runs.
@@ -70,4 +71,4 @@ buyer signs and funds -> scanner batch -> index admission -> worker claims befor
 
 The happy-path, failed-task refund, and timeout-refund Solana testnet loops now work at protocol level. A production system that can safely support a global market for instant `$10` work is still much farther: likely months of focused buildout after dispute/product paths work, because the hard parts become abuse resistance, demand liquidity, dispute quality, and reliable user experience.
 
-If Solana is the preferred path, the next increment is now concrete: live-test guarded browser wallet sends in a normal extension environment, then publish fresh proof indexes as a hosted feed instead of manually pasting artifacts.
+If Solana is the preferred path, the next increment is now concrete: capture signed worker submissions in the browser, live-test guarded wallet sends in a normal extension environment, then publish fresh proof indexes as a hosted feed instead of manually pasting artifacts.

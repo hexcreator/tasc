@@ -6,8 +6,87 @@
       "kind": "tasc.index.entry",
       "version": "0.1",
       "status": "claimable",
+      "task_file": "examples/summarize_url.tasc",
+      "task_name": "summarize_url",
+      "display_reward": {
+        "amount": "10",
+        "currency": "USDC"
+      },
+      "chain_reward": {
+        "amount": "10000000",
+        "decimals": 6,
+        "token": "0x3333333333333333333333333333333333333333"
+      },
+      "relative_deadline": {
+        "raw": "60s",
+        "seconds": 60
+      },
+      "inputs": {
+        "url": "https://docs.cdp.coinbase.com/x402/welcome"
+      },
+      "input_hash": "0xad2e20b1f70ba6bf13c6ed2d8f246284beabb0ac70d9548f8691c730c0af4537",
+      "task": {
+        "kind": "tasc.task.summary",
+        "version": "0.1",
+        "name": "summarize_url",
+        "reward": {
+          "amount": "10",
+          "currency": "USDC"
+        },
+        "deadline": {
+          "raw": "60s",
+          "seconds": 60
+        },
+        "inputs": [
+          {
+            "name": "url",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "name": "markdown",
+            "type": "string"
+          }
+        ],
+        "verify": [
+          {
+            "op": "min_words",
+            "args": [
+              "120"
+            ]
+          },
+          {
+            "op": "contains_citation",
+            "args": [
+              "input.url"
+            ]
+          },
+          {
+            "op": "no_duplicate",
+            "args": [
+              "worker"
+            ]
+          }
+        ],
+        "payout": [
+          {
+            "event": "pass",
+            "destination": "worker"
+          },
+          {
+            "event": "timeout",
+            "destination": "buyer"
+          },
+          {
+            "event": "dispute",
+            "destination": "reviewers",
+            "count": 3
+          }
+        ]
+      },
       "admitted_at": "1970-01-01T00:00:00.000Z",
-      "intent_hash": "sha256:4ccb1f9069e875a065958b5618c23000b0477abbb3abb010c06bb0925e7515ed",
+      "intent_hash": "sha256:c923f0bdc461b6577c0dff9a1c8ecb7c2d94ace68bd69ebb1015592898c1b4e2",
       "task_hash": "0x28443f131686bc717c485b52cdb05c70fd4b959ee784357537bc1ef92fccbb45",
       "chain_id": 84532,
       "escrow": "0x2222222222222222222222222222222222222222",

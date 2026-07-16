@@ -1,10 +1,10 @@
 {
   "kind": "tasc.intent.signature.solana",
   "version": "0.1",
-  "intent_hash": "sha256:7b1ec5e6291c4e5b2e9d713375bc27fb4281c4d42f98b3c32a3bd3898c48ff5c",
+  "intent_hash": "sha256:7edbcb7c428b06543d6487bda05acf0580db51b488eb9c29d5f4345af2faa9d7",
   "signer": "ByfGMg9jszQEgMLinwBukAEBM3SiAZyTVt3Kquu8xAyp",
   "buyer": "ByfGMg9jszQEgMLinwBukAEBM3SiAZyTVt3Kquu8xAyp",
-  "signature": "3A2sjC2GbEoigpn62eY3wApKupXu36ab6sStsjcnJfSyTbkkfwU3vHGK6BeFetcBGoWBfPeEukNawy8BQ1MP869L",
+  "signature": "MG8n6BXF4PSLB8GBJ71RkcA9LJKGLY3kMDGtxuhLR26XTz9FQv7zPMJDbtV86PTMEEKqxTD6K5TNHTJLg3UyqwV",
   "intent": {
     "kind": "tasc.intent.solana",
     "version": "0.1",
@@ -23,18 +23,23 @@
       "raw": "60s",
       "seconds": 60
     },
+    "inputs": {
+      "url": "https://docs.cdp.coinbase.com/x402/welcome"
+    },
+    "input_hash": "0xad2e20b1f70ba6bf13c6ed2d8f246284beabb0ac70d9548f8691c730c0af4537",
     "generated_at_unix": 1800000000,
     "message": {
       "cluster": "devnet",
       "program_id": "Eyh4Q93EG7nSR4zBW6VbGkknKNJM59W3UKAx6Yo7iJRk",
       "buyer": "ByfGMg9jszQEgMLinwBukAEBM3SiAZyTVt3Kquu8xAyp",
       "task_hash": "0x28443f131686bc717c485b52cdb05c70fd4b959ee784357537bc1ef92fccbb45",
+      "input_hash": "0xad2e20b1f70ba6bf13c6ed2d8f246284beabb0ac70d9548f8691c730c0af4537",
       "token_mint": "2yUhqDXZGKzNswLYVqfnJErRHMfkUJTrfruJNnLncSic",
       "amount": "10000000",
       "deadline_unix": "1800000060",
       "verifier": "BkdSvHTynUnxa6sEShTjBZagwNpXvQ6VAyyQtgmtiR83",
       "nonce": "1"
     },
-    "intent_hash": "sha256:7b1ec5e6291c4e5b2e9d713375bc27fb4281c4d42f98b3c32a3bd3898c48ff5c"
+    "intent_hash": "sha256:7edbcb7c428b06543d6487bda05acf0580db51b488eb9c29d5f4345af2faa9d7"
   }
 }

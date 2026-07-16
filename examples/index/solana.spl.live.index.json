@@ -6,8 +6,87 @@
       "kind": "tasc.index.entry",
       "version": "0.1",
       "status": "claimable",
+      "task_file": "examples/summarize_url_spl.tasc",
+      "task_name": "summarize_url_spl",
+      "display_reward": {
+        "amount": "10",
+        "currency": "USDC"
+      },
+      "chain_reward": {
+        "amount": "10000000",
+        "decimals": 6,
+        "token_mint": "8WdRRCNVr8Du5Q1C1EeiMvqCRpSTBwWnHRjnx3FZ7KbC"
+      },
+      "relative_deadline": {
+        "raw": "60s",
+        "seconds": 60
+      },
+      "inputs": {
+        "url": "https://docs.cdp.coinbase.com/x402/welcome"
+      },
+      "input_hash": "0xad2e20b1f70ba6bf13c6ed2d8f246284beabb0ac70d9548f8691c730c0af4537",
+      "task": {
+        "kind": "tasc.task.summary",
+        "version": "0.1",
+        "name": "summarize_url_spl",
+        "reward": {
+          "amount": "10",
+          "currency": "USDC"
+        },
+        "deadline": {
+          "raw": "60s",
+          "seconds": 60
+        },
+        "inputs": [
+          {
+            "name": "url",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "name": "markdown",
+            "type": "string"
+          }
+        ],
+        "verify": [
+          {
+            "op": "min_words",
+            "args": [
+              "120"
+            ]
+          },
+          {
+            "op": "contains_citation",
+            "args": [
+              "input.url"
+            ]
+          },
+          {
+            "op": "no_duplicate",
+            "args": [
+              "worker"
+            ]
+          }
+        ],
+        "payout": [
+          {
+            "event": "pass",
+            "destination": "worker"
+          },
+          {
+            "event": "timeout",
+            "destination": "buyer"
+          },
+          {
+            "event": "dispute",
+            "destination": "reviewers",
+            "count": 3
+          }
+        ]
+      },
       "admitted_at": "1970-01-01T00:00:00.000Z",
-      "intent_hash": "sha256:cf0bba00c96f417f3a74bb7d7005b3d8f69ef196b793dde7b659188761ff3bc5",
+      "intent_hash": "sha256:15fe6d73bcedf28ad18646044e61c743f764493e66be52ebe035661ddc5a02b4",
       "task_hash": "0x103317ad603569805133b51ddd3447461a5ff998e8bca2642728205f7f7db65e",
       "settlement": {
         "chain": "solana",

@@ -221,7 +221,45 @@
         "type": "u8",
         "value": 4
       }
-    ]
+    ],
+    "account_requirements": {
+      "claim": [
+        "worker signer",
+        "writable task account",
+        "Clock sysvar account"
+      ],
+      "release": [
+        "worker signer",
+        "writable task account",
+        "SPL vault token account",
+        "mint",
+        "worker destination token account",
+        "vault authority PDA",
+        "SPL Token Program"
+      ],
+      "refund": [
+        "buyer signer",
+        "writable task account",
+        "SPL vault token account",
+        "mint",
+        "buyer destination token account",
+        "vault authority PDA",
+        "SPL Token Program"
+      ],
+      "timeout_refund": [
+        "buyer signer",
+        "writable task account",
+        "SPL vault token account",
+        "mint",
+        "buyer destination token account",
+        "vault authority PDA",
+        "SPL Token Program",
+        "Clock sysvar account"
+      ]
+    }
+  },
+  "sysvars": {
+    "clock": "SysvarC1ock11111111111111111111111111111111"
   },
   "scanner_contract": {
     "input": "Solana task account owned by the Global Tasc program plus the matching signed buyer intent",

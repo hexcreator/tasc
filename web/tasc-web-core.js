@@ -203,6 +203,8 @@
     assert(entry.settlement && typeof entry.settlement === "object", `${label} missing settlement`);
     assert(entry.settlement.chain, `${label} missing settlement chain`);
     assert(entry.status, `${label} missing status`);
+    if (entry.input_hash !== undefined) assertHex(entry.input_hash, 32, `${label} input_hash`);
+    if (entry.inputs !== undefined) assert(entry.inputs && typeof entry.inputs === "object" && !Array.isArray(entry.inputs), `${label} inputs must be an object`);
     return entry;
   }
 

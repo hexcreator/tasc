@@ -5,7 +5,7 @@ const path = require("path");
 const crypto = require("crypto");
 const { compile, canonicalize } = require("./tasclang");
 const { verifyCompiledTask } = require("./tascverify");
-const { decimalToBaseUnits, taskHashToBytes32 } = require("./tascintent");
+const { decimalToBaseUnits, inputHashToBytes32, normalizeTaskInputs, taskHashToBytes32 } = require("./tascintent");
 const { base58Decode, base58Encode } = require("./run-solana-devnet");
 
 const DEFAULT_CLUSTER = "devnet";
@@ -136,6 +136,8 @@ function createSolanaIntent(taskFile, options = {}) {
   const amount = decimalToBaseUnits(compiled.task.reward.amount, options.decimals ?? DEFAULT_DECIMALS);
   const nonce = assertUint(options.nonce ?? DEFAULT_NONCE, "nonce");
   const taskHash = taskHashToBytes32(compiled.task_hash);
+  const inputs = normalizeTaskInputs(compiled.task, options.inputs || {});
+  const inputHash = inputHashToBytes32(inputs);
 
   assertSolanaAddress(buyer, "buyer");
   assertSolanaAddress(verifier, "verifier");
@@ -154,12 +156,15 @@ function createSolanaIntent(taskFile, options = {}) {
       token_mint: tokenMint,
     },
     relative_deadline: compiled.task.deadline,
+    inputs,
+    input_hash: inputHash,
     generated_at_unix: now,
     message: {
       cluster: options.cluster || DEFAULT_CLUSTER,
       program_id: programId,
       buyer,
       task_hash: taskHash,
+      input_hash: inputHash,
       token_mint: tokenMint,
       amount,
       deadline_unix: String(deadlineUnix),
@@ -372,6 +377,7 @@ function demo(taskFile, submissionFile, options = {}) {
     now: options.now,
     nonce: options.nonce,
     decimals: options.decimals,
+    inputs: options.inputs || EXAMPLE_INPUTS,
   });
   const signed = signSolanaIntent(intent, buyerKeypair);
   const result = simulateSettlement({

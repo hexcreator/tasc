@@ -23,7 +23,7 @@ const DEFAULT_NOW = 1800000000;
 function usage() {
   console.error([
     "Usage:",
-    "  node bin/create-solana-live-intent.js [task.tasc] [--env file] [--out-dir dir] [--program-id address] [--token-mint address] [--now unix]",
+    "  node bin/create-solana-live-intent.js [task.tasc] [--env file] [--out-dir dir] [--program-id address] [--token-mint address] --input name=value [--input name=value ...] [--now unix]",
     "",
     "Creates public signed intent files from local devnet keys. It never prints key material.",
   ].join("\n"));
@@ -41,6 +41,7 @@ function parseOptions(rest) {
     outDir: DEFAULT_OUT_DIR,
     programId: null,
     tokenMint: null,
+    inputs: {},
     now: DEFAULT_NOW,
   };
   const args = [...rest];
@@ -51,6 +52,11 @@ function parseOptions(rest) {
     else if (arg === "--out-dir") options.outDir = args[++i];
     else if (arg === "--program-id") options.programId = args[++i];
     else if (arg === "--token-mint") options.tokenMint = args[++i];
+    else if (arg === "--input") {
+      const [name, ...valueParts] = String(args[++i] || "").split("=");
+      if (!name || valueParts.length === 0) throw new Error("--input must use name=value");
+      options.inputs[name] = valueParts.join("=");
+    }
     else if (arg === "--now") options.now = Number(args[++i]);
     else usage();
   }
@@ -89,6 +95,7 @@ function main() {
     programId,
     tokenMint,
     now: options.now,
+    inputs: options.inputs,
   });
   const signed = signSolanaIntent(intent, buyer);
   const safeName = path.basename(options.taskFile).replace(/\.tasc$/, "");

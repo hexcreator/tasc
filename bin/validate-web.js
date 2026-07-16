@@ -57,9 +57,11 @@ function assertBundledSolanaIndexMatchesFixture() {
   assert(demoIndex.entries.length === expected.entries.length, "bundled Solana index entry count mismatch");
   const actualEntry = demoIndex.entries[0];
   const expectedEntry = expected.entries[0];
-  for (const field of ["status", "intent_hash", "task_hash", "buyer", "token_mint", "amount", "deadline_unix", "verifier"]) {
+  for (const field of ["status", "intent_hash", "task_hash", "task_name", "input_hash", "buyer", "token_mint", "amount", "deadline_unix", "verifier"]) {
     assert(actualEntry[field] === expectedEntry[field], `bundled Solana ${field} mismatch`);
   }
+  assert(actualEntry.inputs.url === expectedEntry.inputs.url, "bundled Solana input URL mismatch");
+  assert(actualEntry.task.outputs[0].name === "markdown", "bundled Solana output metadata mismatch");
   assert(actualEntry.settlement.vault === expectedEntry.settlement.vault, "bundled Solana vault mismatch");
   assert(actualEntry.funding.signature === expectedEntry.funding.signature, "bundled Solana funding signature mismatch");
   assert(actualEntry.funding.custody.amount === expectedEntry.funding.custody.amount, "bundled Solana custody amount mismatch");
@@ -97,10 +99,13 @@ function assertFeedImportPayloads() {
   const fromIndex = core.indexEntriesFromImportPayload(claimableIndex);
   assert(fromIndex.entries.length === 1, "index import entry count mismatch");
   assert(fromIndex.entries[0].task_hash === claimableIndex.entries[0].task_hash, "index import task hash mismatch");
+  assert(fromIndex.entries[0].inputs.url === claimableIndex.entries[0].inputs.url, "index import input URL mismatch");
+  assert(fromIndex.entries[0].input_hash === claimableIndex.entries[0].input_hash, "index import input hash mismatch");
 
   const fromArray = core.indexEntriesFromImportPayload([claimableIndex.entries[0]]);
   assert(fromArray.entries.length === 1, "array import entry count mismatch");
   assert(fromArray.entries[0].settlement.task_pda === claimableIndex.entries[0].settlement.task_pda, "array import task account mismatch");
+  assert(fromArray.entries[0].task_name === "summarize_url_spl", "array import task name mismatch");
 
   const merged = core.mergeIndexEntries(claimableIndex.entries, completedIndex.entries);
   assert(merged.length === 1, "completed merge should replace claimable entry for same task");

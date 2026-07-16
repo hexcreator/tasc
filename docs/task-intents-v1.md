@@ -6,6 +6,7 @@ The intent binds the compiled task to the exact settlement context:
 
 - buyer address
 - task hash
+- input hash for the concrete task input values
 - escrow contract
 - token contract
 - amount in token base units
@@ -14,7 +15,28 @@ The intent binds the compiled task to the exact settlement context:
 - nonce
 - chain id
 
-Without this binding, an indexer could list a task with mismatched settlement parameters, or replay an old task onto a different chain/escrow.
+Without this binding, an indexer could list a task with mismatched settlement parameters, replay an old task onto a different chain/escrow, or show a worker inputs the buyer never signed.
+
+## Input Boundary
+
+The TascLang task describes the input schema:
+
+```text
+input url string
+```
+
+The buyer intent carries the concrete input values:
+
+```json
+{
+  "inputs": {
+    "url": "https://docs.cdp.coinbase.com/x402/welcome"
+  },
+  "input_hash": "0xad2e20b1f70ba6bf13c6ed2d8f246284beabb0ac70d9548f8691c730c0af4537"
+}
+```
+
+The input hash is a SHA-256 bytes32 over canonicalized input JSON. It is included in the EIP-712 message and Solana intent message, so indexers and workers can detect if a feed tries to swap the work target after signing.
 
 ## Deadline Boundary
 
@@ -49,6 +71,7 @@ primaryType = "TaskIntent"
 ```text
 buyer address
 taskHash bytes32
+inputHash bytes32
 escrow address
 token address
 amount uint256
@@ -69,6 +92,7 @@ node bin/tascintent.js create examples/summarize_url.tasc \
   --verifier 0x4444444444444444444444444444444444444444 \
   --chain-id 84532 \
   --nonce 1 \
+  --input url=https://docs.cdp.coinbase.com/x402/welcome \
   --now 1800000000
 ```
 

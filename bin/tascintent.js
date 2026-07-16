@@ -11,7 +11,7 @@ const DEFAULT_DECIMALS = 6;
 function usage() {
   console.error([
     "Usage:",
-    "  node bin/tascintent.js create <file.tasc> --buyer 0x... --escrow 0x... --token 0x... --verifier 0x... --chain-id n --nonce n [--now unix] [--decimals n] [--out file]",
+    "  node bin/tascintent.js create <file.tasc> --buyer 0x... --escrow 0x... --token 0x... --verifier 0x... --chain-id n --nonce n --input name=value [--input name=value ...] [--now unix] [--decimals n] [--out file]",
     "",
     "The output is EIP-712-compatible typed data for a buyer to sign.",
   ].join("\n"));
@@ -22,7 +22,7 @@ function parseArgs(argv) {
   const [command, taskFile, ...rest] = argv;
   if (command !== "create" || !taskFile) usage();
 
-  const options = { decimals: DEFAULT_DECIMALS };
+  const options = { decimals: DEFAULT_DECIMALS, inputs: {} };
   for (let i = 0; i < rest.length; i += 1) {
     const arg = rest[i];
     if (arg === "--buyer") options.buyer = rest[++i];
@@ -31,6 +31,11 @@ function parseArgs(argv) {
     else if (arg === "--verifier") options.verifier = rest[++i];
     else if (arg === "--chain-id") options.chainId = rest[++i];
     else if (arg === "--nonce") options.nonce = rest[++i];
+    else if (arg === "--input") {
+      const [name, ...valueParts] = String(rest[++i] || "").split("=");
+      if (!name || valueParts.length === 0) throw new Error("--input must use name=value");
+      options.inputs[name] = valueParts.join("=");
+    }
     else if (arg === "--now") options.now = rest[++i];
     else if (arg === "--decimals") options.decimals = Number(rest[++i]);
     else if (arg === "--out") options.out = rest[++i];
@@ -92,6 +97,31 @@ function sha256Hex(text) {
   return crypto.createHash("sha256").update(text).digest("hex");
 }
 
+function normalizeTaskInputs(task, rawInputs = {}) {
+  const allowed = new Set(task.inputs.map((field) => field.name));
+  const normalized = {};
+
+  for (const key of Object.keys(rawInputs).sort()) {
+    if (!allowed.has(key)) throw new Error(`Unknown task input '${key}'`);
+  }
+
+  for (const field of task.inputs) {
+    if (!Object.prototype.hasOwnProperty.call(rawInputs, field.name)) {
+      throw new Error(`Missing task input '${field.name}'. Pass --input ${field.name}=...`);
+    }
+    if (field.type !== "string") {
+      throw new Error(`Input '${field.name}' uses unsupported type '${field.type}'`);
+    }
+    normalized[field.name] = String(rawInputs[field.name]);
+  }
+
+  return normalized;
+}
+
+function inputHashToBytes32(inputs) {
+  return `0x${sha256Hex(canonicalize(inputs))}`;
+}
+
 function createIntent(taskFile, options) {
   const compiled = compile(fs.readFileSync(taskFile, "utf8"));
   const now = unixNow(options);
@@ -106,6 +136,8 @@ function createIntent(taskFile, options) {
   const amount = decimalToBaseUnits(compiled.task.reward.amount, options.decimals);
   const nonce = assertUint(options.nonce, "nonce");
   const taskHash = taskHashToBytes32(compiled.task_hash);
+  const inputs = normalizeTaskInputs(compiled.task, options.inputs || {});
+  const inputHash = inputHashToBytes32(inputs);
 
   const typedData = {
     types: {
@@ -118,6 +150,7 @@ function createIntent(taskFile, options) {
       TaskIntent: [
         { name: "buyer", type: "address" },
         { name: "taskHash", type: "bytes32" },
+        { name: "inputHash", type: "bytes32" },
         { name: "escrow", type: "address" },
         { name: "token", type: "address" },
         { name: "amount", type: "uint256" },
@@ -136,6 +169,7 @@ function createIntent(taskFile, options) {
     message: {
       buyer,
       taskHash,
+      inputHash,
       escrow,
       token,
       amount,
@@ -157,6 +191,8 @@ function createIntent(taskFile, options) {
       token,
     },
     relative_deadline: compiled.task.deadline,
+    inputs,
+    input_hash: inputHash,
     generated_at_unix: now,
     typed_data: typedData,
   };
@@ -187,5 +223,7 @@ if (require.main === module) {
 module.exports = {
   createIntent,
   decimalToBaseUnits,
+  inputHashToBytes32,
+  normalizeTaskInputs,
   taskHashToBytes32,
 };

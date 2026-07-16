@@ -51,6 +51,8 @@ Supported import payloads:
 
 Completed index entries replace older claimable entries for the same Solana task account, so proof bundles can show the final `Released` or `Refunded` state instead of duplicating the same task.
 
+When entries include signed task metadata, the claimable card shows the display reward, relative deadline, concrete input URL, expected output field, verifier rules, and input hash. This keeps the worker's fast path inside the same feed artifact instead of requiring a separate task-description service.
+
 ## Solana Operator Console
 
 The browser can connect to an injected Solana wallet provider, refresh bundled Solana task accounts from a devnet RPC, decode the live task-account status, and classify the connected wallet as buyer, verifier, worker, worker candidate, or spectator.
@@ -123,6 +125,7 @@ The validator checks that:
 - the generated `eth_getLogs` filter matches the escrow and `Funded` topic
 - the browser Solana task-account decoder matches a committed live Solana lifecycle account fixture
 - the browser accepts `tasc.index`, raw entry arrays, and proof-summary import shapes
+- the bundled Solana feed exposes signed task input metadata and input hash
 - the browser can build wallet transaction payloads for Solana `claim`, `attest`, `release`, `refund`, and `timeout-refund`
 
 ## Limits
@@ -130,7 +133,7 @@ The validator checks that:
 This is now a guarded operator surface, but still needs:
 
 - live wallet QA in a normal browser extension environment
-- richer task metadata retrieval
 - hosted proof-bundle/index publication workflow
+- signed worker submission capture and verifier handoff
 - multi-RPC fallback
 - reorg handling for cached entries

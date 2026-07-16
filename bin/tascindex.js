@@ -4,6 +4,8 @@ const fs = require("fs");
 const path = require("path");
 const { verifySignedIntent } = require("./tascsign");
 const { verifySignedSolanaIntent } = require("./tascsolana");
+const { compile } = require("./tasclang");
+const { taskHashToBytes32 } = require("./tascintent");
 const { base58Decode } = require("./run-solana-devnet");
 const { TOKEN_PROGRAM_ID } = require("./tascsolana-spl");
 
@@ -265,12 +267,61 @@ function compareFundingToIntent(signed, funding) {
   return compareEvidenceToIntent(signed, funding);
 }
 
+function signedMetadataSource(signed) {
+  if (signed && signed.intent) return signed.intent;
+  return signed || {};
+}
+
+function buildTaskSummary(compiled) {
+  return {
+    kind: "tasc.task.summary",
+    version: compiled.task.version,
+    name: compiled.task.name,
+    reward: compiled.task.reward,
+    deadline: compiled.task.deadline,
+    inputs: compiled.task.inputs,
+    outputs: compiled.task.outputs,
+    verify: compiled.task.verify,
+    payout: compiled.task.payout,
+  };
+}
+
+function taskMetadataFromSigned(signed) {
+  const source = signedMetadataSource(signed);
+  const metadata = {};
+  for (const field of [
+    "task_file",
+    "task_name",
+    "display_reward",
+    "chain_reward",
+    "relative_deadline",
+    "inputs",
+    "input_hash",
+  ]) {
+    if (source[field] !== undefined) metadata[field] = source[field];
+  }
+
+  if (source.task_file && fs.existsSync(source.task_file)) {
+    const compiled = compile(fs.readFileSync(source.task_file, "utf8"));
+    const compiledHash = taskHashToBytes32(compiled.task_hash).toLowerCase();
+    const signedHash = String(signedTaskHash(signed)).toLowerCase();
+    assert(compiledHash === signedHash, `${source.task_file} hash does not match signed intent`);
+    metadata.task = buildTaskSummary(compiled);
+    metadata.task_name = metadata.task_name || compiled.task.name;
+    metadata.display_reward = metadata.display_reward || compiled.task.reward;
+    metadata.relative_deadline = metadata.relative_deadline || compiled.task.deadline;
+  }
+
+  return metadata;
+}
+
 function buildEvmEntry(signed, funding, validation) {
   const message = signed.typed_data.message;
   return {
     kind: "tasc.index.entry",
     version: "0.1",
     status: "claimable",
+    ...taskMetadataFromSigned(signed),
     admitted_at: new Date(0).toISOString(),
     intent_hash: signed.intent_hash,
     task_hash: message.taskHash,
@@ -325,6 +376,7 @@ function buildSolanaEntry(signed, funding, validation) {
     kind: "tasc.index.entry",
     version: "0.1",
     status: "claimable",
+    ...taskMetadataFromSigned(signed),
     admitted_at: new Date(0).toISOString(),
     intent_hash: signed.intent_hash,
     task_hash: message.task_hash,
@@ -356,6 +408,7 @@ function buildSolanaSettlementEntry(signed, settlement, validation) {
     version: "0.1",
     status: "completed",
     completed_status: settlement.status,
+    ...taskMetadataFromSigned(signed),
     admitted_at: new Date(0).toISOString(),
     intent_hash: signed.intent_hash,
     task_hash: message.task_hash,

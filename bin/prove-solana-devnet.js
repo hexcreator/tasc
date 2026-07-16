@@ -224,6 +224,7 @@ function writeSignedTask(input) {
     programId,
     tokenMint,
     now,
+    inputs: DEFAULT_INPUTS,
   });
   const signed = signSolanaIntent(intent, buyer);
   const intentFile = path.join(outDir, `${name}.intent.json`);

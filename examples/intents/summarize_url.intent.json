@@ -16,6 +16,10 @@
     "raw": "60s",
     "seconds": 60
   },
+  "inputs": {
+    "url": "https://docs.cdp.coinbase.com/x402/welcome"
+  },
+  "input_hash": "0xad2e20b1f70ba6bf13c6ed2d8f246284beabb0ac70d9548f8691c730c0af4537",
   "generated_at_unix": 1800000000,
   "typed_data": {
     "types": {
@@ -44,6 +48,10 @@
         },
         {
           "name": "taskHash",
+          "type": "bytes32"
+        },
+        {
+          "name": "inputHash",
           "type": "bytes32"
         },
         {
@@ -82,6 +90,7 @@
     "message": {
       "buyer": "0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266",
       "taskHash": "0x28443f131686bc717c485b52cdb05c70fd4b959ee784357537bc1ef92fccbb45",
+      "inputHash": "0xad2e20b1f70ba6bf13c6ed2d8f246284beabb0ac70d9548f8691c730c0af4537",
       "escrow": "0x2222222222222222222222222222222222222222",
       "token": "0x3333333333333333333333333333333333333333",
       "amount": "10000000",
@@ -90,5 +99,5 @@
       "nonce": "1"
     }
   },
-  "intent_hash": "sha256:4ccb1f9069e875a065958b5618c23000b0477abbb3abb010c06bb0925e7515ed"
+  "intent_hash": "sha256:c923f0bdc461b6577c0dff9a1c8ecb7c2d94ace68bd69ebb1015592898c1b4e2"
 }

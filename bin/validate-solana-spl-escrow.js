@@ -36,6 +36,8 @@ function assert(condition, message) {
   if (!condition) throw new Error(message);
 }
 
+const EXAMPLE_INPUTS = { url: "https://docs.cdp.coinbase.com/x402/welcome" };
+
 function main() {
   const buyer = fixtureKeypair("buyer");
   const verifier = fixtureKeypair("verifier");
@@ -47,6 +49,7 @@ function main() {
     verifier: verifier.address,
     programId,
     tokenMint,
+    inputs: EXAMPLE_INPUTS,
   });
   const signed = signSolanaIntent(intent, buyer);
   const message = signed.intent.message;
@@ -192,6 +195,8 @@ function main() {
 
   const admitted = admit({ inlineSigned: signed }, { inlineFunding: funding });
   assert(admitted.entry.status === "claimable", "SPL custody funding should admit");
+  assert(admitted.entry.inputs.url === EXAMPLE_INPUTS.url, "index entry should include signed input URL");
+  assert(admitted.entry.input_hash === signed.intent.input_hash, "index entry should include signed input hash");
   assert(admitted.entry.funding.custody.amount === message.amount, "index entry should include custody amount");
 
   const liveTaskAccount = taskAccountFixtureFromState({

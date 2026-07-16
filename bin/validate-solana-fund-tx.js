@@ -24,6 +24,8 @@ function assert(condition, message) {
   if (!condition) throw new Error(message);
 }
 
+const EXAMPLE_INPUTS = { url: "https://docs.cdp.coinbase.com/x402/welcome" };
+
 function main() {
   const zero = "11111111111111111111111111111111";
   assert(
@@ -41,6 +43,7 @@ function main() {
     verifier: verifier.address,
     programId,
     tokenMint,
+    inputs: EXAMPLE_INPUTS,
   });
   const signed = signSolanaIntent(intent, buyer);
   const addresses = fundAddresses(signed.intent.message);

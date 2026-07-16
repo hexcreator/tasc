@@ -226,6 +226,95 @@
     return submissions[solanaSubmissionKey(entry, action)] || null;
   }
 
+  function displayReward(entry, custody) {
+    if (entry.display_reward && entry.display_reward.amount && entry.display_reward.currency) {
+      return `${entry.display_reward.amount} ${entry.display_reward.currency}`;
+    }
+    return `${core.formatTokenAmount(entry.amount, custody.decimals ?? 6)} USDC`;
+  }
+
+  function relativeDeadlineText(entry) {
+    const deadline = entry.relative_deadline || (entry.task && entry.task.deadline);
+    if (!deadline) return null;
+    if (deadline.raw) return deadline.raw;
+    if (deadline.seconds !== undefined) return `${deadline.seconds}s`;
+    return null;
+  }
+
+  function verifyRuleText(rule, inputs) {
+    if (!rule || !rule.op) return "";
+    const args = rule.args || [];
+    if (rule.op === "min_words" && args[0]) return `Minimum ${args[0]} words`;
+    if (rule.op === "contains_citation" && args[0]) {
+      const inputName = String(args[0]).replace(/^input\./, "");
+      return inputs[inputName] ? `Cite ${inputs[inputName]}` : `Cite ${args[0]}`;
+    }
+    if (rule.op === "no_duplicate" && args[0]) return `No duplicate ${args[0]} submission`;
+    return [rule.op, ...args].join(" ");
+  }
+
+  function renderTaskBrief(entry) {
+    const inputs = entry.inputs || {};
+    const task = entry.task || {};
+    const inputEntries = Object.entries(inputs);
+    const outputEntries = Array.isArray(task.outputs) ? task.outputs : [];
+    const verifyRules = Array.isArray(task.verify) ? task.verify.map((rule) => verifyRuleText(rule, inputs)).filter(Boolean) : [];
+    if (inputEntries.length === 0 && outputEntries.length === 0 && verifyRules.length === 0) return null;
+
+    const brief = document.createElement("div");
+    brief.className = "task-brief";
+
+    if (inputEntries.length > 0) {
+      const group = document.createElement("div");
+      group.className = "task-brief-group";
+      const label = document.createElement("span");
+      label.textContent = "Input";
+      const list = document.createElement("div");
+      list.className = "task-brief-list";
+      for (const [name, value] of inputEntries) {
+        const item = document.createElement("div");
+        const nameNode = document.createElement("strong");
+        nameNode.textContent = name;
+        const valueNode = /^https?:\/\//.test(String(value))
+          ? Object.assign(document.createElement("a"), {
+            href: String(value),
+            target: "_blank",
+            rel: "noreferrer",
+            textContent: String(value),
+          })
+          : Object.assign(document.createElement("span"), { textContent: String(value) });
+        item.append(nameNode, valueNode);
+        list.append(item);
+      }
+      group.append(label, list);
+      brief.append(group);
+    }
+
+    if (outputEntries.length > 0) {
+      const group = document.createElement("div");
+      group.className = "task-brief-group";
+      const label = document.createElement("span");
+      label.textContent = "Output";
+      const value = document.createElement("strong");
+      value.textContent = outputEntries.map((field) => `${field.name} ${field.type}`).join(", ");
+      group.append(label, value);
+      brief.append(group);
+    }
+
+    if (verifyRules.length > 0) {
+      const group = document.createElement("div");
+      group.className = "task-brief-group";
+      const label = document.createElement("span");
+      label.textContent = "Verifier";
+      const value = document.createElement("strong");
+      value.textContent = verifyRules.join(" · ");
+      group.append(label, value);
+      brief.append(group);
+    }
+
+    return brief;
+  }
+
   function feedSourceText(state) {
     if (state.feedSource && state.feedSource.label) {
       return `${state.feedSource.label}: ${state.feedSource.count} task(s)`;
@@ -291,7 +380,8 @@
     const custody = funding.custody || {};
     const completedSettlement = entry.completed_settlement || {};
     const cluster = settlement.cluster || "devnet";
-    const reward = `${core.formatTokenAmount(entry.amount, custody.decimals ?? 6)} USDC`;
+    const reward = displayReward(entry, custody);
+    const deadlineText = relativeDeadlineText(entry);
     const liveAccount = solanaAccountForEntry(state, entry);
     const wallet = connectedWallet(state);
     const solanaConfig = readSolanaConfig();
@@ -307,11 +397,13 @@
     eyebrow.className = "eyebrow";
     eyebrow.textContent = `${settlement.chain || "chain"} / ${cluster}`;
     const title = document.createElement("h3");
-    title.textContent = entry.task_name || entry.name || "Tasc task";
+    title.textContent = entry.task_name || (entry.task && entry.task.name) || entry.name || "Tasc task";
     const subtitle = document.createElement("p");
     subtitle.textContent = entry.completed_status
       ? `Completed with ${entry.completed_status} settlement evidence.`
-      : "Live devnet task admitted from signed intent plus SPL vault custody.";
+      : entry.inputs && entry.inputs.url
+        ? "Ready to claim: summarize the linked source and submit markdown proof."
+        : "Live devnet task admitted from signed intent plus SPL vault custody.";
     titleWrap.append(eyebrow, title, subtitle);
 
     const rewardNode = document.createElement("div");
@@ -336,6 +428,8 @@
       metaItem(evidenceLabel, shortMiddle(evidenceSignature), evidenceSignature ? solanaExplorerUrl(`tx/${evidenceSignature}`, cluster) : null),
       metaItem("Verifier", shortMiddle(entry.verifier), solanaExplorerUrl(`address/${entry.verifier}`, cluster)),
     );
+    if (deadlineText) meta.append(metaItem("SLA", deadlineText));
+    if (entry.input_hash) meta.append(metaItem("Input hash", shortHash(entry.input_hash)));
     if (liveAccount && liveAccount.worker !== core.ZERO_SOLANA_PUBKEY) {
       meta.append(metaItem("Worker", shortMiddle(liveAccount.worker), solanaExplorerUrl(`address/${liveAccount.worker}`, cluster)));
     }
@@ -366,7 +460,9 @@
     actionButton.addEventListener("click", () => onSubmitSolanaAction(entry, action.action, actionButton));
     footer.append(actionGroup, actionButton);
 
-    card.append(header, meta, footer);
+    const taskBrief = renderTaskBrief(entry);
+    if (taskBrief) card.append(header, taskBrief, meta, footer);
+    else card.append(header, meta, footer);
     return card;
   }
 

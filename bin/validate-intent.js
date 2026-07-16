@@ -13,6 +13,9 @@ const EXAMPLE_OPTIONS = {
   verifier: "0x4444444444444444444444444444444444444444",
   chainId: "84532",
   nonce: "1",
+  inputs: {
+    url: "https://docs.cdp.coinbase.com/x402/welcome",
+  },
   now: "1800000000",
   decimals: 6,
 };
@@ -42,13 +45,18 @@ function main() {
   assert(message.deadline === "1800000060", "wrong absolute deadline");
   assert(message.nonce === "1", "wrong nonce");
   assert(message.taskHash === taskHashToBytes32(compiled.task_hash), "wrong task bytes32");
+  assert(message.inputHash === intent.input_hash, "wrong input hash in typed data");
+  assert(intent.inputs.url === EXAMPLE_OPTIONS.inputs.url, "wrong signed input url");
   assert(/^sha256:[a-f0-9]{64}$/.test(intent.intent_hash), "invalid intent hash");
+  assert(/^0x[a-f0-9]{64}$/.test(intent.input_hash), "invalid input hash");
   assert(JSON.stringify(intent) === JSON.stringify(fixture), "generated intent does not match checked-in fixture");
 
   process.stdout.write(`${JSON.stringify({
     ok: true,
     task_hash: compiled.task_hash,
     evm_task_hash: message.taskHash,
+    input_hash: message.inputHash,
+    inputs: intent.inputs,
     intent_hash: intent.intent_hash,
     chain_id: typed.domain.chainId,
     escrow: message.escrow,

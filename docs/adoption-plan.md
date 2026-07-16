@@ -28,9 +28,11 @@ Done:
 - GitHub topics and starter issues exist
 - guarded Solana wallet transaction construction exists in the static operator console
 - static feed import exists for `tasc.index`, raw entry arrays, and hosted proof-summary indexes
+- admitted feed entries carry signed task inputs, input hash, output schema, and verifier rules
 
 Next:
 
+- capture signed worker submissions in the browser
 - live-test the guarded wallet send flow with Phantom or another injected Solana wallet
 - publish a fresh proof index as a hosted feed artifact
 - add a short demo video or GIF
@@ -69,7 +71,7 @@ The current static web proof should become the main public demo:
 
 - load `examples/index/solana.spl.live.index.json`
 - import fresh proof/index artifacts without editing bundled demo code
-- show task title, reward, deadline, status, chain, vault, and proof coordinates
+- show task title, reward, 60-second window, signed input URL, output schema, verifier rules, status, chain, vault, and proof coordinates
 - connect a Solana wallet and show live task-account status plus guarded role/action sends
 - link to docs explaining what is real and what is simulated
 
@@ -83,6 +85,7 @@ Open issues for:
 - `indexer`: discover funded task accounts from program-owned accounts
 - `indexer`: scan post-funding lifecycle state
 - `web`: live-test wallet transaction submission in injected wallet browsers
+- `web`: capture signed worker submissions and result hashes
 - `security`: define pre-mainnet audit checklist
 
 ### 5. Get External Feedback
@@ -104,10 +107,11 @@ Ask for specific feedback:
 
 ## Next Engineering Steps
 
-1. Live-test guarded Solana wallet sends from the static operator console in a normal wallet-extension browser.
-2. Publish fresh proof indexes as hosted task-feed artifacts instead of only local runner output.
-3. Add finality windows, duplicate-task suppression, and multi-RPC fallback to the browser/indexer boundary.
-4. Start the dispute/reviewer path once pass/fail/timeout UX is usable end to end.
+1. Capture signed worker submissions and result hashes in the static browser flow.
+2. Live-test guarded Solana wallet sends from the static operator console in a normal wallet-extension browser.
+3. Publish fresh proof indexes as hosted task-feed artifacts instead of only local runner output.
+4. Add finality windows, duplicate-task suppression, and multi-RPC fallback to the browser/indexer boundary.
+5. Start the dispute/reviewer path once pass/fail/timeout UX is usable end to end.
 
 ## Success Criteria For Early Use
 
@@ -117,5 +121,6 @@ Early users are actually using Tasc when:
 - someone can inspect the live devnet proof from README links
 - someone can add a new task fixture and verifier rule
 - someone can serve a static claimable feed
+- a worker can see the exact signed input and verifier rules from the feed
 - someone can connect a wallet and submit the correct guarded live role/action transaction
 - a worker can complete a devnet task and see token release proof
