@@ -21,6 +21,7 @@ EVM:     browser -> RPC eth_blockNumber -> confirmed range -> RPC eth_getLogs ->
 Solana:  browser -> RPC getAccountInfo(task_pda) -> decode 276-byte task account -> role/action readiness
 Solana:  browser -> wallet sign -> RPC sendTransaction -> refreshed task-account status
 Import:  paste/select tasc.index JSON -> merge entries -> refresh live Solana status
+Submit:  markdown output -> SHA-256 result hash -> tasc.worker.submission proof -> attest hash
 ```
 
 The browser reads only `TascEscrow.Funded` logs. It decodes the same event shape used by the CLI scanner:
@@ -52,6 +53,20 @@ Supported import payloads:
 Completed index entries replace older claimable entries for the same Solana task account, so proof bundles can show the final `Released` or `Refunded` state instead of duplicating the same task.
 
 When entries include signed task metadata, the claimable card shows the display reward, relative deadline, concrete input URL, expected output field, verifier rules, and input hash. This keeps the worker's fast path inside the same feed artifact instead of requiring a separate task-description service.
+
+## Worker Submission Capture
+
+The task card can capture markdown output and build a `tasc.worker.submission` proof in the browser. The proof includes:
+
+- task hash and input hash
+- worker address when a wallet is connected
+- markdown output
+- verifier-compatible `sha256:<hex>` result hash
+- Solana-ready `0x<hex>` result hash for attest transactions
+- local preview checks for deterministic rules
+- optional Solana `signMessage` signature when the wallet supports it
+
+The captured hash is written into the Solana operator result-hash field, so a verifier can attest the same output hash without recomputing it by hand.
 
 ## Solana Operator Console
 
@@ -126,6 +141,7 @@ The validator checks that:
 - the browser Solana task-account decoder matches a committed live Solana lifecycle account fixture
 - the browser accepts `tasc.index`, raw entry arrays, and proof-summary import shapes
 - the bundled Solana feed exposes signed task input metadata and input hash
+- browser worker submission capture matches the CLI verifier result hash format
 - the browser can build wallet transaction payloads for Solana `claim`, `attest`, `release`, `refund`, and `timeout-refund`
 
 ## Limits
@@ -134,6 +150,6 @@ This is now a guarded operator surface, but still needs:
 
 - live wallet QA in a normal browser extension environment
 - hosted proof-bundle/index publication workflow
-- signed worker submission capture and verifier handoff
+- verifier service ingestion for captured submission proofs
 - multi-RPC fallback
 - reorg handling for cached entries

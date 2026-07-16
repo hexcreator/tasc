@@ -375,6 +375,14 @@
     return out;
   }
 
+  function canonicalize(value) {
+    if (Array.isArray(value)) return `[${value.map(canonicalize).join(",")}]`;
+    if (value && typeof value === "object") {
+      return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonicalize(value[key])}`).join(",")}}`;
+    }
+    return JSON.stringify(value === undefined ? null : value);
+  }
+
   function mod(value) {
     const result = value % ED25519_P;
     return result >= 0n ? result : result + ED25519_P;
@@ -427,6 +435,117 @@
 
   async function sha256HexFromText(value) {
     return hexFromBytes(await sha256Bytes(bytesFromUtf8(value)));
+  }
+
+  function submissionWordCount(text) {
+    const words = String(text || "").trim().match(/[A-Za-z0-9]+(?:['-][A-Za-z0-9]+)*/g);
+    return words ? words.length : 0;
+  }
+
+  function resolveSubmissionRef(ref, inputs) {
+    const value = String(ref || "");
+    if (value.startsWith("input.")) {
+      const name = value.slice("input.".length);
+      assert(Object.prototype.hasOwnProperty.call(inputs || {}, name), `Missing input '${name}'`);
+      return inputs[name];
+    }
+    return value;
+  }
+
+  function evaluateSubmissionRule(rule, context) {
+    if (!rule || !rule.op) {
+      return {
+        rule,
+        pass: false,
+        actual: "missing",
+        expected: "supported verifier rule",
+      };
+    }
+
+    if (rule.op === "min_words") {
+      const required = Number(rule.args && rule.args[0]);
+      const actual = submissionWordCount(context.markdown);
+      return {
+        rule,
+        pass: actual >= required,
+        actual,
+        expected: `>= ${required}`,
+      };
+    }
+
+    if (rule.op === "contains_citation") {
+      const required = resolveSubmissionRef(rule.args && rule.args[0], context.inputs);
+      const pass = String(context.markdown).includes(required);
+      return {
+        rule,
+        pass,
+        actual: pass ? "found" : "missing",
+        expected: required,
+      };
+    }
+
+    if (rule.op === "no_duplicate") {
+      return {
+        rule,
+        pass: null,
+        actual: "verifier required",
+        expected: "unique result hash",
+      };
+    }
+
+    return {
+      rule,
+      pass: null,
+      actual: "unsupported in browser preview",
+      expected: "verifier service decision",
+    };
+  }
+
+  function localSubmissionVerdict(checks) {
+    if (checks.some((check) => check.pass === false)) return "fail";
+    if (checks.some((check) => check.pass !== true)) return "needs_verifier";
+    return "pass";
+  }
+
+  async function buildWorkerSubmission(options) {
+    const entry = options && options.entry ? options.entry : {};
+    const markdown = String((options && options.markdown) || "");
+    assert(markdown.trim().length > 0, "submission markdown is required");
+    assert(entry.task_hash, "submission entry missing task_hash");
+    const resultHex = await sha256HexFromText(markdown);
+    const checks = Array.isArray(entry.task && entry.task.verify)
+      ? entry.task.verify.map((rule) => evaluateSubmissionRule(rule, {
+        inputs: entry.inputs || {},
+        markdown,
+        resultHash: `sha256:${resultHex}`,
+      }))
+      : [];
+    const settlement = entry.settlement || {};
+    return {
+      kind: "tasc.worker.submission",
+      version: "0.1",
+      task_hash: entry.task_hash,
+      intent_hash: entry.intent_hash || null,
+      input_hash: entry.input_hash || null,
+      task_name: entry.task_name || (entry.task && entry.task.name) || null,
+      worker: (options && options.workerAddress) || null,
+      submitted_at: (options && options.submittedAt) || new Date().toISOString(),
+      output: {
+        markdown,
+      },
+      result_hash: `sha256:${resultHex}`,
+      result_hash_bytes32: `0x${resultHex}`,
+      inputs: entry.inputs || {},
+      verifier: entry.verifier || null,
+      settlement: {
+        chain: settlement.chain || null,
+        cluster: settlement.cluster || null,
+        program_id: settlement.program_id || null,
+        task_pda: settlement.task_pda || null,
+      },
+      checks,
+      local_verdict: localSubmissionVerdict(checks),
+    };
   }
 
   async function seedFrom(label, parts) {
@@ -924,6 +1043,8 @@
     base64FromBytes,
     buildFundedFilter,
     buildSolanaLifecycleTransaction,
+    buildWorkerSubmission,
+    canonicalize,
     createSolanaWalletTransaction,
     decodeFundedLog,
     decodeSolanaTaskAccountBase64,
@@ -936,6 +1057,7 @@
     normalizeAddress,
     numberFromRpcQuantity,
     numberToRpcQuantity,
+    sha256HexFromText,
     solanaSettlementAccountsForAction,
     solanaNextAction,
     solanaWalletRole,

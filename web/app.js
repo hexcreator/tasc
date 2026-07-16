@@ -226,6 +226,16 @@
     return submissions[solanaSubmissionKey(entry, action)] || null;
   }
 
+  function workerSubmissionKey(entry) {
+    const settlement = entry.settlement || {};
+    return settlement.task_pda || entry.task_hash || entry.intent_hash;
+  }
+
+  function workerSubmissionForEntry(state, entry) {
+    const submissions = state.workerSubmissions || {};
+    return submissions[workerSubmissionKey(entry)] || null;
+  }
+
   function displayReward(entry, custody) {
     if (entry.display_reward && entry.display_reward.amount && entry.display_reward.currency) {
       return `${entry.display_reward.amount} ${entry.display_reward.currency}`;
@@ -313,6 +323,129 @@
     }
 
     return brief;
+  }
+
+  function messageSignatureFromResult(result) {
+    const signature = result && result.signature !== undefined ? result.signature : result;
+    if (typeof signature === "string") return signature;
+    if (signature instanceof Uint8Array || Array.isArray(signature)) return core.base58Encode(signature);
+    if (signature && signature.data && Array.isArray(signature.data)) return core.base58Encode(signature.data);
+    if (signature && signature.toString && signature.toString() !== "[object Object]") return signature.toString();
+    return "";
+  }
+
+  async function signWorkerSubmission(provider, submission, wallet) {
+    if (!wallet || !provider || !provider.signMessage) return submission;
+    const message = core.canonicalize(submission);
+    const encoded = new TextEncoder().encode(message);
+    const signed = await provider.signMessage(encoded, "utf8");
+    const signature = messageSignatureFromResult(signed);
+    if (!signature) throw new Error("Wallet did not return a message signature");
+    return {
+      ...submission,
+      signature: {
+        scheme: "solana.signMessage",
+        signer: wallet,
+        message_hash: `sha256:${await core.sha256HexFromText(message)}`,
+        signature,
+      },
+    };
+  }
+
+  async function onCaptureWorkerSubmission(entry, textarea, button) {
+    try {
+      if (button) button.disabled = true;
+      const state = readState();
+      const wallet = connectedWallet(state);
+      const provider = solanaProvider();
+      const submission = await core.buildWorkerSubmission({
+        entry,
+        markdown: textarea.value,
+        workerAddress: wallet || null,
+      });
+      const signedSubmission = await signWorkerSubmission(provider, submission, wallet);
+      const nextState = readState();
+      nextState.workerSubmissions = {
+        ...(nextState.workerSubmissions || {}),
+        [workerSubmissionKey(entry)]: signedSubmission,
+      };
+      nextState.solana = {
+        ...(nextState.solana || {}),
+        ...readSolanaConfig(),
+        attestResultHash: signedSubmission.result_hash_bytes32,
+      };
+      writeState(nextState);
+      setFormFromState(nextState);
+      render();
+      setStatus(`Captured submission ${shortHash(signedSubmission.result_hash_bytes32)}`, "success");
+    } catch (error) {
+      setStatus(error.message, "error");
+    } finally {
+      if (button) button.disabled = false;
+    }
+  }
+
+  async function onCopyWorkerSubmission(entry) {
+    try {
+      const submission = workerSubmissionForEntry(readState(), entry);
+      if (!submission) throw new Error("Capture a submission first");
+      if (!navigator.clipboard || !navigator.clipboard.writeText) throw new Error("Clipboard API is unavailable");
+      await navigator.clipboard.writeText(JSON.stringify(submission, null, 2));
+      setStatus("Copied submission proof JSON", "success");
+    } catch (error) {
+      setStatus(error.message, "error");
+    }
+  }
+
+  function renderWorkerSubmission(entry, state) {
+    if (entry.completed_status || entry.status === "completed") return null;
+    const latest = workerSubmissionForEntry(state, entry);
+    const panel = document.createElement("div");
+    panel.className = "worker-submission";
+
+    const label = document.createElement("div");
+    label.className = "worker-submission-label";
+    label.textContent = "Worker Submission";
+
+    const textarea = document.createElement("textarea");
+    textarea.className = "worker-output";
+    textarea.spellcheck = true;
+    textarea.placeholder = "Paste markdown output";
+    textarea.value = latest && latest.output ? latest.output.markdown : "";
+
+    const actions = document.createElement("div");
+    actions.className = "actions";
+    const capture = document.createElement("button");
+    capture.type = "button";
+    capture.textContent = "Capture Submission";
+    capture.addEventListener("click", () => onCaptureWorkerSubmission(entry, textarea, capture));
+    actions.append(capture);
+    if (latest) {
+      const copy = document.createElement("button");
+      copy.type = "button";
+      copy.textContent = "Copy Proof";
+      copy.addEventListener("click", () => onCopyWorkerSubmission(entry));
+      actions.append(copy);
+    }
+
+    panel.append(label, textarea, actions);
+    if (latest) {
+      const proof = document.createElement("div");
+      proof.className = "submission-proof";
+      proof.append(
+        metaItem("Result hash", shortHash(latest.result_hash_bytes32)),
+        metaItem("Local verdict", latest.local_verdict),
+        metaItem("Signature", latest.signature ? "signed" : "unsigned"),
+      );
+      panel.append(proof);
+      const proofJson = document.createElement("textarea");
+      proofJson.className = "submission-json";
+      proofJson.readOnly = true;
+      proofJson.spellcheck = false;
+      proofJson.value = JSON.stringify(latest, null, 2);
+      panel.append(proofJson);
+    }
+    return panel;
   }
 
   function feedSourceText(state) {
@@ -461,8 +594,11 @@
     footer.append(actionGroup, actionButton);
 
     const taskBrief = renderTaskBrief(entry);
-    if (taskBrief) card.append(header, taskBrief, meta, footer);
-    else card.append(header, meta, footer);
+    const workerSubmission = renderWorkerSubmission(entry, state);
+    card.append(header);
+    if (taskBrief) card.append(taskBrief);
+    if (workerSubmission) card.append(workerSubmission);
+    card.append(meta, footer);
     return card;
   }
 

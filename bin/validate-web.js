@@ -16,7 +16,9 @@ const SOLANA_RELEASE_PLAN = "examples/solana-devnet/summarize_url_spl.release-pl
 const SOLANA_TIMEOUT_FUNDING = "examples/solana-devnet/summarize_url_timeout_job_spl.funding.live.json";
 const SOLANA_TIMEOUT_ACCOUNT = "examples/solana-devnet/summarize_url_timeout_job_spl.task-account.live.json";
 const SOLANA_TIMEOUT_PLAN = "examples/solana-devnet/summarize_url_timeout_job_spl.timeout-refund-plan.live.json";
+const SUBMISSION = "examples/submissions/summarize_url.pass.md";
 const DUMMY_BLOCKHASH = "11111111111111111111111111111111";
+const EXPECTED_SUBMISSION_HASH = "sha256:0bdfacb7e0ec2c3241da82c7b812b1a0fa28945b47c7f8a6b113b4de3779776f";
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -42,6 +44,8 @@ function assertNoExternalRuntimeDependencies() {
   assert(html.includes("attest-result-hash"), "index should expose Solana attest result hash");
   assert(html.includes("feed-import"), "index should expose feed JSON import");
   assert(html.includes("feed-files"), "index should expose feed file import");
+  assert(read(path.join(WEB_DIR, "app.js")).includes("worker-output"), "app should expose worker output capture");
+  assert(read(path.join(WEB_DIR, "app.js")).includes("submission-json"), "app should expose submission proof JSON");
 
   for (const file of ["app.js", "demo-index.js", "tasc-web-core.js"]) {
     const source = read(path.join(WEB_DIR, file));
@@ -133,6 +137,36 @@ function assertFeedImportPayloads() {
     rejected = true;
   }
   assert(rejected, "invalid feed import should be rejected");
+}
+
+async function assertWorkerSubmissionCapture() {
+  const entry = demoIndex.entries[0];
+  const markdown = read(SUBMISSION);
+  const submission = await core.buildWorkerSubmission({
+    entry,
+    markdown,
+    workerAddress: "BfRmLmH7ksPRCRxNBi7c8SspN7zKoyuAPKrJMDL5uQCJ",
+    submittedAt: "2026-01-01T00:00:00.000Z",
+  });
+  assert(submission.kind === "tasc.worker.submission", "worker submission kind mismatch");
+  assert(submission.task_hash === entry.task_hash, "worker submission task hash mismatch");
+  assert(submission.input_hash === entry.input_hash, "worker submission input hash mismatch");
+  assert(submission.result_hash === EXPECTED_SUBMISSION_HASH, "worker submission result hash mismatch");
+  assert(submission.result_hash_bytes32 === `0x${EXPECTED_SUBMISSION_HASH.slice("sha256:".length)}`, "worker submission bytes32 hash mismatch");
+  assert(submission.output.markdown === markdown, "worker submission markdown mismatch");
+  assert(submission.checks.some((check) => check.rule.op === "min_words" && check.pass === true), "worker submission min_words preview mismatch");
+  assert(submission.checks.some((check) => check.rule.op === "contains_citation" && check.pass === true), "worker submission citation preview mismatch");
+  assert(submission.checks.some((check) => check.rule.op === "no_duplicate" && check.pass === null), "worker submission duplicate check should require verifier");
+  assert(submission.local_verdict === "needs_verifier", "worker submission local verdict mismatch");
+  assert(/^sha256:[a-f0-9]{64}$/.test(`sha256:${await core.sha256HexFromText(core.canonicalize(submission))}`), "submission canonical message hash mismatch");
+
+  let rejected = false;
+  try {
+    await core.buildWorkerSubmission({ entry, markdown: "" });
+  } catch {
+    rejected = true;
+  }
+  assert(rejected, "empty worker submission should be rejected");
 }
 
 function entryFromFunding(funding) {
@@ -311,6 +345,7 @@ async function main() {
   assertBundledSolanaIndexMatchesFixture();
   assertSolanaTaskAccountDecode();
   assertFeedImportPayloads();
+  await assertWorkerSubmissionCapture();
   await assertSolanaLifecycleTransactionBuilds();
 
   process.stdout.write(`${JSON.stringify({
@@ -321,6 +356,7 @@ async function main() {
     bundled_solana_index: SOLANA_INDEX,
     solana_task_account_fixture: SOLANA_LIFECYCLE_ACCOUNT,
     feed_import_shapes: ["tasc.index", "tasc.index.entry[]", "tasc.solana-devnet.proof"],
+    worker_submission_capture: "tasc.worker.submission",
     solana_wallet_transaction_builds: ["claim", "attest", "release", "refund", "timeout-refund"],
     external_runtime_dependencies: 0,
     next: "Open web/index.html or deploy web/ as static files.",

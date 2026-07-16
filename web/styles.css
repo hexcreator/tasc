@@ -461,6 +461,39 @@ button:disabled {
   overflow-wrap: anywhere;
 }
 
+.worker-submission {
+  display: grid;
+  gap: 10px;
+  border: 1px solid #b6e5d9;
+  border-radius: 8px;
+  padding: 12px;
+  background: #fbfffd;
+}
+
+.worker-submission-label {
+  color: var(--accent-dark);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.worker-output {
+  min-height: 142px;
+}
+
+.submission-proof {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.submission-json {
+  min-height: 150px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: 12px;
+  white-space: pre;
+}
+
 .claimable-meta {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -558,6 +591,10 @@ a:hover {
   }
 
   .grid-two {
+    grid-template-columns: 1fr;
+  }
+
+  .submission-proof {
     grid-template-columns: 1fr;
   }
 
