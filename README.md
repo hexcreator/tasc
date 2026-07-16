@@ -176,9 +176,16 @@ For the local private-beta operator session, run:
 npm run beta:plan
 npm run beta:local
 npm run beta:qa
+npm run beta:feed
 ```
 
 `beta:local` serves the static app and verifier API together on localhost, prints the app URL, verifier URL, local config URL, and bearer token, writes verifier artifacts under `.tascverifier/`, and lets the app auto-fill the Verifier API panel from same-origin local config. After a wallet-extension run, use `Export QA Evidence` to download a redacted `tasc.private_beta.qa_evidence` bundle with feed state, verifier results, and wallet transaction signatures.
+
+`beta:feed` builds the same-origin static feed bundle at `web/feed/proof-feed.json`. The static app's `Load Hosted Feed` button fetches that bundle without a backend, so `web/` can be served by free static hosting. After a fresh devnet proof run, rebuild the hosted feed with:
+
+```bash
+npm run beta:feed -- --proof-summary examples/solana-devnet/proofs/<run-id>/proof-summary.json
+```
 
 `beta:qa` prints the wallet QA runbook when no evidence path is provided. Validate a real exported bundle with:
 
@@ -247,7 +254,7 @@ The best first contributions are narrow and verifiable:
 - harden live Solana `claim`, `attest`, `release`, and `refund`
 - add dispute handling around release/refund eligibility
 - harden duplicate-task, finality, and concurrency handling around the live Solana proofs
-- publish fresh proof indexes as static feed artifacts
+- publish fresh proof indexes as static feed artifacts with `npm run beta:feed`
 - deploy the verifier API and feed its durable proof artifacts back into hosted task indexes
 - live-test the guarded Solana operator console in wallet-extension browsers
 - use `npm run beta:local` as the local operator session while testing Phantom/Solflare flows

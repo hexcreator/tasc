@@ -1,0 +1,101 @@
+{
+  "ok": true,
+  "kind": "tasc.solana-devnet.proof",
+  "version": "0.1",
+  "mode": "static-proof-feed",
+  "generated_at": "1970-01-01T00:00:00.000Z",
+  "generated_by": "bin/build-static-feed.js",
+  "static_feed": {
+    "public_prefix": "feed",
+    "files": [
+      {
+        "branch": "release",
+        "role": "claimable",
+        "source": "examples/index/solana.spl.live.index.json",
+        "path": "feed/release.claimable.index.json",
+        "sha256": "1b2eea1f4bcc340a50cf7cc362bcdd2c937d04119078dbc3360d816789bc6111",
+        "bytes": 3955,
+        "entries": 1,
+        "statuses": [
+          "claimable"
+        ]
+      },
+      {
+        "branch": "release",
+        "role": "completed",
+        "source": "examples/index/solana.spl.release.index.json",
+        "path": "feed/release.completed.index.json",
+        "sha256": "d2c24fc17551d766a29b23dc4cb32d02d6075469ed46743d04084503a2cb7bfa",
+        "bytes": 3920,
+        "entries": 1,
+        "statuses": [
+          "completed"
+        ]
+      },
+      {
+        "branch": "refund",
+        "role": "claimable",
+        "source": "examples/index/solana.spl.refund-job.claimable.index.json",
+        "path": "feed/refund.claimable.index.json",
+        "sha256": "9c1be38dac6a5d2d8347632d834d2a489a7be59fe32e8b626a59327d38af9a5f",
+        "bytes": 2126,
+        "entries": 1,
+        "statuses": [
+          "claimable"
+        ]
+      },
+      {
+        "branch": "refund",
+        "role": "completed",
+        "source": "examples/index/solana.spl.refund.index.json",
+        "path": "feed/refund.completed.index.json",
+        "sha256": "4e09fb8555248cc559b62be02229bdd236348fe818e49f0449daceca39760ba8",
+        "bytes": 2086,
+        "entries": 1,
+        "statuses": [
+          "completed"
+        ]
+      },
+      {
+        "branch": "timeout",
+        "role": "claimable",
+        "source": "examples/index/solana.spl.timeout-job.claimable.index.json",
+        "path": "feed/timeout.claimable.index.json",
+        "sha256": "ad0604f0e71984fbaf329e7f49522cebe90c7f829b99789cbc9b490ba2e0a803",
+        "bytes": 2123,
+        "entries": 1,
+        "statuses": [
+          "claimable"
+        ]
+      },
+      {
+        "branch": "timeout",
+        "role": "completed",
+        "source": "examples/index/solana.spl.timeout-refund.index.json",
+        "path": "feed/timeout.completed.index.json",
+        "sha256": "4477b353de2dac572a21b6b3bc72861b56740239d6870c875d589bb8c5e2fcb2",
+        "bytes": 2074,
+        "entries": 1,
+        "statuses": [
+          "completed"
+        ]
+      }
+    ],
+    "no_secrets": true,
+    "no_new_dependencies": true
+  },
+  "branches": {
+    "release": {
+      "claimable_index_file": "feed/release.claimable.index.json",
+      "completed_index_file": "feed/release.completed.index.json"
+    },
+    "refund": {
+      "claimable_index_file": "feed/refund.claimable.index.json",
+      "completed_index_file": "feed/refund.completed.index.json"
+    },
+    "timeout": {
+      "claimable_index_file": "feed/timeout.claimable.index.json",
+      "completed_index_file": "feed/timeout.completed.index.json"
+    }
+  }
+}

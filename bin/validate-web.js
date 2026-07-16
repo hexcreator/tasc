@@ -11,6 +11,7 @@ const FUNDING = "examples/funding/summarize_url.from-log.json";
 const HANDOFF = "examples/testnet/base-sepolia.handoff.example.json";
 const SOLANA_INDEX = "examples/index/solana.spl.live.index.json";
 const SOLANA_RELEASE_INDEX = "examples/index/solana.spl.release.index.json";
+const HOSTED_FEED = "web/feed/proof-feed.json";
 const SOLANA_LIFECYCLE_ACCOUNT = "examples/solana-devnet/summarize_url_spl.lifecycle-account.live.json";
 const SOLANA_RELEASE_PLAN = "examples/solana-devnet/summarize_url_spl.release-plan.live.json";
 const SOLANA_TIMEOUT_FUNDING = "examples/solana-devnet/summarize_url_timeout_job_spl.funding.live.json";
@@ -44,6 +45,7 @@ function assertNoExternalRuntimeDependencies() {
   assert(html.includes("attest-result-hash"), "index should expose Solana attest result hash");
   assert(html.includes("feed-import"), "index should expose feed JSON import");
   assert(html.includes("feed-files"), "index should expose feed file import");
+  assert(html.includes("load-hosted-feed"), "index should expose hosted feed loader");
   assert(html.includes("verifier-api-url"), "index should expose verifier API URL");
   assert(html.includes("verifier-api-token"), "index should expose verifier API token");
   assert(html.includes("export-qa-evidence"), "index should expose private beta QA evidence export");
@@ -56,6 +58,7 @@ function assertNoExternalRuntimeDependencies() {
   assert(app.includes("authorization = `Bearer ${token}`"), "app should send verifier bearer auth when configured");
   assert(app.includes("JSON.stringify({ submission })"), "app should submit captured worker proof JSON");
   assert(app.includes("loadLocalBetaConfig"), "app should load local beta verifier config when served");
+  assert(app.includes("./feed/proof-feed.json"), "app should load same-origin hosted proof feed");
   assert(app.includes("./tasc-local-config.json"), "app should look for same-origin local beta config");
   assert(app.includes("tasc.private_beta.local_config"), "app should require local beta config kind");
   assert(app.includes("source: \"local-beta\""), "app should tag auto-filled local beta verifier config");
@@ -154,6 +157,12 @@ function assertFeedImportPayloads() {
   assert(fromProof.entries.length === 0, "proof summary should not invent entries without referenced indexes");
   assert(fromProof.index_paths.includes(SOLANA_INDEX), "proof summary claimable index path missing");
   assert(fromProof.index_paths.includes(SOLANA_RELEASE_INDEX), "proof summary completed index path missing");
+
+  const hostedProof = loadJson(HOSTED_FEED);
+  const fromHostedProof = core.indexEntriesFromImportPayload(hostedProof);
+  assert(fromHostedProof.entries.length === 0, "hosted proof summary should fetch referenced indexes");
+  assert(fromHostedProof.index_paths.includes("feed/release.claimable.index.json"), "hosted feed release claimable path missing");
+  assert(fromHostedProof.index_paths.includes("feed/release.completed.index.json"), "hosted feed release completed path missing");
 
   let rejected = false;
   try {

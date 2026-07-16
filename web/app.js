@@ -4,10 +4,12 @@
   const core = window.TascWebCore;
   const demoIndex = window.TascDemoIndex;
   const storageKey = "global-tasc.web.feed.v1";
+  const hostedFeedPath = "./feed/proof-feed.json";
   const defaultAttestResultHash = "0x0bdfacb7e0ec2c3241da82c7b812b1a0fa28945b47c7f8a6b113b4de3779776f";
 
   const el = {
     loadDemo: document.querySelector("#load-demo"),
+    loadHostedFeed: document.querySelector("#load-hosted-feed"),
     feedImport: document.querySelector("#feed-import"),
     feedFiles: document.querySelector("#feed-files"),
     importFeed: document.querySelector("#import-feed"),
@@ -1067,32 +1069,50 @@
     return payloads;
   }
 
+  async function importFeedPayloads(payloads, label) {
+    let importedEntries = [];
+    let referencedPaths = [];
+    for (const payload of payloads) {
+      const imported = await entriesFromImportPayload(payload);
+      importedEntries = core.mergeIndexEntries(importedEntries, imported.entries);
+      referencedPaths = [...referencedPaths, ...imported.indexPaths];
+    }
+    if (importedEntries.length === 0) throw new Error("No index entries found in import");
+    const state = readState();
+    state.claimableEntries = core.mergeIndexEntries(state.claimableEntries || [], importedEntries);
+    state.feedSource = {
+      label: label || (referencedPaths.length > 0 ? "Imported proof bundle" : "Imported feed"),
+      count: importedEntries.length,
+      importedAt: new Date().toISOString(),
+    };
+    state.solana = {
+      ...(state.solana || {}),
+      ...readSolanaConfig(),
+    };
+    writeState(state);
+    render();
+    return importedEntries.length;
+  }
+
+  async function onLoadHostedFeed() {
+    el.loadHostedFeed.disabled = true;
+    try {
+      const payload = await fetchImportJson(hostedFeedPath);
+      const importedCount = await importFeedPayloads([payload], "Hosted static feed");
+      setStatus(`Loaded ${importedCount} hosted feed task(s)`, "success");
+    } catch (error) {
+      setStatus(error.message, "error");
+    } finally {
+      el.loadHostedFeed.disabled = false;
+    }
+  }
+
   async function onImportFeed() {
     el.importFeed.disabled = true;
     try {
       const payloads = await payloadsFromFeedInputs();
-      let importedEntries = [];
-      let referencedPaths = [];
-      for (const payload of payloads) {
-        const imported = await entriesFromImportPayload(payload);
-        importedEntries = core.mergeIndexEntries(importedEntries, imported.entries);
-        referencedPaths = [...referencedPaths, ...imported.indexPaths];
-      }
-      if (importedEntries.length === 0) throw new Error("No index entries found in import");
-      const state = readState();
-      state.claimableEntries = core.mergeIndexEntries(state.claimableEntries || [], importedEntries);
-      state.feedSource = {
-        label: referencedPaths.length > 0 ? "Imported proof bundle" : "Imported feed",
-        count: importedEntries.length,
-        importedAt: new Date().toISOString(),
-      };
-      state.solana = {
-        ...(state.solana || {}),
-        ...readSolanaConfig(),
-      };
-      writeState(state);
-      render();
-      setStatus(`Imported ${importedEntries.length} feed task(s)`, "success");
+      const importedCount = await importFeedPayloads(payloads);
+      setStatus(`Imported ${importedCount} feed task(s)`, "success");
     } catch (error) {
       setStatus(error.message, "error");
     } finally {
@@ -1322,6 +1342,7 @@
     render();
     loadLocalBetaConfig();
     el.loadDemo.addEventListener("click", onLoadDemo);
+    el.loadHostedFeed.addEventListener("click", onLoadHostedFeed);
     el.importFeed.addEventListener("click", onImportFeed);
     el.connectSolana.addEventListener("click", onConnectSolana);
     el.refreshSolana.addEventListener("click", onRefreshSolana);

@@ -10,6 +10,7 @@ web/styles.css
 web/tasc-web-core.js
 web/demo-index.js
 web/app.js
+web/feed/proof-feed.json
 ```
 
 There is no build step, no bundled dependency, no hosted database, and no required indexer service.
@@ -21,6 +22,7 @@ EVM:     browser -> RPC eth_blockNumber -> confirmed range -> RPC eth_getLogs ->
 Solana:  browser -> RPC getAccountInfo(task_pda) -> decode 276-byte task account -> role/action readiness
 Solana:  browser -> wallet sign -> RPC sendTransaction -> refreshed task-account status
 Import:  paste/select tasc.index JSON -> merge entries -> refresh live Solana status
+Hosted:  click Load Hosted Feed -> fetch same-origin proof summary -> fetch referenced feed indexes
 Submit:  markdown output -> tasc.worker.submission proof -> POST /v1/ingest -> tasc.verifier.ingestion -> attest controls
 ```
 
@@ -50,6 +52,12 @@ Supported import payloads:
 - `tasc.index` JSON files
 - raw arrays of `tasc.index.entry` objects
 - `tasc.solana-devnet.proof` summaries, when the referenced index JSON files are served from the same static host
+
+`npm run beta:feed` builds `web/feed/proof-feed.json` plus the referenced branch indexes. The hosted feed loader fetches that same-origin summary from `./feed/proof-feed.json`, so a free static host can serve the current public proof bundle without a backend, database, or artifact proxy. For a fresh private-beta run, point the builder at a newly generated proof summary:
+
+```sh
+npm run beta:feed -- --proof-summary examples/solana-devnet/proofs/<run-id>/proof-summary.json
+```
 
 Completed index entries replace older claimable entries for the same Solana task account, so proof bundles can show the final `Released` or `Refunded` state instead of duplicating the same task.
 
@@ -200,6 +208,7 @@ The canonical data source remains Base logs, not the static host. If the static 
 Run:
 
 ```sh
+npm run validate:static-feed
 npm run validate:web
 npm run validate:verifier-ingest
 npm run validate:verifier-api
@@ -216,6 +225,7 @@ The validator checks that:
 - the generated `eth_getLogs` filter matches the escrow and `Funded` topic
 - the browser Solana task-account decoder matches a committed live Solana lifecycle account fixture
 - the browser accepts `tasc.index`, raw entry arrays, and proof-summary import shapes
+- the same-origin hosted feed bundle references six public branch index files and merges to the release/refund/timeout completed proof entries
 - the bundled Solana feed exposes signed task input metadata and input hash
 - browser worker submission capture matches the CLI verifier result hash format
 - verifier ingestion converts a captured proof into a `tasc.attestation` and Solana-ready attest hash
