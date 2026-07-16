@@ -275,10 +275,12 @@ Check whether the real `$10 in less than a minute` goal is actually ready:
 npm run real:readiness:plan
 npm run real:readiness -- \
   --timed-proof examples/solana-devnet/proofs/<run-id>/proof-summary.json \
-  --production-payout <production-payout-evidence.json>
+  --production-payout <production-payout-evidence.json> \
+  --production-rpc-url <mainnet-rpc-url> \
+  --expected-genesis-hash <mainnet-genesis-hash>
 ```
 
-`real:readiness` accepts the devnet timed proof as a prerequisite, but it refuses to mark the goal ready until a non-example mainnet USDC payout artifact proves funding, claim, attest, release, post-release balances, and under-60-second timing. The schema example lives at `examples/private-beta/production-payout-evidence.example.json`.
+`real:readiness` accepts the devnet timed proof as a prerequisite, but it refuses to mark the goal ready until a non-example mainnet USDC payout artifact proves funding, claim, attest, release, post-release balances, under-60-second timing, and live RPC verification. The live check verifies the RPC genesis hash, transaction confirmations, and SPL token-account balances without printing the full RPC URL. The schema example lives at `examples/private-beta/production-payout-evidence.example.json`.
 
 ## Why Tasc Might Work
 

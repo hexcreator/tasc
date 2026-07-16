@@ -454,7 +454,7 @@ npm run real:readiness -- \
   --timed-proof examples/solana-devnet/proofs/<run-id>/proof-summary.json
 ```
 
-That command should still report `ready_for_goal: false` until a non-example production payout artifact is supplied with `--production-payout`. The required artifact shape is `examples/private-beta/production-payout-evidence.example.json`; it must represent mainnet USDC, not devnet/test-token evidence.
+That command should still report `ready_for_goal: false` until a non-example production payout artifact is supplied with `--production-payout` and verified through `--production-rpc-url` plus `--expected-genesis-hash`. The required artifact shape is `examples/private-beta/production-payout-evidence.example.json`; it must represent mainnet USDC, not devnet/test-token evidence. The live RPC check verifies the genesis hash, fund/claim/attest/release signature confirmations, vault token-account balance, and worker destination token-account balance.
 
 The next real implementation steps are:
 

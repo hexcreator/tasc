@@ -3,11 +3,21 @@
 const fs = require("fs");
 const path = require("path");
 const { validate: validateTimedPayout } = require("./validate-timed-payout-proof");
+const {
+  TOKEN_PROGRAM_ID,
+  decodeTokenAccountData,
+  encodeTokenAccount,
+} = require("./tascsolana-spl");
 
 const ROOT = path.resolve(__dirname, "..");
 const TARGET_MS = 60_000;
 const MIN_USDC_BASE_UNITS = 10_000_000n;
 const TEST_NETWORK_RE = /(devnet|testnet|sepolia|local|mock|fixture|example)/i;
+const CONFIRMATION_ORDER = {
+  processed: 0,
+  confirmed: 1,
+  finalized: 2,
+};
 
 function usage() {
   console.error([
@@ -19,6 +29,9 @@ function usage() {
     "Options:",
     "  --timed-proof <proof-summary.json>          devnet timed payout proof from npm run earn:devnet",
     "  --production-payout <evidence.json>         real-money payout evidence JSON",
+    "  --production-rpc-url <url>                  Solana mainnet RPC URL for live verification",
+    "  --expected-genesis-hash <hash>              expected mainnet genesis hash for the RPC",
+    "  --min-confirmation <status>                 processed, confirmed, or finalized; default finalized",
     "  --allow-example                            validate example fixture schema without marking ready",
   ].join("\n"));
   process.exit(1);
@@ -42,6 +55,9 @@ function parseArgs(argv) {
     command: "validate",
     timedProof: "",
     productionPayout: "",
+    productionRpcUrl: "",
+    expectedGenesisHash: "",
+    minConfirmation: "finalized",
     allowExample: false,
     selfTest: false,
   };
@@ -55,6 +71,15 @@ function parseArgs(argv) {
     } else if (arg === "--production-payout") {
       options.productionPayout = args[++i] || "";
       if (!options.productionPayout) usage();
+    } else if (arg === "--production-rpc-url") {
+      options.productionRpcUrl = args[++i] || "";
+      if (!options.productionRpcUrl) usage();
+    } else if (arg === "--expected-genesis-hash") {
+      options.expectedGenesisHash = args[++i] || "";
+      if (!options.expectedGenesisHash) usage();
+    } else if (arg === "--min-confirmation") {
+      options.minConfirmation = args[++i] || "";
+      if (!Object.prototype.hasOwnProperty.call(CONFIRMATION_ORDER, options.minConfirmation)) usage();
     } else if (arg === "--allow-example") {
       options.allowExample = true;
     } else if (arg === "--self-test") {
@@ -85,6 +110,12 @@ function assertBaseUnits(value, label) {
 function assertSignature(value, label) {
   assertString(value, label);
   assert(/^[1-9A-HJ-NP-Za-km-z]{40,100}$/.test(value), `${label} must look like a Solana signature`);
+}
+
+function assertHttpUrl(value, label) {
+  assertString(value, label);
+  const url = new URL(value);
+  assert(url.protocol === "http:" || url.protocol === "https:", `${label} must be http(s)`);
 }
 
 function validateProductionPayout(payload, options = {}) {
@@ -185,10 +216,145 @@ function validateProductionPayout(payload, options = {}) {
   };
 }
 
-function validateReadiness(options = {}) {
+function confirmationStatusName(status) {
+  if (!status) return "";
+  if (status.confirmationStatus && Object.prototype.hasOwnProperty.call(CONFIRMATION_ORDER, status.confirmationStatus)) {
+    return status.confirmationStatus;
+  }
+  if (status.confirmations === null) return "finalized";
+  if (Number.isInteger(status.confirmations)) return "confirmed";
+  return "";
+}
+
+function assertConfirmationAtLeast(status, minimum, label) {
+  const actual = confirmationStatusName(status);
+  assert(actual, `${label} confirmation status is missing`);
+  assert(CONFIRMATION_ORDER[actual] >= CONFIRMATION_ORDER[minimum], `${label} confirmation ${actual} is below ${minimum}`);
+}
+
+async function defaultRpcCall(rpcUrl, method, params) {
+  assert(typeof fetch === "function", "global fetch is required for Solana RPC verification");
+  const response = await fetch(rpcUrl, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ jsonrpc: "2.0", id: Date.now(), method, params }),
+  });
+  if (!response.ok) throw new Error(`Solana RPC HTTP ${response.status}`);
+  const payload = await response.json();
+  if (payload.error) throw new Error(payload.error.message || "Solana RPC error");
+  return payload.result;
+}
+
+function rpcHost(rpcUrl) {
+  return new URL(rpcUrl).host;
+}
+
+function signatureList(payload) {
+  const signatures = payload.signatures || {};
+  return [
+    ["fund", signatures.fund],
+    ["claim", signatures.claim],
+    ["attest", signatures.attest],
+    ["release", signatures.release],
+  ];
+}
+
+async function verifyProductionSignatures(payload, options, rpcCall) {
+  const signatures = signatureList(payload);
+  const values = signatures.map(([, signature]) => signature);
+  const result = await rpcCall(options.productionRpcUrl, "getSignatureStatuses", [
+    values,
+    { searchTransactionHistory: true },
+  ]);
+  const statuses = result && Array.isArray(result.value) ? result.value : [];
+  assert(statuses.length === values.length, "production RPC signature status count mismatch");
+  const checked = {};
+  signatures.forEach(([label, signature], index) => {
+    const status = statuses[index];
+    assert(status, `production RPC status missing for ${label} signature ${signature}`);
+    assert(!status.err, `production ${label} transaction has error ${JSON.stringify(status.err)}`);
+    assertConfirmationAtLeast(status, options.minConfirmation, `production ${label} transaction`);
+    checked[label] = {
+      signature,
+      confirmation_status: confirmationStatusName(status),
+    };
+  });
+  return {
+    checked: signatures.length,
+    minimum_confirmation: options.minConfirmation,
+    signatures: checked,
+  };
+}
+
+async function fetchTokenAccount(rpcUrl, pubkey, options, rpcCall) {
+  const result = await rpcCall(rpcUrl, "getAccountInfo", [
+    pubkey,
+    {
+      commitment: options.minConfirmation,
+      encoding: "base64",
+    },
+  ]);
+  const value = result && result.value;
+  assert(value, `production token account ${pubkey} not found`);
+  assert(value.owner === TOKEN_PROGRAM_ID, `production token account ${pubkey} must be owned by SPL Token Program`);
+  assert(Array.isArray(value.data) && value.data[1] === "base64", `production token account ${pubkey} must return base64 data`);
+  return {
+    pubkey,
+    owner: value.owner,
+    decoded: decodeTokenAccountData(value.data[0]),
+  };
+}
+
+async function verifyProductionTokenAccounts(payload, options, rpcCall) {
+  const settlement = payload.settlement || {};
+  const token = payload.token || {};
+  const amount = payload.amount || {};
+  const vault = await fetchTokenAccount(options.productionRpcUrl, settlement.vault_token_account, options, rpcCall);
+  const destination = await fetchTokenAccount(options.productionRpcUrl, settlement.destination_token_account, options, rpcCall);
+  assert(vault.decoded.mint === token.mint, "production vault token account mint mismatch");
+  assert(destination.decoded.mint === token.mint, "production destination token account mint mismatch");
+  assert(vault.decoded.amount === settlement.vault_balance_after, "production vault token account balance mismatch");
+  assert(destination.decoded.amount === settlement.destination_balance_after, "production destination token account balance mismatch");
+  assert(BigInt(destination.decoded.amount) >= BigInt(amount.base_units), "production destination token account does not hold released amount");
+  return {
+    checked: 2,
+    token_program_id: TOKEN_PROGRAM_ID,
+    token_mint: token.mint,
+    vault_token_account: {
+      pubkey: vault.pubkey,
+      amount: vault.decoded.amount,
+    },
+    destination_token_account: {
+      pubkey: destination.pubkey,
+      amount: destination.decoded.amount,
+    },
+  };
+}
+
+async function verifyProductionRpc(payload, options = {}, rpcCall = defaultRpcCall) {
+  assertHttpUrl(options.productionRpcUrl, "production RPC URL");
+  assertString(options.expectedGenesisHash, "expected genesis hash");
+  const genesisHash = await rpcCall(options.productionRpcUrl, "getGenesisHash", []);
+  assert(genesisHash === options.expectedGenesisHash, "production RPC genesis hash mismatch");
+  const signatures = await verifyProductionSignatures(payload, options, rpcCall);
+  const tokenAccounts = await verifyProductionTokenAccounts(payload, options, rpcCall);
+  return {
+    ok: true,
+    rpc_host: rpcHost(options.productionRpcUrl),
+    rpc_url_printed: false,
+    genesis_hash: genesisHash,
+    minimum_confirmation: options.minConfirmation,
+    signatures,
+    token_accounts: tokenAccounts,
+  };
+}
+
+async function validateReadiness(options = {}) {
   const missing = [];
   let timedProof = null;
   let productionPayout = null;
+  let productionRpc = null;
+  let productionPayload = null;
 
   if (options.timedProof) {
     timedProof = validateTimedPayout(path.resolve(options.timedProof));
@@ -197,17 +363,22 @@ function validateReadiness(options = {}) {
   }
 
   if (options.productionPayout) {
-    productionPayout = validateProductionPayout(loadJson(options.productionPayout), {
+    productionPayload = loadJson(options.productionPayout);
+    productionPayout = validateProductionPayout(productionPayload, {
       allowExample: options.allowExample,
     });
     if (!productionPayout.real_money_ready) {
       missing.push("non-example real-money payout evidence");
+    } else if (!options.productionRpcUrl || !options.expectedGenesisHash) {
+      missing.push("live mainnet RPC verification");
+    } else {
+      productionRpc = await verifyProductionRpc(productionPayload, options, options.rpcCall || defaultRpcCall);
     }
   } else {
     missing.push("real USDC production payout evidence");
   }
 
-  const ready = Boolean(timedProof && productionPayout && productionPayout.real_money_ready);
+  const ready = Boolean(timedProof && productionPayout && productionPayout.real_money_ready && productionRpc);
   return {
     ok: true,
     kind: "tasc.real_money.readiness",
@@ -223,9 +394,11 @@ function validateReadiness(options = {}) {
       }
       : null,
     production_payout: productionPayout,
+    production_rpc: productionRpc,
     missing,
     next_required_evidence: ready ? [] : [
       "mainnet production asset funding evidence",
+      "mainnet RPC genesis hash verification",
       "mainnet worker claim signature",
       "mainnet verifier attest signature",
       "mainnet release signature",
@@ -237,18 +410,23 @@ function validateReadiness(options = {}) {
   };
 }
 
-function plan(options = {}) {
-  const result = validateReadiness(options);
+async function plan(options = {}) {
+  const result = await validateReadiness({
+    ...options,
+    productionRpcUrl: "",
+    expectedGenesisHash: "",
+  });
   return {
     ...result,
     mode: "plan",
     sends_transactions: false,
+    calls_rpc: false,
     writes_files: false,
     production_schema_example: "examples/private-beta/production-payout-evidence.example.json",
     commands: {
       devnet_timed_proof: "GLOBAL_TASC_ALLOW_SOLANA_DEVNET_PROOF=1 npm run earn:devnet",
       validate_timed_proof: "npm run validate:timed-payout -- examples/solana-devnet/proofs/<run-id>/proof-summary.json",
-      validate_readiness: "npm run real:readiness -- --timed-proof examples/solana-devnet/proofs/<run-id>/proof-summary.json --production-payout <production-payout-evidence.json>",
+      validate_readiness: "npm run real:readiness -- --timed-proof examples/solana-devnet/proofs/<run-id>/proof-summary.json --production-payout <production-payout-evidence.json> --production-rpc-url <mainnet-rpc-url> --expected-genesis-hash <mainnet-genesis-hash>",
     },
   };
 }
@@ -268,7 +446,7 @@ function sampleProductionEvidence(overrides = {}) {
     token: {
       symbol: "USDC",
       decimals: 6,
-      mint: "USDCMainnetMintAddressReplaceWithVerifiedMint111",
+      mint: "3RP5BZZnumXgV2ivCQSYkfDwRWuqpphcKJGBRzVH1TFx",
       production_asset: true,
     },
     amount: {
@@ -278,10 +456,10 @@ function sampleProductionEvidence(overrides = {}) {
     settlement: {
       completed_status: "Released",
       action: "release",
-      task_account: "TaskAccountMainnet1111111111111111111111111111",
-      vault_token_account: "VaultTokenMainnet11111111111111111111111111",
+      task_account: "9h2CPTQfhpQWD3fddC5tdcfMfLCJ4WtudZU8avAiDdCH",
+      vault_token_account: "Bu8kBFdxE6RwFbnz7cyLZDs7ixDrN2AabEPhWk24uE3u",
       destination_role: "worker",
-      destination_token_account: "WorkerTokenMainnet111111111111111111111111",
+      destination_token_account: "8LRqfMkLZnEwaQecoExQ3P8D9rrzNKvAiYqSLN8cHtFx",
       vault_balance_after: "0",
       destination_balance_after: "10000000",
     },
@@ -351,7 +529,45 @@ function sampleTimedProof(dir) {
   return summaryFile;
 }
 
-function selfTest() {
+function selfTestProductionRpc(payload, expectedGenesisHash, options = {}) {
+  const token = payload.token || {};
+  const settlement = payload.settlement || {};
+  return async (_rpcUrl, method, params) => {
+    if (method === "getGenesisHash") return options.badGenesis ? "wrong-genesis-hash" : expectedGenesisHash;
+    if (method === "getSignatureStatuses") {
+      return {
+        value: params[0].map(() => options.missingStatus ? null : {
+          err: null,
+          confirmationStatus: options.confirmationStatus || "finalized",
+        }),
+      };
+    }
+    if (method === "getAccountInfo") {
+      const pubkey = params[0];
+      let amount = null;
+      if (pubkey === settlement.vault_token_account) amount = options.nonzeroVault ? "1" : settlement.vault_balance_after;
+      if (pubkey === settlement.destination_token_account) amount = options.shortDestination ? "9999999" : settlement.destination_balance_after;
+      assert(amount !== null, `unexpected production self-test token account ${pubkey}`);
+      return {
+        value: {
+          owner: TOKEN_PROGRAM_ID,
+          data: [
+            encodeTokenAccount({
+              pubkey,
+              mint: token.mint,
+              owner: "BfRmLmH7ksPRCRxNBi7c8SspN7zKoyuAPKrJMDL5uQCJ",
+              amount,
+            }).toString("base64"),
+            "base64",
+          ],
+        },
+      };
+    }
+    throw new Error(`unexpected production self-test RPC method ${method}`);
+  };
+}
+
+async function selfTest() {
   fs.mkdirSync(path.join(ROOT, ".tascverifier"), { recursive: true });
   const dir = fs.mkdtempSync(path.join(ROOT, ".tascverifier", "real-readiness-"));
   const timedProofFile = sampleTimedProof(dir);
@@ -375,17 +591,29 @@ function selfTest() {
     },
   }));
 
-  const ready = validateReadiness({ timedProof: timedProofFile, productionPayout: realFile });
-  assert(ready.ready_for_goal === true, "real evidence should mark readiness true");
-  const missingProduction = validateReadiness({ timedProof: timedProofFile });
+  const productionPayload = loadJson(realFile);
+  const expectedGenesisHash = "mainnet-self-test-genesis-hash";
+  const ready = await validateReadiness({
+    timedProof: timedProofFile,
+    productionPayout: realFile,
+    productionRpcUrl: "http://127.0.0.1/mock-mainnet-rpc",
+    expectedGenesisHash,
+    minConfirmation: "finalized",
+    rpcCall: selfTestProductionRpc(productionPayload, expectedGenesisHash),
+  });
+  assert(ready.ready_for_goal === true, "real evidence plus RPC should mark readiness true");
+  const missingProduction = await validateReadiness({ timedProof: timedProofFile });
   assert(missingProduction.ready_for_goal === false, "missing production evidence should not be ready");
-  const example = validateReadiness({ timedProof: timedProofFile, productionPayout: exampleFile, allowExample: true });
+  const missingRpc = await validateReadiness({ timedProof: timedProofFile, productionPayout: realFile });
+  assert(missingRpc.ready_for_goal === false, "real evidence without RPC should not be ready");
+  assert(missingRpc.missing.includes("live mainnet RPC verification"), "missing RPC should be reported");
+  const example = await validateReadiness({ timedProof: timedProofFile, productionPayout: exampleFile, allowExample: true });
   assert(example.ready_for_goal === false, "example fixture should not be ready");
   assert(example.production_payout.schema_valid === true, "example fixture schema should validate");
 
   let rejectedDevnet = false;
   try {
-    validateReadiness({ timedProof: timedProofFile, productionPayout: devnetFile });
+    await validateReadiness({ timedProof: timedProofFile, productionPayout: devnetFile });
   } catch {
     rejectedDevnet = true;
   }
@@ -393,41 +621,72 @@ function selfTest() {
 
   let rejectedSmallAmount = false;
   try {
-    validateReadiness({ timedProof: timedProofFile, productionPayout: smallAmountFile });
+    await validateReadiness({ timedProof: timedProofFile, productionPayout: smallAmountFile });
   } catch {
     rejectedSmallAmount = true;
   }
   assert(rejectedSmallAmount, "underfunded production payout evidence should be rejected");
+
+  let rejectedBadGenesis = false;
+  try {
+    await validateReadiness({
+      timedProof: timedProofFile,
+      productionPayout: realFile,
+      productionRpcUrl: "http://127.0.0.1/mock-mainnet-rpc",
+      expectedGenesisHash,
+      minConfirmation: "finalized",
+      rpcCall: selfTestProductionRpc(productionPayload, expectedGenesisHash, { badGenesis: true }),
+    });
+  } catch {
+    rejectedBadGenesis = true;
+  }
+  assert(rejectedBadGenesis, "bad genesis hash should be rejected");
+
+  let rejectedShortDestination = false;
+  try {
+    await validateReadiness({
+      timedProof: timedProofFile,
+      productionPayout: realFile,
+      productionRpcUrl: "http://127.0.0.1/mock-mainnet-rpc",
+      expectedGenesisHash,
+      minConfirmation: "finalized",
+      rpcCall: selfTestProductionRpc(productionPayload, expectedGenesisHash, { shortDestination: true }),
+    });
+  } catch {
+    rejectedShortDestination = true;
+  }
+  assert(rejectedShortDestination, "short destination balance should be rejected");
 
   return {
     ok: true,
     self_test: true,
     ready_case: ready.ready_for_goal,
     missing_production_ready: missingProduction.ready_for_goal,
+    missing_rpc_ready: missingRpc.ready_for_goal,
     example_schema_valid: example.production_payout.schema_valid,
     rejected_devnet: rejectedDevnet,
     rejected_underfunded: rejectedSmallAmount,
+    rejected_bad_genesis: rejectedBadGenesis,
+    rejected_short_destination: rejectedShortDestination,
     no_new_dependencies: true,
   };
 }
 
-function main() {
+async function main() {
   const options = parseArgs(process.argv.slice(2));
   if (options.selfTest) {
-    process.stdout.write(`${JSON.stringify(selfTest(), null, 2)}\n`);
+    process.stdout.write(`${JSON.stringify(await selfTest(), null, 2)}\n`);
     return;
   }
-  const result = options.command === "plan" ? plan(options) : validateReadiness(options);
+  const result = options.command === "plan" ? await plan(options) : await validateReadiness(options);
   process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
 }
 
 if (require.main === module) {
-  try {
-    main();
-  } catch (error) {
+  main().catch((error) => {
     console.error(`validate-real-money-readiness: ${error.message}`);
     process.exit(1);
-  }
+  });
 }
 
 module.exports = {
