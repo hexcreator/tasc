@@ -630,13 +630,22 @@ async function selfTest() {
   assert(existingArtifact.source.token_account_exists === true, "existing account should be marked");
   validateArtifact(existingArtifact);
 
-  const manualWorker = await buildArtifact({
-    role: "worker",
-    owner: worker,
-    usdcMint: mint,
-    usdcTokenAccount: workerAta,
-    recentBlockhash: sampleAddress(31),
-  });
+  const previousProcessRpc = process.env[PRODUCTION_ENV.rpcUrl];
+  delete process.env[PRODUCTION_ENV.rpcUrl];
+  let manualWorker;
+  try {
+    manualWorker = await buildArtifact({
+      envFile: path.join(dir, "missing.env"),
+      role: "worker",
+      owner: worker,
+      usdcMint: mint,
+      usdcTokenAccount: workerAta,
+      recentBlockhash: sampleAddress(31),
+    });
+  } finally {
+    if (previousProcessRpc === undefined) delete process.env[PRODUCTION_ENV.rpcUrl];
+    else process.env[PRODUCTION_ENV.rpcUrl] = previousProcessRpc;
+  }
   assert(manualWorker.source.calls_rpc === false, "manual build should not call RPC");
   assert(manualWorker.signer_role === "worker", "manual worker signer role mismatch");
   validateArtifact(manualWorker);

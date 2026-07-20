@@ -801,6 +801,10 @@ async function selfTest() {
     `${PRODUCTION_ENV.expectedGenesisHash}=${expectedGenesisHash}`,
     "",
   ].join("\n"));
+  const missingEnvFile = path.join(dir, "missing.env");
+  const previousProcessEnv = new Map(Object.values(PRODUCTION_ENV).map((key) => [key, process.env[key]]));
+  Object.values(PRODUCTION_ENV).forEach((key) => delete process.env[key]);
+  try {
   const ready = await validateReadiness({
     envFile,
     timedProof: timedProofFile,
@@ -812,18 +816,18 @@ async function selfTest() {
   });
   assert(ready.ready_for_goal === true, "real evidence plus RPC should mark readiness true");
   assert(ready.production_rpc.task_account.task_account.status === "Released", "ready proof should include released task account");
-  const missingProduction = await validateReadiness({ timedProof: timedProofFile });
+  const missingProduction = await validateReadiness({ envFile: missingEnvFile, timedProof: timedProofFile });
   assert(missingProduction.ready_for_goal === false, "missing production evidence should not be ready");
-  const missingRpc = await validateReadiness({ timedProof: timedProofFile, productionPayout: realFile });
+  const missingRpc = await validateReadiness({ envFile: missingEnvFile, timedProof: timedProofFile, productionPayout: realFile });
   assert(missingRpc.ready_for_goal === false, "real evidence without RPC should not be ready");
   assert(missingRpc.missing.includes("live mainnet RPC verification"), "missing RPC should be reported");
-  const example = await validateReadiness({ timedProof: timedProofFile, productionPayout: exampleFile, allowExample: true });
+  const example = await validateReadiness({ envFile: missingEnvFile, timedProof: timedProofFile, productionPayout: exampleFile, allowExample: true });
   assert(example.ready_for_goal === false, "example fixture should not be ready");
   assert(example.production_payout.schema_valid === true, "example fixture schema should validate");
 
   let rejectedDevnet = false;
   try {
-    await validateReadiness({ timedProof: timedProofFile, productionPayout: devnetFile });
+    await validateReadiness({ envFile: missingEnvFile, timedProof: timedProofFile, productionPayout: devnetFile });
   } catch {
     rejectedDevnet = true;
   }
@@ -831,7 +835,7 @@ async function selfTest() {
 
   let rejectedSmallAmount = false;
   try {
-    await validateReadiness({ timedProof: timedProofFile, productionPayout: smallAmountFile });
+    await validateReadiness({ envFile: missingEnvFile, timedProof: timedProofFile, productionPayout: smallAmountFile });
   } catch {
     rejectedSmallAmount = true;
   }
@@ -912,6 +916,13 @@ async function selfTest() {
     rejected_task_status: rejectedTaskStatus,
     no_new_dependencies: true,
   };
+  } finally {
+    Object.values(PRODUCTION_ENV).forEach((key) => {
+      const value = previousProcessEnv.get(key);
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    });
+  }
 }
 
 async function main() {

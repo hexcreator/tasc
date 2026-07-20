@@ -644,6 +644,19 @@ async function selfTest() {
   const dir = fs.mkdtempSync(path.join(ROOT, ".tascverifier", "production-payout-builder-"));
   const out = path.join(dir, "production-payout-evidence.json");
   const options = sampleOptions(out);
+  const withClearedProcessEnv = async (keys, fn) => {
+    const previous = new Map(keys.map((key) => [key, process.env[key]]));
+    keys.forEach((key) => delete process.env[key]);
+    try {
+      return await fn();
+    } finally {
+      keys.forEach((key) => {
+        const value = previous.get(key);
+        if (value === undefined) delete process.env[key];
+        else process.env[key] = value;
+      });
+    }
+  };
   const envFile = path.join(dir, ".env.solana-mainnet.local");
   fs.writeFileSync(envFile, [
     `${PRODUCTION_ENV.rpcUrl}=http://127.0.0.1/mock-mainnet-rpc`,
@@ -668,17 +681,27 @@ async function selfTest() {
   assert(!JSON.stringify(written).includes("/mock-mainnet-rpc"), "evidence must not store full RPC URL");
   validateProductionPayout(written);
 
-  const manualBalances = await buildEvidence({
+  const manualBalances = await withClearedProcessEnv([
+    PRODUCTION_ENV.rpcUrl,
+  ], () => buildEvidence({
     ...options,
+    envFile: path.join(dir, "manual-balances.env"),
     productionRpcUrl: "",
     vaultBalanceAfter: "0",
     destinationBalanceAfter: DEFAULT_AMOUNT_BASE_UNITS,
-  });
+  }));
   assert(manualBalances.source.calls_rpc === false, "manual balance build should not call RPC");
 
   const signed = await sampleSignedIntent(path.join(dir, "production-intent.signature.json"), options);
-  const signedIntentEvidence = await buildEvidence({
+  const signedIntentEvidence = await withClearedProcessEnv([
+    PRODUCTION_ENV.rpcUrl,
+    PRODUCTION_ENV.programId,
+    PRODUCTION_ENV.tokenMint,
+    PRODUCTION_ENV.buyer,
+    PRODUCTION_ENV.verifier,
+  ], () => buildEvidence({
     ...options,
+    envFile: path.join(dir, "signed-intent-only.env"),
     signedIntent: signed.signed_intent_file,
     programId: "",
     tokenMint: "",
@@ -690,11 +713,19 @@ async function selfTest() {
     productionRpcUrl: "",
     vaultBalanceAfter: "0",
     destinationBalanceAfter: DEFAULT_AMOUNT_BASE_UNITS,
-  });
+  }));
   assert(signedIntentEvidence.source.signed_intent_verified === true, "signed intent should be verified");
   assert(signedIntentEvidence.settlement.buyer === signed.buyer, "signed intent should fill buyer");
 
-  const envEvidence = await buildEvidence({
+  const envEvidence = await withClearedProcessEnv([
+    PRODUCTION_ENV.rpcUrl,
+    PRODUCTION_ENV.programId,
+    PRODUCTION_ENV.tokenMint,
+    PRODUCTION_ENV.buyer,
+    PRODUCTION_ENV.worker,
+    PRODUCTION_ENV.verifier,
+    PRODUCTION_ENV.workerUsdc,
+  ], () => buildEvidence({
     ...options,
     envFile,
     programId: "",
@@ -704,7 +735,7 @@ async function selfTest() {
     verifier: "",
     destinationTokenAccount: "",
     productionRpcUrl: "",
-  }, mockRpcCall(options));
+  }, mockRpcCall(options)));
   assert(envEvidence.settlement.worker === options.worker, "env should fill worker");
   assert(envEvidence.settlement.destination_token_account === options.destinationTokenAccount, "env should fill destination");
   assert(envEvidence.source.rpc_host === "127.0.0.1", "env RPC evidence should keep only host");

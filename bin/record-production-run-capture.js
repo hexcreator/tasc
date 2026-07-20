@@ -656,6 +656,7 @@ function evidenceOptionsFromCapture(capture, options = {}) {
     ? path.resolve(ROOT, capture.signed_intent.file)
     : "";
   return {
+    envFile: options.envFile || DEFAULT_ENV_FILE,
     out: options.out || DEFAULT_PAYOUT,
     generatedAt: options.generatedAt || "",
     cluster: DEFAULT_CLUSTER,
@@ -804,10 +805,15 @@ async function selfTest() {
     `${PRODUCTION_ENV.workerUsdc}=${destination}`,
     "",
   ].join("\n"));
+  const previousProcessEnv = new Map(Object.values(PRODUCTION_ENV).map((key) => [key, process.env[key]]));
+  Object.values(PRODUCTION_ENV).forEach((key) => delete process.env[key]);
+  try {
   const signed = await sampleSignedIntent(signedIntentFile, { programId, tokenMint, verifier });
   const recentBlockhash = sampleAddress(36);
+  const offlineEnvFile = path.join(dir, "offline-transaction-build.env");
   const fundTransactionFile = path.join(dir, "production-fund-transaction.json");
   const fundTransaction = await buildProductionFundTransaction({
+    envFile: offlineEnvFile,
     signedIntent: signed.signed_intent_file,
     buyerUsdcTokenAccount: sampleAddress(37),
     recentBlockhash,
@@ -819,6 +825,7 @@ async function selfTest() {
   const vault = fundTransaction.vault_token_account;
   const claimTransactionFile = path.join(dir, "production-lifecycle-claim.json");
   writeJson(claimTransactionFile, await buildProductionLifecycleTransaction({
+    envFile: offlineEnvFile,
     action: "claim",
     signedIntent: signed.signed_intent_file,
     taskAccount,
@@ -827,6 +834,7 @@ async function selfTest() {
   }));
   const attestTransactionFile = path.join(dir, "production-lifecycle-attest.json");
   writeJson(attestTransactionFile, await buildProductionLifecycleTransaction({
+    envFile: offlineEnvFile,
     action: "attest",
     signedIntent: signed.signed_intent_file,
     taskAccount,
@@ -837,6 +845,7 @@ async function selfTest() {
   }));
   const releaseTransactionFile = path.join(dir, "production-lifecycle-release.json");
   writeJson(releaseTransactionFile, await buildProductionLifecycleTransaction({
+    envFile: offlineEnvFile,
     action: "release",
     signedIntent: signed.signed_intent_file,
     taskAccount,
@@ -956,6 +965,13 @@ async function selfTest() {
     accepts_private_keys: false,
     no_new_dependencies: true,
   };
+  } finally {
+    Object.values(PRODUCTION_ENV).forEach((key) => {
+      const value = previousProcessEnv.get(key);
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    });
+  }
 }
 
 async function main() {

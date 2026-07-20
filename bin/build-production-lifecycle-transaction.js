@@ -37,7 +37,7 @@ const DEFAULT_AMOUNT_BASE_UNITS = "10000000";
 const DEFAULT_DECIMALS = 6;
 const DEFAULT_COMMITMENT = "confirmed";
 const CLOCK_SYSVAR_ID = "SysvarC1ock11111111111111111111111111111111";
-const ACTIONS = new Set(["claim", "attest", "release"]);
+const ACTIONS = new Set(["claim", "attest", "release", "timeout-refund"]);
 const TEST_RPC_HOST_RE = /(devnet|testnet|localhost|127\.0\.0\.1|0\.0\.0\.0|(^|\.)example\.(com|net|org|invalid)$)/i;
 
 function usage() {
@@ -50,7 +50,7 @@ function usage() {
     "",
     "Build options:",
     "  --env <file>                              production env file; default .env.solana-mainnet.local",
-    "  --action claim|attest|release             lifecycle action",
+    "  --action claim|attest|release|timeout-refund",
     "  --signed-intent <file>                    signed production intent; default .tascverifier/production-intent/production-intent.signature.json",
     "  --task-account <address>                  mainnet task account",
     "  --signer <address>                        wallet signer for this action",
@@ -120,7 +120,9 @@ function optionsWithEnv(options = {}) {
   };
   if (action === "claim" || action === "release") mapping.signer = PRODUCTION_ENV.worker;
   if (action === "attest") mapping.signer = PRODUCTION_ENV.verifier;
+  if (action === "timeout-refund") mapping.signer = PRODUCTION_ENV.buyer;
   if (action === "release") mapping.destinationTokenAccount = PRODUCTION_ENV.workerUsdc;
+  if (action === "timeout-refund") mapping.destinationTokenAccount = PRODUCTION_ENV.buyerUsdc;
   return withProductionEnv(options, mapping);
 }
 
@@ -153,7 +155,7 @@ function base64Url(buffer) {
 
 function normalizeAction(action) {
   const normalized = String(action || "").toLowerCase().replace(/[_\s]+/g, "-");
-  assert(ACTIONS.has(normalized), "action must be claim, attest, or release");
+  assert(ACTIONS.has(normalized), "action must be claim, attest, release, or timeout-refund");
   return normalized;
 }
 
@@ -265,7 +267,7 @@ function validateActionInputs(action, signed, options) {
     const verdict = String(options.verdict || "pass").toLowerCase();
     assert(verdict === "pass" || verdict === "fail", "verdict must be pass or fail");
   }
-  if (action === "release") {
+  if (action === "release" || action === "timeout-refund") {
     assertSolanaAddress(options.destinationTokenAccount, "destination_token_account");
   }
   return {
@@ -303,6 +305,11 @@ async function buildArtifact(options = {}, rpcCall = defaultRpcCall) {
   });
   const messageBytes = Buffer.from(compiled.message);
   const unsignedTransaction = encodeUnsignedTransaction(messageBytes);
+  const afterSend = action === "release"
+    ? ["build production payout evidence with fund/claim/attest/release signatures"]
+    : action === "timeout-refund"
+      ? ["rerun production preflight and build a fresh intent before another attempt"]
+      : [`build and submit the next ${action === "claim" ? "attest" : "release"} transaction`];
   return {
     ok: true,
     kind: "tasc.production_lifecycle_transaction",
@@ -375,16 +382,16 @@ async function buildArtifact(options = {}, rpcCall = defaultRpcCall) {
     next: {
       submit_with_wallet: true,
       capture_signature_as: `${action}-signature`,
-      after_send: action === "release"
-        ? ["build production payout evidence with fund/claim/attest/release signatures"]
-        : [`build and submit the next ${action === "claim" ? "attest" : "release"} transaction`],
+      after_send: afterSend,
     },
     source: {
       built_by: "bin/build-production-lifecycle-transaction.js",
       ...envMetadata(options.envFile, [
         PRODUCTION_ENV.rpcUrl,
+        PRODUCTION_ENV.buyer,
         PRODUCTION_ENV.worker,
         PRODUCTION_ENV.verifier,
+        PRODUCTION_ENV.buyerUsdc,
         PRODUCTION_ENV.workerUsdc,
       ]),
       sends_transactions: false,
@@ -438,6 +445,16 @@ function validateArtifact(artifact) {
     assert(artifact.settlement.destination_role === "worker", "release destination role must be worker");
     assertSolanaAddress(artifact.settlement.destination_token_account, "settlement.destination_token_account");
     assert(artifact.settlement.token_program_id === TOKEN_PROGRAM_ID, "release token program mismatch");
+  }
+  if (action === "timeout-refund") {
+    assert(instruction.program_instruction === "refund", "timeout-refund program instruction mismatch");
+    assert(instruction.data_hex === "0x04", "timeout-refund data mismatch");
+    assert(instruction.clock_sysvar === CLOCK_SYSVAR_ID, "timeout-refund must include Clock sysvar");
+    assert(artifact.signer === artifact.buyer, "timeout-refund signer must match buyer");
+    assert(artifact.settlement, "timeout-refund settlement is required");
+    assert(artifact.settlement.destination_role === "buyer", "timeout-refund destination role must be buyer");
+    assertSolanaAddress(artifact.settlement.destination_token_account, "settlement.destination_token_account");
+    assert(artifact.settlement.token_program_id === TOKEN_PROGRAM_ID, "timeout-refund token program mismatch");
   }
   const payload = artifact.wallet_payload || {};
   assert(payload.signer === artifact.signer, "wallet payload signer mismatch");
@@ -504,7 +521,7 @@ function plan(options = {}) {
     ok: true,
     kind: "tasc.production_lifecycle_transaction.plan",
     version: "0.1",
-    goal: "build unsigned mainnet wallet transactions for claim, attest, and release",
+    goal: "build unsigned mainnet wallet transactions for claim, attest, release, and timeout refund",
     default_signed_intent: options.signedIntent || DEFAULT_SIGNED_INTENT,
     default_env_file: envFile,
     default_output_pattern: ".tascverifier/production-lifecycle-<action>.json",
@@ -521,18 +538,20 @@ function plan(options = {}) {
       "worker signer from --signer or env for claim and release",
       "verifier signer from --signer or env plus result hash for attest",
       "worker destination USDC token account from --destination-token-account or env for release",
+      "buyer destination USDC token account from --destination-token-account or env for timeout-refund",
       "either --production-rpc-url/env RPC or --recent-blockhash",
     ],
     commands: {
       claim: `npm run real:lifecycle:build -- --env ${envFile} --action claim --signed-intent .tascverifier/production-intent/production-intent.signature.json --task-account <task-account>`,
       attest: `npm run real:lifecycle:build -- --env ${envFile} --action attest --signed-intent .tascverifier/production-intent/production-intent.signature.json --task-account <task-account> --verdict pass --result-hash <0x-result-hash>`,
       release: `npm run real:lifecycle:build -- --env ${envFile} --action release --signed-intent .tascverifier/production-intent/production-intent.signature.json --task-account <task-account>`,
+      timeout_refund: `npm run real:lifecycle:build -- --env ${envFile} --action timeout-refund --signed-intent .tascverifier/production-intent/production-intent.signature.json --task-account <task-account>`,
       validate: "npm run real:lifecycle:validate -- .tascverifier/production-lifecycle-claim.json",
     },
     notes: [
       "The RPC path is read-only and only stores the RPC host, never the full URL.",
       "Each output is unsigned; submit it through the required role wallet and capture the returned signature.",
-      "This covers the happy-path production sequence required by real:readiness: claim, attest pass, release.",
+      "This covers the happy-path production sequence required by real:readiness: claim, attest pass, release, plus timeout refund recovery for expired funded tasks.",
     ],
   };
 }
@@ -584,20 +603,25 @@ async function selfTest() {
   const taskAccount = fundAddresses(fixture.signed.intent.message).task_account;
   const worker = sampleAddress(43);
   const destination = sampleAddress(44);
+  const buyerDestination = sampleAddress(45);
   const resultHash = `0x${"12".repeat(32)}`;
   const rpcUrl = "https://mainnet.example.com/sensitive/rpc?credential=do-not-store";
   const envFile = path.join(dir, ".env.solana-mainnet.local");
   fs.writeFileSync(envFile, [
     `${PRODUCTION_ENV.rpcUrl}=${rpcUrl}`,
+    `${PRODUCTION_ENV.buyer}=${fixture.buyer.address}`,
     `${PRODUCTION_ENV.worker}=${worker}`,
     `${PRODUCTION_ENV.verifier}=${fixture.verifier.address}`,
     `${PRODUCTION_ENV.workerUsdc}=${destination}`,
+    `${PRODUCTION_ENV.buyerUsdc}=${buyerDestination}`,
     "",
   ].join("\n"));
   const noRpcEnvFile = path.join(dir, "worker-only.env");
   fs.writeFileSync(noRpcEnvFile, [
+    `${PRODUCTION_ENV.buyer}=${fixture.buyer.address}`,
     `${PRODUCTION_ENV.worker}=${worker}`,
     `${PRODUCTION_ENV.workerUsdc}=${destination}`,
+    `${PRODUCTION_ENV.buyerUsdc}=${buyerDestination}`,
     "",
   ].join("\n"));
   const planResult = plan();
@@ -630,7 +654,9 @@ async function selfTest() {
     resultHash,
     recentBlockhash: sampleAddress(51),
     out: path.join(dir, "production-lifecycle-attest.json"),
-  });
+    productionRpcUrl: rpcUrl,
+    allowTestRpcHost: true,
+  }, mockRpcCall());
   assert(attest.ok === true, "attest build should succeed");
   validateArtifact(loadJson(path.join(dir, "production-lifecycle-attest.json")));
 
@@ -643,12 +669,31 @@ async function selfTest() {
     destinationTokenAccount: "",
     recentBlockhash: sampleAddress(52),
     out: path.join(dir, "production-lifecycle-release.json"),
-  });
+    allowTestRpcHost: true,
+  }, mockRpcCall());
   assert(release.ok === true, "release build should succeed");
   const releaseArtifact = loadJson(path.join(dir, "production-lifecycle-release.json"));
   assert(releaseArtifact.settlement.destination_token_account === destination, "release destination mismatch");
   assert(releaseArtifact.signer === worker, "release should load signer from env");
   validateArtifact(releaseArtifact);
+
+  const timeoutRefund = await build({
+    envFile: noRpcEnvFile,
+    action: "timeout-refund",
+    signedIntent: signedFile,
+    taskAccount,
+    signer: "",
+    destinationTokenAccount: "",
+    recentBlockhash: sampleAddress(53),
+    out: path.join(dir, "production-lifecycle-timeout-refund.json"),
+    allowTestRpcHost: true,
+  }, mockRpcCall());
+  assert(timeoutRefund.ok === true, "timeout refund build should succeed");
+  const timeoutRefundArtifact = loadJson(path.join(dir, "production-lifecycle-timeout-refund.json"));
+  assert(timeoutRefundArtifact.signer === fixture.buyer.address, "timeout refund should load buyer signer from env");
+  assert(timeoutRefundArtifact.settlement.destination_token_account === buyerDestination, "timeout refund destination mismatch");
+  assert(timeoutRefundArtifact.instruction.clock_sysvar === CLOCK_SYSVAR_ID, "timeout refund should include Clock sysvar");
+  validateArtifact(timeoutRefundArtifact);
 
   let rejectedDevnet = false;
   const devnetFile = path.join(dir, "devnet.signature.json");
@@ -659,7 +704,7 @@ async function selfTest() {
       signedIntent: devnetFile,
       taskAccount,
       signer: worker,
-      recentBlockhash: sampleAddress(53),
+      recentBlockhash: sampleAddress(54),
     });
   } catch {
     rejectedDevnet = true;
@@ -675,7 +720,7 @@ async function selfTest() {
       signer: worker,
       verdict: "pass",
       resultHash,
-      recentBlockhash: sampleAddress(54),
+      recentBlockhash: sampleAddress(55),
     });
   } catch {
     rejectedBadAttestSigner = true;
@@ -683,16 +728,26 @@ async function selfTest() {
   assert(rejectedBadAttestSigner, "attest signer must be verifier");
 
   let rejectedMissingReleaseDestination = false;
+  const previousProcessRpc = process.env[PRODUCTION_ENV.rpcUrl];
+  const previousProcessWorkerUsdc = process.env[PRODUCTION_ENV.workerUsdc];
+  delete process.env[PRODUCTION_ENV.rpcUrl];
+  delete process.env[PRODUCTION_ENV.workerUsdc];
   try {
     await buildArtifact({
+      envFile: path.join(dir, "missing-release-destination.env"),
       action: "release",
       signedIntent: signedFile,
       taskAccount,
       signer: worker,
-      recentBlockhash: sampleAddress(55),
+      recentBlockhash: sampleAddress(56),
     });
   } catch {
     rejectedMissingReleaseDestination = true;
+  } finally {
+    if (previousProcessRpc === undefined) delete process.env[PRODUCTION_ENV.rpcUrl];
+    else process.env[PRODUCTION_ENV.rpcUrl] = previousProcessRpc;
+    if (previousProcessWorkerUsdc === undefined) delete process.env[PRODUCTION_ENV.workerUsdc];
+    else process.env[PRODUCTION_ENV.workerUsdc] = previousProcessWorkerUsdc;
   }
   assert(rejectedMissingReleaseDestination, "release destination should be required");
 
@@ -707,6 +762,7 @@ async function selfTest() {
     claim_build: true,
     attest_build: true,
     release_build: true,
+    timeout_refund_build: true,
     rejected_devnet: rejectedDevnet,
     rejected_bad_attest_signer: rejectedBadAttestSigner,
     rejected_missing_release_destination: rejectedMissingReleaseDestination,
