@@ -4,7 +4,7 @@
 
 <p align="center">
   <a href="https://github.com/hexcreator/tasc"><img alt="Repo" src="https://img.shields.io/badge/repo-hexcreator%2Ftasc-102520?style=flat-square"></a>
-  <img alt="Status" src="https://img.shields.io/badge/status-devnet%20prototype-45E0B8?style=flat-square">
+  <img alt="Status" src="https://img.shields.io/badge/status-mainnet%20proof-45E0B8?style=flat-square">
   <img alt="Runtime deps" src="https://img.shields.io/badge/runtime%20deps-zero-7DD3FC?style=flat-square">
   <img alt="Settlement" src="https://img.shields.io/badge/settlement-Solana%20%2B%20EVM-F8C35B?style=flat-square">
   <img alt="License" src="https://img.shields.io/badge/license-Apache--2.0-8A8F98?style=flat-square">
@@ -16,7 +16,7 @@ Tasc is an early protocol prototype for instant micro-work: buyers publish pre-f
 
 The target is deliberately narrow: make small jobs, like `$10` tasks, globally claimable in about a minute. That only works if the work is already funded or payment-authorized before a worker starts.
 
-> This repository is a research/devnet prototype. It is not audited, not mainnet-ready, and not safe for real funds yet.
+> This repository is a research prototype with one controlled Solana mainnet USDC payout proof. It is not audited and is not safe for unsupervised public funds.
 
 ## What Exists Now
 
@@ -26,14 +26,28 @@ Tasc currently proves the hard protocol boundary: a task can be compiled, signed
 | --- | --- |
 | Task language | `TascLang` compiles a constrained task contract into canonical JSON and a stable task hash. |
 | Buyer authorization | EIP-712 and Solana Ed25519 signed intents bind task hash, input hash, amount, token, deadline, verifier, and nonce. |
-| Settlement | EVM escrow surface plus Solana devnet program/account model. |
+| Settlement | EVM escrow surface plus live Solana program/account model. |
 | Solana custody | Live devnet SPL `TransferChecked` into a fresh task vault. |
 | Indexer gate | Funding evidence is admitted only when it matches the signed intent and custody proof. |
 | Static discovery | Browser-side scanner/feed proof with JSON index import, signed task inputs, and no hosted backend requirement. |
 | Worker proof | Browser-side markdown submission capture derives verifier-compatible result hashes and proof JSON. |
 | Verifier bridge | Captured worker proof JSON ingests into `tasc.attestation` plus Solana-ready attest hashes. |
 | Verifier API | Dependencyless HTTP wrapper exposes proof ingestion at `/v1/ingest`, and the static app can submit captured proofs to it. |
-| Wallet operator | Browser-side Solana claim/attest/release/refund/timeout-refund transaction construction behind an explicit send guard. |
+| Wallet operator | Browser-side and guarded local Solana claim/attest/release/refund/timeout-refund transaction submission paths. |
+
+Current Solana mainnet USDC proof:
+
+```text
+program id:      FAqKhKke5pZr4TK6kXq9aKR98hWFy19SMQG9eGfXQrRM
+usdc mint:       EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v
+task account:    G3tbuXWGXFPZGLVbiJvPp6iWHoP7eS3rbsarZ4AGrpqx
+fund tx:         3aegCSLiMak8BYwuXux1sUUcK1T5gVNEdEM1bZ4PR2PG7h9aMijp9pMN5oLFW2MdSDYgEs8VgnjpQHJVuyuwFUUE
+claim tx:        55DphbFxouhdH97Q8Qu27z9WQ8Uw2rEPpqdAkx5R1oDn9ewMN4EnWUzs4gzPPdDbAn5sp35PUKT6v1WtCagqPfAS
+attest tx:       4XqT8XWS7Cb7Wsh5d9dv15LdDTbjrN44xxaYUAYsKftzZ8G1TnZoe5GEpft3xugjZPXMPaypPUrTUfoNPdRo94ik
+release tx:      2LBTQAv6cvh5q28QfNGdP1bUAmRVdycbzRVfrmLCyfSxQgKZu759xhHypUpSUKT8k6qAvQ4zSUw9iWDRE1eHCUXU
+claim->release:  19852ms
+final status:    Released
+```
 
 Current live Solana SPL proof:
 
@@ -233,6 +247,7 @@ Useful docs:
 
 - [Protocol V1](docs/protocol-v1.md)
 - [Solana Devnet V1](docs/solana-devnet-v1.md)
+- [Production Mainnet Runbook](docs/production-mainnet-runbook.md)
 - [Indexer Admission V1](docs/indexer-admission-v1.md)
 - [Release Modes](docs/release-modes.md)
 - [Adoption Plan](docs/adoption-plan.md)
@@ -404,9 +419,11 @@ npm run real:readiness -- \
   --production-payout .tascverifier/production-payout-evidence.json
 ```
 
+The shorter operator guide for repeating the controlled mainnet loop is [docs/production-mainnet-runbook.md](docs/production-mainnet-runbook.md).
+
 `real:env:init` creates or updates the ignored `.env.solana-mainnet.local` file from `.env.example`, chmods it to `0600`, preserves existing values unless `--force` is used, can copy required values from the process environment with `--from-process-env`, can read the public program id from `.tascverifier/production-deploy-handoff.json`, derives standard buyer/worker USDC associated token accounts from public wallet + mint values when those token-account fields are blank, rejects private-key-like entries, and never prints the RPC URL.
 
-`real:env:*` checks `.env.solana-mainnet.local` without printing the RPC URL, rejects private-key-like entries and devnet/test/local/example RPC hosts, and reports whether the mainnet values are ready for preflight. `real:pause` is the no-spend checkpoint: it reads only canonical production artifact paths, calls no RPC, writes nothing, prints no env values, rejects private-key-like env keys, and reports whether capture/payout evidence implies a mainnet spend already happened. `real:budget` is the no-spend budget gate: it reads an ignored `.tascverifier/production-budget-policy.json` if present, validates USD caps and explicitly allowed spend phases, calls no RPC, writes nothing, and does not prove readiness or completion. `real:resume` composes pause, budget, and env readiness into one read-only restart gate; it calls no RPC, writes nothing, sends nothing, and only reports whether spend work could resume after explicit operator unpause. `real:deploy:build` creates a sanitized mainnet deploy handoff from the SBF artifact and manifest, derives the public program id from the generated program keypair file, keeps the full RPC URL and key material out of JSON, and does not call RPC or send transactions. `real:intent:build` can read buyer, verifier, program, and token-mint values from env, then creates the unsigned mainnet buyer intent plus the exact canonical UTF-8 payload a wallet must sign. `real:intent:attach-signature` verifies the base58 Ed25519 wallet signature against the buyer address before writing the signed intent used by funding. `real:capture:*` records the public run evidence incrementally in `.tascverifier/production-run-capture.json` without private keys or transaction sends; init/payout can read stable public values and RPC from the env file, while `real:capture:record --transaction <artifact> --signature <sig>` validates the generated production transaction artifact and infers task/vault/destination/result fields before writing capture evidence. `real:submitter:serve` starts a localhost-only static server for `web/production-run.html` without reading env files or serving `.tascverifier/`; the page accepts only mainnet production token-account setup, fund, and lifecycle artifacts, requires the connected wallet to match the artifact signer, requires an explicit production-send checkbox, submits through the injected wallet provider, and prints either the matching capture command or the preflight rerun command from the returned signature. `real:preflight` is a read-only mainnet safety gate. It verifies the RPC genesis hash, deployed program account, role SOL balances, verified USDC mint, buyer USDC balance, and worker USDC destination account without accepting private keys or printing the full RPC URL. `real:token-account:build` creates unsigned idempotent associated-token-account setup transactions for missing buyer/worker USDC ATAs, using read-only RPC only for blockhash/account checks and never accepting private keys, sending transactions, or persisting the full RPC URL. `real:fund:build` creates the unsigned buyer-wallet transaction that creates the task account, creates and initializes the PDA-owned vault token account, transfers exactly 10 USDC into that vault, and calls `global_tasc.fund`; it can read RPC and buyer USDC source account from env, can use read-only RPC for blockhash/rent/source-account checks, but never accepts private keys, sends transactions, or writes the full RPC URL. `real:lifecycle:build` creates unsigned role-wallet transactions for claim, verifier attest, and worker release from the signed mainnet intent and funded task account; it can read role signers, worker destination token account, and RPC from env, again without private keys, sends, or full RPC URL persistence. `real:payout:build` remains the lower-level direct artifact builder and can read stable public values/RPC from env. `real:packet:build` assembles the timed proof, deploy handoff, signed intent, capture file, fund and lifecycle transaction handoffs, browser submitter handoffs for `web/production-run.html`, payout evidence, redacted RPC host, live evidence checklist, and env-first remaining commands into `.tascverifier/production-run-packet.json`; it validates present artifacts but never calls RPC or sends transactions. `real:readiness` accepts the devnet timed proof as a prerequisite and can read RPC/genesis from env, but it refuses to mark the goal ready until the non-example mainnet USDC payout artifact proves funding, claim, attest, release, post-release balances, under-60-second timing, and live RPC verification. The live check verifies the RPC genesis hash, transaction confirmations, decoded released task account ownership/state, and SPL token-account balances without printing the full RPC URL. The schema example lives at `examples/private-beta/production-payout-evidence.example.json`.
+`real:env:*` checks `.env.solana-mainnet.local` without printing the RPC URL, rejects private-key-like entries and devnet/test/local/example RPC hosts, and reports whether the mainnet values are ready for preflight. `real:pause` is the no-spend checkpoint: it reads only canonical production artifact paths, calls no RPC, writes nothing, prints no env values, rejects private-key-like env keys, and reports whether capture/payout evidence implies a mainnet spend already happened. `real:budget` is the no-spend budget gate: it reads an ignored `.tascverifier/production-budget-policy.json` if present, validates USD caps and explicitly allowed spend phases, calls no RPC, writes nothing, and does not prove readiness or completion. `real:resume` composes pause, budget, and env readiness into one read-only restart gate; it calls no RPC, writes nothing, sends nothing, and only reports whether spend work could resume after explicit operator unpause. `real:deploy:build` creates a sanitized mainnet deploy handoff from the SBF artifact and manifest, derives the public program id from the generated program keypair file, keeps the full RPC URL and key material out of JSON, and does not call RPC or send transactions. `real:intent:build` can read buyer, verifier, program, and token-mint values from env, then creates the unsigned mainnet buyer intent plus the exact canonical UTF-8 payload a wallet must sign. `real:intent:attach-signature` verifies the base58 Ed25519 wallet signature against the buyer address before writing the signed intent used by funding. `real:capture:*` records the public run evidence incrementally in `.tascverifier/production-run-capture.json` without private keys or transaction sends; init/payout can read stable public values and RPC from the env file, while `real:capture:record --transaction <artifact> --signature <sig>` validates the generated production transaction artifact and infers task/vault/destination/result fields before writing capture evidence. `real:submitter:serve` starts a localhost-only static server for `web/production-run.html` without reading env files or serving `.tascverifier/`; the page accepts only mainnet production token-account setup, fund, and lifecycle artifacts, requires the connected wallet to match the artifact signer, requires an explicit production-send checkbox, submits through the injected wallet provider, and prints either the matching capture command or the preflight rerun command from the returned signature. `real:local:*` provides a guarded dependencyless local signing path for operators who already have owner-private Solana keypair files; it verifies the keypair address matches the intent/artifact signer and does not print key material. `real:preflight` is a read-only mainnet safety gate. It verifies the RPC genesis hash, deployed program account, role SOL balances, verified USDC mint, buyer USDC balance, and worker USDC destination account without accepting private keys or printing the full RPC URL. `real:token-account:build` creates unsigned idempotent associated-token-account setup transactions for missing buyer/worker USDC ATAs, using read-only RPC only for blockhash/account checks and never accepting private keys, sending transactions, or persisting the full RPC URL. `real:fund:build` creates the unsigned buyer-wallet transaction that creates the task account, creates and initializes the PDA-owned vault token account, transfers exactly 10 USDC into that vault, and calls `global_tasc.fund`; it can read RPC and buyer USDC source account from env, can use read-only RPC for blockhash/rent/source-account checks, but never accepts private keys, sends transactions, or writes the full RPC URL. `real:lifecycle:build` creates unsigned role-wallet transactions for claim, verifier attest, worker release, and buyer timeout-refund from the signed mainnet intent and funded task account; it can read role signers, destination token accounts, and RPC from env, again without private keys, sends, or full RPC URL persistence. `real:payout:build` remains the lower-level direct artifact builder and can read stable public values/RPC from env. `real:packet:build` assembles the timed proof, deploy handoff, signed intent, capture file, fund and lifecycle transaction handoffs, browser submitter handoffs for `web/production-run.html`, payout evidence, redacted RPC host, live evidence checklist, and env-first remaining commands into `.tascverifier/production-run-packet.json`; it validates present artifacts but never calls RPC or sends transactions. `real:readiness` accepts the devnet timed proof as a prerequisite and can read RPC/genesis from env, but it refuses to mark the goal ready until the non-example mainnet USDC payout artifact proves funding, claim, attest, release, post-release balances, under-60-second timing, and live RPC verification. The live check verifies the RPC genesis hash, transaction confirmations, decoded released task account ownership/state, and SPL token-account balances without printing the full RPC URL. The schema example lives at `examples/private-beta/production-payout-evidence.example.json`.
 
 ## Why Tasc Might Work
 
@@ -441,7 +458,7 @@ Start with [CONTRIBUTING.md](CONTRIBUTING.md), then pick one of the tracks in [d
 
 ## Safety And Status
 
-- Do not use this with mainnet funds.
+- Do not use this for unsupervised public mainnet funds.
 - Devnet keys and RPC URLs must stay local in `.env*` files.
 - Live transaction commands are guarded by explicit environment flags.
 - Current npm production dependency audit reports zero vulnerabilities.

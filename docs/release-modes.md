@@ -9,6 +9,7 @@ Tasc needs release channels that match the risk level of the protocol. A docs-on
 | Snapshot | none or `snapshot-YYYYMMDD` | Contributors and reviewers | Current source state only. No stability promise. |
 | Devnet Proof | `v0.x.y-devnet.n` | Protocol builders | Reproducible devnet proof with public transaction/account evidence. |
 | Testnet MVP | `v0.x.y-testnet.n` | Early integrators | End-to-end buyer/worker/verifier loop on public testnet/devnet. |
+| Mainnet Proof | `v0.x.y-mainnet-proof.n` | Controlled reviewers | Single controlled real-money proof with public evidence. Not a marketplace release. |
 | Mainnet Alpha | `v0.x.y-alpha.n` | Controlled pilots | Limited scope, guarded funds, documented risks, audit plan. |
 | Stable Protocol | `v1.x.y` | Ecosystem builders | Versioned task/intents/funding schemas and migration policy. |
 
@@ -64,6 +65,29 @@ Required additions before this mode:
 - scanner output for post-funding lifecycle state
 - duplicate claim and timeout tests
 
+### Mainnet Proof Release
+
+Use when a controlled Solana mainnet run proves a real USDC payout, but before public pilots, audits, dispute operations, or marketplace decentralization.
+
+Required checks:
+
+```sh
+npm run demo
+npm run validate:dependencies
+npm run real:readiness -- --env .env.solana-mainnet.local --timed-proof examples/solana-devnet/proofs/<run-id>/proof-summary.json --production-payout .tascverifier/production-payout-evidence.json
+```
+
+Release notes should include:
+
+- program id
+- USDC mint
+- task account and vault token account
+- fund, claim, attest, and release signatures
+- claim-to-release timing
+- final task status
+- post-release vault and worker token balances
+- explicit warning that the release is not audited and not a public marketplace
+
 ### Mainnet Alpha Release
 
 Do not publish this mode until:
@@ -82,6 +106,7 @@ Until `v1`, prefer explicit prerelease tags:
 ```text
 v0.1.0-devnet.1
 v0.2.0-testnet.1
+v0.1.0-mainnet-proof.1
 v0.3.0-alpha.1
 ```
 
